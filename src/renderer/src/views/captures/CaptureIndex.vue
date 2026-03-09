@@ -1,11 +1,18 @@
 <template>
   <div class="drawer drawer-end">
-    <input id="drawerRight" type="checkbox" class="drawer-toggle" />
+    <input id="drawerRight" v-model="isDrawerOpen" type="checkbox" class="drawer-toggle" />
     <div class="drawer-content">
-      <div class="flex flex-col h-[100vh]">
-        <!-- URL Bar -->
-        <div class="flex items-center gap-2 p-2 bg-base-100 border-b border-base-300">
-          <div class="flex grow">
+      <div class="flex h-[100vh] flex-col">
+        <div class="flex items-center gap-3 border-b border-white/10 bg-slate-900 p-2">
+            <button
+              type="button"
+              class="flex h-12 w-12 items-center justify-center rounded-none bg-slate-900 text-white transition-colors hover:bg-slate-900"
+              @click="goHome"
+            >
+            <i-lucide-house class="text-lg" />
+          </button>
+
+          <div class="flex grow items-center gap-2">
             <div class="flex gap-1">
               <button :disabled="!canGoBack" class="btn btn-sm btn-ghost" @click="goBack">
                 <i-lucide-chevron-left />
@@ -18,7 +25,7 @@
                 <i-lucide-refresh-cw />
               </button>
             </div>
-            <form class="flex-1 flex gap-2" @submit.prevent="navigate">
+            <form class="flex flex-1 gap-2" @submit.prevent="navigate">
               <input
                 v-model="urlInput"
                 type="text"
@@ -27,54 +34,118 @@
               />
             </form>
           </div>
-          <div class="flex gap-2 md:w-1/2 lg:w-1/3">
-            <button class="btn btn-sm btn-primary grow" @click="modalCaptureImagesRef?.onOpen()">
-              <div class="flex gap-2 items-center w-full">
-                <div class="flex grow text-left gap-2 items-center">
-                  <i-lucide-chevron-down />
-                  공지사항 메뉴얼
-                </div>
-                <div
-                  class="badge badge-sm w-10"
-                  :class="captureImageItems.length > 0 ? 'badge-secondary' : 'bg-gray-300'"
+
+            <div class="flex items-center gap-2 md:w-1/2 lg:w-[28rem]">
+              <div
+                class="flex h-8 grow items-center rounded-lg border border-white/30 bg-white/5 text-white"
+              >
+                <details class="dropdown dropdown-bottom" :open="isFolderDropdownOpen">
+                  <summary
+                    class="flex h-8 w-12 cursor-pointer items-center justify-center border-r border-white/20"
+                    @click.prevent="isFolderDropdownOpen = !isFolderDropdownOpen"
+                  >
+                    <i-lucide-chevron-down class="text-sm" />
+                  </summary>
+                <ul
+                  class="dropdown-content menu z-50 mt-2 w-64 rounded-box border border-white/10 bg-slate-800 p-2 shadow-xl"
                 >
-                  + {{ captureImageItems.length }}
+                  <li v-if="folderItems.length === 0" class="pointer-events-none opacity-60">
+                    <span>폴더가 없습니다.</span>
+                  </li>
+                  <li v-for="folder in folderItems" :key="folder.id">
+                    <button
+                      type="button"
+                      class="flex items-center justify-between text-white"
+                      @click="onSelectFolder(folder.id)"
+                    >
+                      <span class="truncate">{{ folder.title }}</span>
+                      <span class="badge badge-xs border-0 bg-white/10 text-slate-200">
+                        {{ folder.images.length }}
+                      </span>
+                    </button>
+                  </li>
+                </ul>
+              </details>
+                <div class="flex min-w-0 flex-1 items-center justify-start px-3">
+                  <span class="truncate text-xs font-semibold">
+                    {{ selectedFolder?.title ?? '폴더를 선택하세요' }}
+                  </span>
                 </div>
-              </div>
-            </button>
-            <label for="drawerRight" class="btn btn-sm">
-              <i-lucide-menu />
-            </label>
+                <button
+                  type="button"
+                  class="mr-2 flex h-6 min-w-10 items-center justify-center rounded-full px-2 text-xs font-bold"
+                  :class="
+                    selectedFolderImages.length > 0
+                      ? 'bg-rose-500 text-white'
+                    : 'bg-white/10 text-slate-300'
+                "
+                :disabled="selectedFolderId === null"
+                @click="modalCaptureImagesRef?.onOpen()"
+              >
+                + {{ selectedFolderImages.length }}
+              </button>
+            </div>
+              <button
+                type="button"
+                class="btn btn-sm shrink-0 border border-blue-900 bg-white px-3 text-xs text-blue-900 shadow-none hover:bg-blue-900 hover:text-white"
+                :disabled="selectedFolderId === null"
+                @click="goEditor"
+              >
+                편집 시작하기
+                <i-lucide-arrow-right class="text-sm" />
+              </button>
           </div>
         </div>
 
-        <!-- Webview Container -->
-        <div class="flex-1 relative">
+        <div class="relative flex-1">
           <webview
             ref="webviewRef"
             :src="currentUrl"
-            class="absolute inset-0 w-full h-full bg-white"
+            class="absolute inset-0 h-full w-full bg-white"
           ></webview>
           <div
             class="pointer-events-none absolute inset-0 bg-white transition-opacity duration-150"
             :class="isCaptureFlashVisible ? 'opacity-80' : 'opacity-0'"
           ></div>
+          <label
+            for="drawerRight"
+            class="absolute top-1/2 z-40 flex h-16 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-l-xl bg-slate-900 text-slate-200 shadow-md transition-all duration-200 hover:bg-slate-800"
+            :class="isDrawerOpen ? 'right-80' : 'right-0'"
+          >
+            <i-lucide-chevron-right v-if="isDrawerOpen" class="text-sm" />
+            <i-lucide-chevron-left v-else class="text-sm" />
+          </label>
         </div>
+
         <ModalCaptureImages
           ref="modalCaptureImagesRef"
-          :captureImageItems="captureImageItems"
+          :captureImageItems="selectedFolderImages"
+          :title="selectedFolder?.title ?? '선택된 폴더'"
           @onRemoveImage="onRemoveCaptureImage"
         />
       </div>
     </div>
-    <div class="drawer-side">
-      <label for="drawerRight" aria-label="close sidebar" class="drawer-overlay"></label>
-      <PanelCaptureGroup />
+
+    <div class="drawer-side pointer-events-none z-30 top-16 h-[calc(100vh-4rem)]">
+      <div class="pointer-events-auto h-full">
+        <PanelCaptureGroup
+          :folderItems="folderItems"
+          :selectedFolderId="selectedFolderId"
+          @onCreateFolder="onCreateFolder"
+          @onOpenCaptureModal="modalCaptureImagesRef?.onOpen()"
+          @onRenameFolder="onRenameFolder"
+          @onRemoveFolder="onRemoveFolder"
+          @onSelectFolder="onSelectFolder"
+        />
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { menualCaseItems } from '@/assets/dummy/data'
+import { useRouter } from 'vue-router'
+
 interface WebviewElement extends HTMLElement {
   src: string
   goBack: () => void
@@ -86,20 +157,46 @@ interface WebviewElement extends HTMLElement {
   addEventListener: (event: string, listener: (e: unknown) => void) => void
 }
 
+interface CaptureFolder {
+  id: number
+  title: string
+  description: string
+  path: string
+  images: import('@/types').CaptureImage[]
+}
+
 const START_PAGE_URL = 'https://www.google.com'
+const CAPTURE_SHORTCUT_KEY = 'CommandOrControl+Shift+S'
 
 const webviewRef = ref<WebviewElement | null>(null)
+const modalCaptureImagesRef = ref<ComponentRef<'ModalCaptureImages'> | null>(null)
+const router = useRouter()
+
 const urlInput = ref(START_PAGE_URL)
 const currentUrl = ref(START_PAGE_URL)
 const isLoading = ref(false)
 const canGoBack = ref(false)
 const canGoForward = ref(false)
-
-const CAPTURE_SHORTCUT_KEY = 'CommandOrControl+Shift+S'
-const captureImageItems = ref<import('@/types').CaptureImage[]>([])
-const modalCaptureImagesRef = ref<ComponentRef<'ModalCaptureImages'> | null>(null)
+const isDrawerOpen = ref(false)
+const isFolderDropdownOpen = ref(false)
 const isCaptureFlashVisible = ref(false)
 let captureFlashTimeout: ReturnType<typeof setTimeout> | null = null
+
+const folderItems = ref<CaptureFolder[]>(
+  menualCaseItems.map((item) => ({
+    id: item.id,
+    title: item.title,
+    description: item.description,
+    path: '',
+    images: []
+  }))
+)
+const selectedFolderId = ref<number | null>(folderItems.value[0]?.id ?? null)
+
+const selectedFolder = computed(() =>
+  folderItems.value.find((item) => item.id === selectedFolderId.value) ?? null
+)
+const selectedFolderImages = computed(() => selectedFolder.value?.images ?? [])
 
 const navigate = (): void => {
   let url = urlInput.value.trim()
@@ -123,9 +220,18 @@ const reload = (): void => {
   webviewRef.value?.reload()
 }
 
-const onCaptureWebview = async (): Promise<void> => {
+const goHome = async (): Promise<void> => {
+    await router.push({ name: 'home' })
+  }
+
+const goEditor = async (): Promise<void> => {
+  await router.push({ name: 'editor-index' })
+}
+  
+  const onCaptureWebview = async (): Promise<void> => {
   const webview = webviewRef.value
-  if (!webview) return
+  const activeFolderId = selectedFolderId.value
+  if (!webview || activeFolderId === null) return
 
   if (captureFlashTimeout) {
     clearTimeout(captureFlashTimeout)
@@ -138,14 +244,73 @@ const onCaptureWebview = async (): Promise<void> => {
 
   const image = await webview.capturePage()
   const dataUrl = image.toDataURL()
-  captureImageItems.value.push({
-    id: new Date().getTime().toString(),
-    dataUrl: dataUrl
-  })
+
+  folderItems.value = folderItems.value.map((item) =>
+    item.id === activeFolderId
+      ? {
+          ...item,
+          images: [
+            ...item.images,
+            {
+              id: new Date().getTime().toString(),
+              dataUrl
+            }
+          ]
+        }
+      : item
+  )
 }
 
 const onRemoveCaptureImage = (id: string): void => {
-  captureImageItems.value = captureImageItems.value.filter((item) => item.id !== id)
+  const activeFolderId = selectedFolderId.value
+  if (activeFolderId === null) return
+
+  folderItems.value = folderItems.value.map((item) =>
+    item.id === activeFolderId
+      ? {
+          ...item,
+          images: item.images.filter((image) => image.id !== id)
+        }
+      : item
+  )
+}
+
+const onCreateFolder = (): void => {
+  const nextIndex = folderItems.value.length + 1
+  const newFolder: CaptureFolder = {
+    id: Date.now(),
+    title: `새 폴더 ${nextIndex}`,
+    path: '',
+    description: '',
+    images: []
+  }
+
+  folderItems.value = [...folderItems.value, newFolder]
+  selectedFolderId.value = newFolder.id
+}
+
+const onRenameFolder = (payload: { id: number; title: string }): void => {
+  folderItems.value = folderItems.value.map((item) =>
+    item.id === payload.id
+      ? {
+          ...item,
+          title: payload.title
+        }
+      : item
+  )
+}
+
+const onRemoveFolder = (id: number): void => {
+  folderItems.value = folderItems.value.filter((item) => item.id !== id)
+
+  if (selectedFolderId.value === id) {
+    selectedFolderId.value = folderItems.value[0]?.id ?? null
+  }
+}
+
+const onSelectFolder = (id: number): void => {
+  selectedFolderId.value = id
+  isFolderDropdownOpen.value = false
 }
 
 let webviewCaptureListener: (() => void) | null = null
@@ -176,10 +341,7 @@ onMounted(() => {
     canGoForward.value = webview.canGoForward()
   })
 
-  //단축키 및 이벤트 수신자 등록
   window.api.invoke('shortcut:register', CAPTURE_SHORTCUT_KEY, 'shortcut:captureWebview')
-
-  // 단축키 이벤트 수신자 및 캡처 이벤트 핸들러 등록
   webviewCaptureListener = window.api.on('shortcut:captureWebview', onCaptureWebview)
 })
 

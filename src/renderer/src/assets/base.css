@@ -48,8 +48,8 @@ body {
   color: var(--color-text);
   background: var(--color-background);
   line-height: 1.6;
-  font-family:
-    Inter,
+  font-family: "Pretendard", "Malgun Gothic", "Segoe UI", sans-serif;
+    /* Inter,
     -apple-system,
     BlinkMacSystemFont,
     'Segoe UI',
@@ -63,5 +63,5 @@ body {
     sans-serif;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  -moz-osx-font-smoothing: grayscale; */
 }
