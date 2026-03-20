@@ -118,15 +118,18 @@
           이 폴더에는 캡쳐된 화면이 없습니다.
         </div>
 
-        <div v-else class="grid grid-cols-2 gap-4 lg:grid-cols-3 2xl:grid-cols-4">
+        <div
+          v-else
+          class="grid grid-cols-[repeat(auto-fill,minmax(240px,280px))] justify-start gap-4"
+        >
           <button
             v-for="screenshot in currentFolder.screenshots"
             :key="screenshot.id"
             type="button"
-            class="group overflow-hidden rounded-2xl border text-left transition-colors"
+            class="group overflow-hidden rounded-2xl border-2 text-left transition-colors"
             :class="
               isScreenshotSelected(currentFolder.id, screenshot.id)
-                ? 'border-blue-400/70 bg-slate-900'
+                ? 'border-blue-400 bg-slate-900'
                 : 'border-white/10 bg-slate-900 hover:border-white/30'
             "
             @click="toggleScreenshotSelection(currentFolder.id, screenshot.id)"
@@ -142,7 +145,7 @@
               <img
                 :src="screenshot.image"
                 alt=""
-                class="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+                class="h-full w-full object-cover"
               />
               <div
                 class="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full border text-xs"
@@ -275,7 +278,10 @@
           선택된 캡쳐가 없습니다.
         </div>
 
-        <div v-else class="grid grid-cols-2 gap-4 lg:grid-cols-3 2xl:grid-cols-4">
+        <div
+          v-else
+          class="grid grid-cols-[repeat(auto-fill,minmax(240px,280px))] justify-start gap-4"
+        >
           <button
             v-for="(screenshot, index) in currentFolder.screenshots"
             :key="screenshot.id"
@@ -290,7 +296,7 @@
             @dragend="onWorkspaceDragEnd"
           >
             <div class="relative h-44 overflow-hidden bg-slate-950">
-              <div class="absolute left-2 top-2 flex h-8 min-w-8 items-center justify-center rounded-md bg-rose-500 px-2 text-sm font-bold text-white">
+              <div class="absolute left-2 top-2 z-10 flex h-8 min-w-8 items-center justify-center rounded-md bg-slate-700 px-2 text-sm font-bold text-white">
                 {{ index + 1 }}
               </div>
               <img
@@ -303,7 +309,6 @@
               </div>
             </div>
             <div class="space-y-1 px-3 py-2">
-              <div class="truncate text-xs font-semibold text-white">{{ index + 1 }}</div>
 
             </div>
           </button>
@@ -356,25 +361,6 @@
 
             <div class="pointer-events-none absolute inset-x-0 top-4 z-10 flex justify-center px-6">
               <div class="pointer-events-auto flex flex-col items-center gap-3">
-                <div class="flex items-center gap-2 rounded-2xl border border-white/10 bg-slate-900/90 px-3 py-2">
-                  <button
-                    type="button"
-                    class="btn btn-xs border-0 bg-slate-600 text-white shadow-none hover:bg-slate-500"
-                    @click="undoMarker"
-                  >
-                    <i-lucide-undo-2 class="text-xs" />
-                    Undo
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-xs border-0 bg-slate-600 text-white shadow-none hover:bg-slate-500"
-                    @click="redoMarker"
-                  >
-                    <i-lucide-redo-2 class="text-xs" />
-                    Redo
-                  </button>
-                </div>
-
                 <div class="flex items-center gap-2 rounded-2xl border border-white/10 bg-slate-900/90 p-2">
                   <button
                     type="button"
@@ -465,7 +451,28 @@
               : 'w-0 overflow-hidden border-l-0 opacity-0'
           "
         >
-            <div class="flex items-center justify-between border-b border-white/10 px-5 py-4">
+            <div class="border-b border-white/10 px-5 py-4">
+                <div class="mb-3 flex justify-start gap-1">
+                  <div class="rounded-sm bg-[#41506d] p-0.5">
+                    <button
+                      type="button"
+                      class="flex h-8 w-8 items-center justify-center rounded-sm text-slate-100 transition hover:bg-[#52627e]"
+                      @click="undoMarker"
+                    >
+                      <i-lucide-undo-2 class="text-base" />
+                    </button>
+                  </div>
+                  <div class="rounded-sm bg-[#41506d] p-0.5">
+                    <button
+                      type="button"
+                      class="flex h-8 w-8 items-center justify-center rounded-sm text-slate-100 transition hover:bg-[#52627e]"
+                      @click="redoMarker"
+                    >
+                      <i-lucide-redo-2 class="text-base" />
+                    </button>
+                  </div>
+              </div>
+
               <div class="flex items-center gap-2 text-base font-bold text-white">
                 <i-lucide-notebook-tabs class="text-sm text-blue-400" />
                 기능 설명 리스트
@@ -565,80 +572,51 @@
 
 <script setup lang="ts">
 import { nextTick, type ComponentPublicInstance } from 'vue'
-import { useRouter } from 'vue-router'
-
-import sampleImage from '@/assets/dummy/images/case-1.png'
+import { useRoute, useRouter } from 'vue-router'
+import { editorDummyFolders, type DummyEditorAnnotation, type DummyEditorFolder, type DummyEditorScreenshot } from '@/assets/dummy/data'
 
 type ToolMode = 'number' | 'box'
 type EditorStep = 'select' | 'workspace' | 'edit'
 
-type EditorAnnotation = {
-  id: string
-  number: number
-  x: number
-  y: number
-  description: string
-}
+type EditorAnnotation = DummyEditorAnnotation
+type EditorScreenshot = DummyEditorScreenshot
+type EditorFolder = DummyEditorFolder
 
-type EditorScreenshot = {
-  id: string
-  image: string
-  annotations: EditorAnnotation[]
-}
+type SelectedForManual = Record<number, string[]>
 
-type EditorFolder = {
-  id: number
-  title: string
-  path: string
-  description: string
-  screenshots: EditorScreenshot[]
-}
+const STORAGE_KEY = 'miso-editor-selected-screenshots'
 
 const router = useRouter()
+const route = useRoute()
 
-const folders = ref<EditorFolder[]>([
-  {
-    id: 1,
-    title: '메인 홈',
-    path: '메인 > 홈',
-    description: '메인 홈 화면 설명',
-    screenshots: [
-      {
-        id: 'a-shot-1',
-        image: sampleImage,
-        annotations: [
-          { id: 'a-1', number: 1, x: 0.28, y: 0.66, description: '메인 CTA 영역입니다.' },
-          { id: 'a-2', number: 2, x: 0.73, y: 0.62, description: '' }
-        ]
-      },
-      {
-        id: 'a-shot-2',
-        image: sampleImage,
-        annotations: [{ id: 'a-3', number: 1, x: 0.52, y: 0.44, description: '' }]
-      }
-    ]
-  },
-  {
-    id: 2,
-    title: '로그인 화면',
-    path: '사용자 > 로그인',
-    description: '로그인 화면 설명',
-    screenshots: [
-      {
-        id: 'b-shot-1',
-        image: sampleImage,
-        annotations: [{ id: 'b-1', number: 1, x: 0.5, y: 0.48, description: '' }]
-      },
-      {
-        id: 'b-shot-2',
-        image: sampleImage,
-        annotations: []
-      }
-    ]
+const createFullSelection = (folders: EditorFolder[]): SelectedForManual =>
+  folders.reduce<SelectedForManual>((acc, folder) => {
+    acc[folder.id] = folder.screenshots.map((shot) => shot.id)
+    return acc
+  }, {})
+
+const loadSelectedForManual = (folders: EditorFolder[]): SelectedForManual | null => {
+  const raw = window.sessionStorage.getItem(STORAGE_KEY)
+  if (!raw) return null
+
+  try {
+    const parsed = JSON.parse(raw) as SelectedForManual
+
+    return folders.reduce<SelectedForManual>((acc, folder) => {
+      const validIds = new Set(folder.screenshots.map((shot) => shot.id))
+      acc[folder.id] = (parsed[folder.id] ?? []).filter((id) => validIds.has(id))
+      return acc
+    }, {})
+  } catch {
+    return null
   }
-])
+}
 
-const selectedForManual = ref<Record<number, string[]>>({})
+const folders = ref<EditorFolder[]>(
+  editorDummyFolders.map((folder) => ({ ...folder, screenshots: [...folder.screenshots] }))
+)
+
+const selectedForManual = ref<SelectedForManual>({})
 const selectedFolderId = ref(1)
 const selectedScreenshotId = ref('a-shot-1')
 const editorStep = ref<EditorStep>('select')
@@ -661,7 +639,7 @@ const selectPreviewModalRef = ref<ComponentRef<'ModalCaptureImages'> | null>(nul
 
 const fallbackScreenshot: EditorScreenshot = {
   id: 'empty-shot',
-  image: sampleImage,
+  image: editorDummyFolders[0]?.screenshots[0]?.image ?? '',
   annotations: []
 }
 
@@ -723,6 +701,13 @@ const stepLabel = computed(() => {
 const initializeSelection = (): void => {
   selectedForManual.value = folders.value.reduce<Record<number, string[]>>((acc, folder) => {
     acc[folder.id] = []
+    return acc
+  }, {})
+}
+
+const initializeSelectionWithAllScreenshots = (): void => {
+  selectedForManual.value = folders.value.reduce<Record<number, string[]>>((acc, folder) => {
+    acc[folder.id] = folder.screenshots.map((shot) => shot.id)
     return acc
   }, {})
 }
@@ -850,6 +835,38 @@ const openEditorWithScreenshot = (screenshotId: string): void => {
   focusedAnnotationId.value = null
   zoomScale.value = 1
 }
+
+const applyInitialStep = (): void => {
+  const routeStep = String(route.query.step ?? 'select')
+  const savedSelection = loadSelectedForManual(folders.value)
+
+  if (routeStep === 'edit') {
+    selectedForManual.value = savedSelection ?? createFullSelection(folders.value)
+    ensureCurrentSelection()
+    selectedScreenshotId.value = currentFolder.value.screenshots[0]?.id ?? fallbackScreenshot.id
+    editorStep.value = 'edit'
+    focusedAnnotationId.value = null
+    zoomScale.value = 1
+    return
+  }
+
+  if (routeStep === 'workspace') {
+    selectedForManual.value = savedSelection ?? createFullSelection(folders.value)
+    ensureCurrentSelection()
+    editorStep.value = 'workspace'
+    focusedAnnotationId.value = null
+    zoomScale.value = 1
+    return
+  }
+
+  initializeSelection()
+  ensureCurrentSelection()
+  editorStep.value = 'select'
+  focusedAnnotationId.value = null
+  zoomScale.value = 1
+}
+
+applyInitialStep()
 
 const onWorkspaceDragStart = (index: number): void => {
   workspaceDragFromIndex.value = index
