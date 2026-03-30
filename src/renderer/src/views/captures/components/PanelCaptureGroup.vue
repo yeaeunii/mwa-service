@@ -97,7 +97,7 @@
 import defaultFolderImage from '@/assets/dummy/images/case-1.png'
 
 interface FolderItem {
-  id: number
+  id: string
   title: string
   description: string
   path: string
@@ -106,18 +106,18 @@ interface FolderItem {
 
 const props = defineProps<{
   folderItems: FolderItem[]
-  selectedFolderId: number | null
+  selectedFolderId: string | null
 }>()
 
 const emits = defineEmits<{
   onCreateFolder: []
-  onRenameFolder: [{ id: number; title: string }]
-  onRemoveFolder: [id: number]
-  onSelectFolder: [id: number]
+  onRenameFolder: [{ id: string; title: string }]
+  onRemoveFolder: [id: string]
+  onSelectFolder: [id: string]
   onOpenCaptureModal: []
 }>()
 
-const editingFolderId = ref<number | null>(null)
+const editingFolderId = ref<string | null>(null)
 const editingTitle = ref('')
 
 const createFolder = (): void => {
@@ -134,7 +134,7 @@ const cancelFolderEdit = (): void => {
   editingTitle.value = ''
 }
 
-const commitFolderTitle = (folderId: number): void => {
+const commitFolderTitle = (folderId: string): void => {
   const title = editingTitle.value.trim()
   if (!title) {
     cancelFolderEdit()
@@ -150,6 +150,6 @@ const getFolderThumbnail = (item: FolderItem): string => {
     return defaultFolderImage
   }
 
-  return item.images[0].dataUrl
+  return item.images[0].src
 }
 </script>

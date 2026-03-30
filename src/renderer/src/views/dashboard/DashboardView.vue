@@ -1,263 +1,586 @@
 <template>
-  <div class="min-h-screen bg-[#f7f9fd] px-3 py-4 text-slate-800 md:px-4 md:py-5">
-    <div class="mx-auto max-w-[1160px] pt-20">
-      <div class="mb-8 flex items-start justify-between gap-4">
+  <div class="h-screen overflow-hidden bg-[#f3f0f4] px-3 py-3 text-slate-800 md:px-5">
+    <div class="mx-auto flex h-full max-w-[1280px] flex-col pt-8">
+      <div class="mb-2 flex items-start justify-between gap-4">
         <button
           type="button"
-          class="inline-flex items-center gap-2 text-sm font-semibold text-[#8fa0bf] transition hover:text-[#5f59c6]"
+          class="inline-flex items-center gap-2 text-xs font-semibold text-[#8fa0bf] transition hover:text-[#5f59c6]"
           @click="goHome"
         >
-          <i-lucide-arrow-left class="text-base" />
+          <i-lucide-arrow-left class="text-sm" />
           <span>목록으로 돌아가기</span>
         </button>
 
-        <button
-          type="button"
-          class="flex h-9 w-9 items-center justify-center rounded-full text-[#a7b2c9] transition hover:bg-white hover:text-[#5f59c6]"
-        >
-          <i-lucide-ellipsis-vertical class="text-base" />
-        </button>
+        <div class="rounded-full bg-white/80 px-3 py-1.5 text-xs font-bold text-[#5f59c6] shadow-sm">
+          전체 진행률 {{ project.progress }}%
+        </div>
       </div>
 
-      <section class="space-y-2 pt-10">
-        <h1 class="text-[1.8rem] leading-tight font-black tracking-[-0.04em] text-[#102348] md:text-[2.35rem]">
+      <section class="space-y-1">
+        <h1 class="text-[1.6rem] font-black tracking-[-0.04em] text-[#1b2235] md:text-[2rem]">
           {{ project.title }}
         </h1>
-        <p class="max-w-3xl text-sm leading-[1.55] font-bold tracking-[-0.02em] text-[#9aa8c0] md:text-base">
+        <p class="max-w-3xl text-xs font-bold leading-[1.5] text-[#8f97aa] md:text-sm">
           {{ project.description }}
         </p>
       </section>
 
-      <div class="mt-6 grid gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-        <section
-          class="rounded-[20px] bg-white px-4 py-4 shadow-[0_8px_22px_rgba(36,48,82,0.05)] md:px-5"
-        >
-          <h2 class="text-base font-black tracking-[-0.03em] text-[#a2b0c8]">단계별 진행 상황</h2>
-
-          <div class="mt-5 space-y-5">
-            <article
-              v-for="(step, index) in steps"
-              :key="step.id"
-              class="relative flex gap-5"
+      <div class="mt-4 grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <section class="flex min-h-0 flex-col rounded-[26px] bg-[#f1eef2] p-4 shadow-[0_10px_28px_rgba(55,50,70,0.08)]">
+          <div class="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <h2 class="text-[1.65rem] font-black tracking-[-0.04em] text-[#25252b]">캡쳐 영역</h2>
+              <p class="mt-1 text-xs font-semibold text-[#8e8a97]">프로젝트별 화면 캡쳐 및 자산 관리</p>
+            </div>
+            <button
+              type="button"
+              class="inline-flex items-center gap-2 rounded-xl bg-[#695fc5] px-3 py-2.5 text-xs font-bold text-white shadow-[0_10px_20px_rgba(105,95,197,0.2)] transition hover:bg-[#584eb8]"
+              @click="createFolderDirect('capture')"
             >
-              <div class="flex flex-col items-center">
-                <div
-                  class="flex h-8 w-8 items-center justify-center rounded-full border-[3px] text-sm font-black"
-                  :class="
-                    step.state === 'done'
-                      ? 'border-[#5f59c6] bg-[#5f59c6] text-white'
-                      : step.state === 'active'
-                        ? 'border-[#5f59c6] bg-white text-[#5f59c6]'
-                        : 'border-[#dfe6f3] bg-white text-[#c0cadc]'
-                  "
-                >
-                  <i-lucide-check v-if="step.state === 'done'" class="text-sm" />
-                  <span v-else>{{ index + 1 }}</span>
+              <i-lucide-plus-circle class="text-sm" />
+              새 폴더 생성
+            </button>
+          </div>
+
+          <div v-if="captureFolders.length === 0" class="rounded-[24px] bg-white/70 p-8 text-center text-xs font-semibold text-[#8e8a97]">
+            아직 생성된 캡쳐 폴더가 없습니다.
+          </div>
+
+            <div v-else class="min-h-0 flex-1 overflow-y-auto pr-1">
+              <div class="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3">
+              <article
+                v-for="folder in captureFolders"
+                :key="folder.id"
+                class="rounded-[18px] bg-white p-2.5 shadow-[0_8px_18px_rgba(56,52,68,0.08)]"
+              >
+                <div class="overflow-hidden rounded-[14px] bg-[#efedf2]">
+                  <img
+                    v-if="folder.thumbnail"
+                    :src="folder.thumbnail"
+                    alt=""
+                    class="h-20 w-full object-cover"
+                  />
+                  <div
+                    v-else
+                    class="flex h-20 items-center justify-center bg-[linear-gradient(135deg,#ece9f1,#d8d2e7)] text-[#7f77a7]"
+                  >
+                    <i-lucide-image class="text-xl" />
+                  </div>
                 </div>
-                <div
-                  v-if="index < steps.length - 1"
-                  class="mt-2 h-12 w-px bg-[#e8edf7]"
-                ></div>
+
+              <div class="mt-2">
+                <div class="flex items-start gap-2">
+                  <div class="min-w-0 flex-1">
+                    <input
+                      v-if="editingFolderId === folder.id"
+                      v-model="editingFolderTitle"
+                      type="text"
+                      class="w-full rounded-xl border border-[#d9d3e3] bg-white px-2.5 py-1.5 text-sm font-black tracking-[-0.04em] text-[#25252b] outline-none focus:border-[#695fc5]"
+                      @keydown.enter.prevent="commitFolderTitle(folder.id)"
+                      @keydown.esc.prevent="cancelFolderEdit"
+                      @blur="commitFolderTitle(folder.id)"
+                    />
+                    <div v-else class="text-[0.9rem] font-black tracking-[-0.04em] text-[#25252b]">{{ folder.title }}</div>
+                  </div>
+                  <div class="relative">
+                    <button
+                      type="button"
+                      class="flex h-7 w-7 items-center justify-center rounded-xl bg-white text-[#6d7284] shadow-[0_4px_10px_rgba(33,37,54,0.08)] transition hover:bg-[#f5f6fa]"
+                      @click.stop="toggleFolderMenu(folder.id)"
+                    >
+                      <i-lucide-ellipsis-vertical class="text-sm" />
+                    </button>
+                    <div
+                      v-if="openedFolderMenuId === folder.id"
+                      class="absolute right-0 top-12 z-20 min-w-[120px] rounded-2xl border border-[#ebe7f0] bg-white p-2 shadow-[0_16px_30px_rgba(39,35,56,0.12)]"
+                    >
+                      <button
+                        type="button"
+                        class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-[#374151] transition hover:bg-[#f4f1fb]"
+                        @click.stop="openEditFromMenu(folder)"
+                      >
+                        <i-lucide-pencil class="text-sm" />
+                        수정
+                      </button>
+                      <button
+                        type="button"
+                        class="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-rose-500 transition hover:bg-[#fff1f3]"
+                        @click.stop="removeFolder(folder.id)"
+                      >
+                        <i-lucide-trash-2 class="text-sm" />
+                        삭제
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div class="mt-1 flex items-center gap-1 text-[10px] font-semibold text-[#7f7b86]">
+                  <i-lucide-folder class="text-xs" />
+                  <span>{{ folder.itemCount }}개 항목</span>
+                </div>
               </div>
 
-              <div class="min-w-0 flex-1 pb-1">
-                <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                  <h3
-                    class="text-[1.1rem] leading-tight font-black tracking-[-0.03em] md:text-[1.2rem]"
-                    :class="step.state === 'todo' ? 'text-[#b9c5da]' : 'text-[#102348]'"
-                  >
-                    {{ step.title }}
-                  </h3>
-                  <span
-                    v-if="step.state === 'active'"
-                    class="inline-flex w-fit rounded-full bg-[#ecebff] px-2.5 py-1 text-[10px] font-bold text-[#756fec]"
-                  >
-                    진행 중
-                  </span>
-                </div>
-                <p
-                  class="mt-1 text-xs leading-[1.55] font-bold md:text-sm"
-                  :class="step.state === 'todo' ? 'text-[#b7c2d8]' : 'text-[#8fa0bf]'"
-                >
-                  {{ step.description }}
-                </p>
-
-                <button
-                  v-if="step.state !== 'todo'"
-                  type="button"
-                  class="mt-3 inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-black transition"
-                  :class="
-                    step.state === 'done'
-                      ? 'border-[#5f59c6] bg-white text-[#5f59c6] hover:bg-[#5f59c6] hover:text-white'
-                      : 'border-[#5f59c6] bg-[#5f59c6] text-white shadow-[0_8px_18px_rgba(95,89,198,0.24)] hover:bg-[#554fb7]'
-                  "
-                  @click="goStep(step.id)"
-                >
-                  <i-lucide-camera class="text-sm" />
-                  <span>{{ step.actionLabel }}</span>
-                  <i-lucide-chevron-right class="text-sm" />
-                </button>
-              </div>
+              <button
+                type="button"
+                class="mt-2.5 w-full rounded-xl border border-[#e8e4ee] bg-white px-3 py-1.5 text-[10px] font-bold text-[#33303a] transition hover:border-[#695fc5] hover:text-[#695fc5]"
+                @click="goCaptureArea(folder.id)"
+              >
+                작업 이어하기
+              </button>
             </article>
+            </div>
           </div>
         </section>
 
-        <aside class="space-y-8">
-          <section class="rounded-[20px] bg-white p-4 shadow-[0_8px_22px_rgba(36,48,82,0.05)]">
-            <h2 class="text-base font-black tracking-[-0.03em] text-[#a2b0c8]">빠른 작업</h2>
-
+        <section class="flex min-h-0 flex-col rounded-[26px] bg-[#f1eef2] p-4 shadow-[0_10px_28px_rgba(55,50,70,0.08)]">
+          <div class="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <h2 class="text-[1.65rem] font-black tracking-[-0.04em] text-[#25252b]">문서 생성 영역</h2>
+              <p class="mt-1 text-xs font-semibold text-[#8e8a97]">분석 및 기획 리포트 워크플로우</p>
+            </div>
             <button
               type="button"
-              class="mt-4 flex w-full items-center gap-2.5 rounded-[18px] p-3 text-left transition"
-              :class="
-                isPdfDownloadEnabled
-                  ? 'bg-[#fbfcff] hover:shadow-[0_8px_18px_rgba(72,87,124,0.08)]'
-                  : 'cursor-not-allowed bg-[#f4f6fb] opacity-65'
-              "
-              :disabled="!isPdfDownloadEnabled"
+              class="inline-flex items-center gap-2 rounded-xl bg-[#695fc5] px-3 py-2.5 text-xs font-bold text-white shadow-[0_10px_20px_rgba(105,95,197,0.2)] transition hover:bg-[#584eb8]"
+              @click="createFolderDirect('document')"
             >
-              <span
-                class="flex h-9 w-9 items-center justify-center rounded-xl bg-[#ecebff] text-[#5f59c6]"
-              >
-                <i-lucide-file-down class="text-lg" />
-              </span>
-              <span class="min-w-0 flex-1">
-                <span class="block text-base leading-tight font-black tracking-[-0.03em] text-[#102348]">
-                  PDF 다운로드
-                </span>
-                <span class="mt-0.5 block text-[11px] font-bold text-[#8fa0bf]">
-                  {{ isPdfDownloadEnabled ? '다운로드 가능' : '2단계 완료 시 가능' }}
-                </span>
-              </span>
-              <i-lucide-chevron-right class="text-base text-[#28334f]" />
+              <i-lucide-plus-circle class="text-sm" />
+              새 폴더 생성
             </button>
-          </section>
+          </div>
 
-          <section
-            class="rounded-[20px] bg-[#5f59c6] p-4 text-white shadow-[0_12px_22px_rgba(95,89,198,0.24)]"
-          >
-            <div class="flex items-end justify-between gap-4">
-              <h2 class="text-base font-black tracking-[-0.03em] text-white/75">전체 진행률</h2>
-              <span class="text-[2rem] font-black tracking-[-0.04em]">{{ project.progress }}%</span>
-            </div>
+          <div v-if="documentFolders.length === 0" class="rounded-[24px] bg-white/70 p-8 text-center text-xs font-semibold text-[#8e8a97]">
+            아직 생성된 문서 폴더가 없습니다.
+          </div>
 
-            <div class="mt-4 h-2 rounded-full bg-white/15">
-              <div
-                class="h-full rounded-full bg-white"
-                :style="{ width: `${project.progress}%` }"
-              ></div>
+            <div v-else class="min-h-0 flex-1 overflow-y-auto pr-1">
+              <div class="space-y-3">
+            <article
+              v-for="folder in documentFolders"
+              :key="folder.id"
+                class="rounded-[18px] bg-white p-3 shadow-[0_8px_18px_rgba(56,52,68,0.08)]"
+              >
+                <div class="flex items-start gap-2">
+                  <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[#ddd6ff] text-[#5f59c6]">
+                    <i-lucide-file-text class="text-sm" />
+                  </div>
+
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0 flex-1">
+                      <input
+                        v-if="editingFolderId === folder.id"
+                        v-model="editingFolderTitle"
+                        type="text"
+                        class="w-full rounded-xl border border-[#d9d3e3] bg-white px-2.5 py-1.5 text-sm font-black tracking-[-0.04em] text-[#35333c] outline-none focus:border-[#695fc5]"
+                        @keydown.enter.prevent="commitFolderTitle(folder.id)"
+                        @keydown.esc.prevent="cancelFolderEdit"
+                        @blur="commitFolderTitle(folder.id)"
+                      />
+                      <div v-else class="truncate text-[0.95rem] font-black tracking-[-0.04em] text-[#35333c]">
+                        {{ folder.title }}
+                      </div>
+                      <div class="mt-0.5 text-[10px] font-semibold text-[#8e8a97]">
+                        최종 수정: {{ folder.updatedLabel }}
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span
+                        class="rounded-full px-2 py-0.5 text-[10px] font-bold"
+                        :class="folder.badgeClass"
+                      >
+                        {{ folder.statusLabel }}
+                      </span>
+                      <div class="relative">
+                        <button
+                          type="button"
+                          class="flex h-7 w-7 items-center justify-center rounded-xl bg-white text-[#6d7284] shadow-[0_4px_10px_rgba(33,37,54,0.08)] transition hover:bg-[#f5f6fa]"
+                          @click.stop="toggleFolderMenu(folder.id)"
+                        >
+                          <i-lucide-ellipsis-vertical class="text-sm" />
+                        </button>
+                        <div
+                          v-if="openedFolderMenuId === folder.id"
+                          class="absolute right-0 top-12 z-20 min-w-[120px] rounded-2xl border border-[#ebe7f0] bg-white p-2 shadow-[0_16px_30px_rgba(39,35,56,0.12)]"
+                        >
+                          <button
+                            type="button"
+                            class="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-[#374151] transition hover:bg-[#f4f1fb]"
+                            @click.stop="openEditFromMenu(folder)"
+                          >
+                            <i-lucide-pencil class="text-sm" />
+                            수정
+                          </button>
+                          <button
+                            type="button"
+                            class="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold text-rose-500 transition hover:bg-[#fff1f3]"
+                            @click.stop="removeFolder(folder.id)"
+                          >
+                            <i-lucide-trash-2 class="text-sm" />
+                            삭제
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="mt-2.5 flex items-center justify-between gap-3 text-[10px] font-bold text-[#8e8a97]">
+                    <span>진척도</span>
+                    <span class="text-[#4c4958]">{{ folder.progress }}%</span>
+                  </div>
+                  <div class="mt-2 h-1.5 rounded-full bg-[#e9e6ee]">
+                    <div
+                      class="h-full rounded-full bg-[#6256c9]"
+                      :style="{ width: `${folder.progress}%` }"
+                    ></div>
+                  </div>
+
+                  <div class="mt-2.5 flex justify-end">
+                    <button
+                      type="button"
+                        class="rounded-xl px-3 py-1.5 text-[10px] font-bold transition"
+                      :class="folder.progress >= 100 ? 'border border-[#e8e4ee] bg-white text-[#3b3942] hover:border-[#695fc5] hover:text-[#695fc5]' : 'bg-[#695fc5] text-white hover:bg-[#584eb8]'"
+                      @click="goDocumentArea(folder.id)"
+                    >
+                      {{ folder.progress >= 100 ? '보기' : '수정하기' }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </article>
             </div>
-          </section>
-        </aside>
+          </div>
+        </section>
       </div>
     </div>
+
   </div>
 </template>
 
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
-import { dashboardProjectMap, type DummyDashboardProject } from '@/assets/dummy/data'
+import { toFileImageSrc } from '@/utils/manualWorkspace'
 
-type DashboardProject = DummyDashboardProject
+type FolderArea = 'capture' | 'document'
 
-interface DashboardStep {
+interface DashboardProject {
   id: string
   title: string
   description: string
-  state: 'done' | 'active' | 'todo'
-  actionLabel: string
+  progress: number
+  status: 'draft' | 'in_progress' | 'completed' | 'archived'
+}
+
+interface WorkspaceResponse {
+  project: {
+    id: string
+    name: string
+    description: string
+    progress: number
+    status: 'draft' | 'in_progress' | 'completed' | 'archived'
+  } | null
+  folders: Array<{
+    id: string
+    title: string
+    path: string
+    description: string
+    area_type: FolderArea
+    updated_at: string
+    screenshots: Array<{
+      id: string
+      image_path: string
+      image_src?: string
+      is_selected: number
+      annotations: Array<{
+        description: string
+        tool_type: 'number' | 'box'
+      }>
+    }>
+  }>
+}
+
+interface DashboardFolderItem {
+  id: string
+  title: string
+  path: string
+  description: string
+  areaType: FolderArea
+  updatedAt: string
+  thumbnail: string | null
+  itemCount: number
+  progress: number
+  statusLabel: string
+  badgeClass: string
+  updatedLabel: string
 }
 
 const router = useRouter()
 const route = useRoute()
 
-const project = computed<DashboardProject>(() => {
-  const projectId = String(route.query.projectId ?? 'shopping-ui-research')
-  return dashboardProjectMap[projectId] ?? dashboardProjectMap['shopping-ui-research']
+const projectId = computed(() => String(route.query.projectId ?? ''))
+const project = ref<DashboardProject>({
+  id: '',
+  title: '프로젝트 없음',
+  description: '프로젝트를 먼저 생성하거나 선택하세요.',
+  progress: 0,
+  status: 'draft'
 })
+const folders = ref<DashboardFolderItem[]>([])
+const editingFolderId = ref<string | null>(null)
+const editingFolderTitle = ref('')
+const openedFolderMenuId = ref<string | null>(null)
 
-const steps = computed<DashboardStep[]>(() => {
-  if (project.value.progress >= 100) {
-    return [
-      {
-        id: 'capture-browser',
-        title: '브라우저 캡처',
-        description: '웹페이지를 캡처하여 소스를 수집합니다.',
-        state: 'done',
-        actionLabel: '브라우저 캡처 다시하기'
-      },
-      {
-        id: 'select-folder',
-        title: '캡처본 선택 및 폴더링',
-        description: '수집된 이미지를 선택하고 폴더링 합니다.',
-        state: 'done',
-        actionLabel: '캡처본 선택 및 폴더링 다시하기'
-      },
-      {
-        id: 'edit-capture',
-        title: '캡처본 편집',
-        description: '각 화면의 기능 설명을 추가하여 매뉴얼을 작성을 완료합니다.',
-        state: 'done',
-        actionLabel: '캡처본 편집 다시하기'
-      }
-    ]
+const formatUpdatedLabel = (value: string): string => {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}.${month}.${day}`
+}
+
+const getFolderProgress = (folder: WorkspaceResponse['folders'][number]): number => {
+  const total = folder.screenshots.length
+  if (total === 0) return 0
+
+  const selectedCount = folder.screenshots.filter((shot) => shot.is_selected === 1).length
+  const documentedCount = folder.screenshots.filter((shot) =>
+    shot.annotations.some(
+      (annotation) => annotation.tool_type === 'number' && annotation.description.trim().length > 0
+    )
+  ).length
+
+  if (selectedCount === 0) {
+    return 33
   }
 
-  return [
+  if (documentedCount >= selectedCount) {
+    return 100
+  }
+
+  return 66
+}
+
+const getFolderStatus = (progress: number): Pick<DashboardFolderItem, 'statusLabel' | 'badgeClass'> => {
+  if (progress >= 100) {
+    return {
+      statusLabel: '완료',
+      badgeClass: 'bg-[#e7e4e8] text-[#797381]'
+    }
+  }
+
+  if (progress > 0) {
+    return {
+      statusLabel: '편집 중',
+      badgeClass: 'bg-[#e8ecff] text-[#6972d8]'
+    }
+  }
+
+  return {
+    statusLabel: '준비 중',
+    badgeClass: 'bg-[#efecef] text-[#8f8a94]'
+  }
+}
+
+const mapFolderItem = (folder: WorkspaceResponse['folders'][number]): DashboardFolderItem => {
+  const progress = getFolderProgress(folder)
+  const status = getFolderStatus(progress)
+
+  return {
+    id: folder.id,
+    title: folder.title,
+    path: folder.path,
+    description: folder.description,
+    areaType: folder.area_type,
+    updatedAt: folder.updated_at,
+    thumbnail:
+      folder.screenshots[0]?.image_src ??
+      (folder.screenshots[0]?.image_path ? toFileImageSrc(folder.screenshots[0].image_path) : null),
+    itemCount: folder.screenshots.length,
+    progress,
+    statusLabel: status.statusLabel,
+    badgeClass: status.badgeClass,
+    updatedLabel: formatUpdatedLabel(folder.updated_at)
+  }
+}
+
+const captureFolders = computed(() => folders.value.filter((folder) => folder.areaType === 'capture'))
+const documentFolders = computed(() => folders.value.filter((folder) => folder.areaType === 'document'))
+const normalizedFolderTitles = computed(() =>
+  new Set(folders.value.map((folder) => folder.title.trim().toLocaleLowerCase()))
+)
+
+const loadDashboard = async (): Promise<void> => {
+  if (!projectId.value) return
+
+  const response = (await window.api.invoke('workspace:get', {
+    projectId: projectId.value
+  })) as WorkspaceResponse
+
+  if (response.project) {
+    project.value = {
+      id: response.project.id,
+      title: response.project.name,
+      description: response.project.description,
+      progress: response.project.progress,
+      status: response.project.status
+    }
+  }
+
+  folders.value = response.folders.map(mapFolderItem)
+}
+
+const syncFoldersToDatabase = async (): Promise<void> => {
+  await window.api.invoke('capture:syncFolders', {
+    projectId: projectId.value,
+    projectName: project.value.title,
+    projectDescription: project.value.description,
+    areaScope: undefined,
+    folders: folders.value.map((folder, index) => ({
+      id: folder.id,
+      title: folder.title,
+      description: folder.description,
+      path: folder.path,
+      areaType: folder.areaType,
+      sortOrder: index
+    }))
+  })
+}
+
+const buildUniqueFolderTitle = (area: FolderArea): string => {
+  const baseTitle = area === 'capture' ? '새 캡쳐 폴더' : '새 문서 폴더'
+
+  if (!normalizedFolderTitles.value.has(baseTitle.toLocaleLowerCase())) {
+    return baseTitle
+  }
+
+  let index = 2
+  while (normalizedFolderTitles.value.has(`${baseTitle} ${index}`.toLocaleLowerCase())) {
+    index += 1
+  }
+
+  return `${baseTitle} ${index}`
+}
+
+const createFolderDirect = async (area: FolderArea): Promise<void> => {
+  const now = new Date().toISOString()
+  folders.value = [
+    ...folders.value,
     {
-      id: 'capture-browser',
-      title: '브라우저 캡처',
-      description: '웹페이지를 캡처하여 소스를 수집합니다.',
-      state: 'done',
-      actionLabel: '브라우저 캡처 다시하기'
-    },
-    {
-      id: 'select-folder',
-      title: '캡처본 선택 및 폴더링',
-      description: '수집된 이미지를 정리하고 PDF로 변환할 준비를 합니다.',
-      state: 'active',
-      actionLabel: '캡처본 선택 및 폴더링 계속하기'
-    },
-    {
-      id: 'edit-capture',
-      title: '캡처본 편집',
-      description: '이미지에 주석을 달거나 레이아웃을 조정합니다.',
-      state: 'todo',
-      actionLabel: '캡처본 편집 계속하기'
+      id: `folder-${Date.now()}`,
+      title: buildUniqueFolderTitle(area),
+      path: '',
+      description: '',
+      areaType: area,
+      updatedAt: now,
+      thumbnail: null,
+      itemCount: 0,
+      progress: 0,
+      statusLabel: '준비 중',
+      badgeClass: 'bg-[#efecef] text-[#8f8a94]',
+      updatedLabel: formatUpdatedLabel(now)
     }
   ]
-})
+  await syncFoldersToDatabase()
+  await loadDashboard()
+}
 
-const isPdfDownloadEnabled = computed(() =>
-  steps.value.some((step) => step.id === 'select-folder' && step.state === 'done')
-)
+const startFolderEdit = (folder: DashboardFolderItem): void => {
+  openedFolderMenuId.value = null
+  editingFolderId.value = folder.id
+  editingFolderTitle.value = folder.title
+}
+
+const toggleFolderMenu = (folderId: string): void => {
+  openedFolderMenuId.value = openedFolderMenuId.value === folderId ? null : folderId
+}
+
+const openEditFromMenu = (folder: DashboardFolderItem): void => {
+  startFolderEdit(folder)
+}
+
+const cancelFolderEdit = (): void => {
+  editingFolderId.value = null
+  editingFolderTitle.value = ''
+}
+
+const commitFolderTitle = async (folderId: string): Promise<void> => {
+  const title = editingFolderTitle.value.trim()
+  const currentFolder = folders.value.find((folder) => folder.id === folderId)
+
+  if (!currentFolder) {
+    cancelFolderEdit()
+    return
+  }
+
+  if (!title) {
+    cancelFolderEdit()
+    return
+  }
+
+  const duplicated = folders.value.some(
+    (folder) => folder.id !== folderId && folder.title.trim().toLocaleLowerCase() === title.toLocaleLowerCase()
+  )
+
+  if (duplicated) {
+    editingFolderTitle.value = currentFolder.title
+    return
+  }
+
+  const now = new Date().toISOString()
+  folders.value = folders.value.map((folder) =>
+    folder.id === folderId
+      ? {
+          ...folder,
+          title,
+          updatedAt: now,
+          updatedLabel: formatUpdatedLabel(now)
+        }
+      : folder
+  )
+
+  cancelFolderEdit()
+  openedFolderMenuId.value = null
+  await syncFoldersToDatabase()
+  await loadDashboard()
+}
+
+const removeFolder = async (folderId: string): Promise<void> => {
+  folders.value = folders.value.filter((folder) => folder.id !== folderId)
+  openedFolderMenuId.value = null
+
+  if (editingFolderId.value === folderId) {
+    cancelFolderEdit()
+  }
+
+  await syncFoldersToDatabase()
+  await loadDashboard()
+}
 
 const goHome = async (): Promise<void> => {
   await router.push({ name: 'home' })
 }
 
-const goStep = async (stepId: string): Promise<void> => {
-  const projectId = route.query.projectId ?? 'shopping-ui-research'
-
-  if (stepId === 'select-folder') {
-    await router.push({
-      name: 'select-index',
-      query: { projectId }
-    })
-    return
-  }
-
-  if (stepId === 'edit-capture') {
-    await router.push({
-      name: 'editor-index',
-      query: { projectId, step: 'edit' }
-    })
-    return
-  }
-
+const goCaptureArea = async (folderId: string): Promise<void> => {
   await router.push({
     name: 'capture-index',
-    query: { projectId }
+    query: {
+      projectId: projectId.value,
+      folderId
+    }
   })
 }
+
+const goDocumentArea = async (folderId: string): Promise<void> => {
+  await router.push({
+    name: 'workspace-index',
+    query: {
+      projectId: projectId.value,
+      folderId
+    }
+  })
+}
+
+onMounted(() => {
+  void loadDashboard()
+})
 </script>

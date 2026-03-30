@@ -1,4 +1,5 @@
 export type CaptureImage = {
   id: string
-  dataUrl: string
+  src: string
+  filePath?: string
 }

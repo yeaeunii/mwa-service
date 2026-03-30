@@ -89,9 +89,9 @@
                 type="button"
                 class="btn btn-sm shrink-0 border border-blue-900 bg-white px-3 text-xs text-blue-900 shadow-none hover:bg-blue-900 hover:text-white"
                 :disabled="selectedFolderId === null"
-                @click="goEditor"
+                @click="goSelect"
               >
-                편집 시작하기
+                문서 생성 시작하기
                 <i-lucide-arrow-right class="text-sm" />
               </button>
           </div>
@@ -143,8 +143,8 @@
 </template>
 
 <script setup lang="ts">
-import { menualCaseItems } from '@/assets/dummy/data'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { toFileImageSrc } from '@/utils/manualWorkspace'
 
 interface WebviewElement extends HTMLElement {
   src: string
@@ -158,11 +158,42 @@ interface WebviewElement extends HTMLElement {
 }
 
 interface CaptureFolder {
-  id: number
+  id: string
   title: string
   description: string
   path: string
   images: import('@/types').CaptureImage[]
+}
+
+interface ProjectRecord {
+  id: string
+  name: string
+  description: string
+  progress: number
+  status: 'draft' | 'in_progress' | 'completed' | 'archived'
+}
+
+interface WorkspaceFolderResponse {
+  id: string
+  title: string
+  description: string
+  path: string
+  area_type: 'capture' | 'document'
+  sort_order: number
+  screenshots: SavedCaptureRecord[]
+}
+
+interface SavedCaptureRecord {
+  id: string
+  folder_id: string
+  file_name: string
+  image_path: string
+  image_src?: string
+  source_url: string
+  page_title: string
+  sort_order: number
+  is_selected: number
+  created_at: string
 }
 
 const START_PAGE_URL = 'https://www.google.com'
@@ -171,6 +202,7 @@ const CAPTURE_SHORTCUT_KEY = 'CommandOrControl+Shift+S'
 const webviewRef = ref<WebviewElement | null>(null)
 const modalCaptureImagesRef = ref<ComponentRef<'ModalCaptureImages'> | null>(null)
 const router = useRouter()
+const route = useRoute()
 
 const urlInput = ref(START_PAGE_URL)
 const currentUrl = ref(START_PAGE_URL)
@@ -182,21 +214,77 @@ const isFolderDropdownOpen = ref(false)
 const isCaptureFlashVisible = ref(false)
 let captureFlashTimeout: ReturnType<typeof setTimeout> | null = null
 
-const folderItems = ref<CaptureFolder[]>(
-  menualCaseItems.map((item) => ({
-    id: item.id,
-    title: item.title,
-    description: item.description,
-    path: '',
-    images: []
-  }))
-)
-const selectedFolderId = ref<number | null>(folderItems.value[0]?.id ?? null)
+const projectId = computed(() => String(route.query.projectId ?? ''))
+const currentProject = ref<ProjectRecord | null>(null)
+const folderItems = ref<CaptureFolder[]>([])
+const selectedFolderId = ref<string | null>(String(route.query.folderId ?? '') || null)
 
 const selectedFolder = computed(() =>
   folderItems.value.find((item) => item.id === selectedFolderId.value) ?? null
 )
 const selectedFolderImages = computed(() => selectedFolder.value?.images ?? [])
+
+const ensureSelectedFolder = (): void => {
+  if (selectedFolderId.value && folderItems.value.some((item) => item.id === selectedFolderId.value)) {
+    return
+  }
+
+  selectedFolderId.value = folderItems.value[0]?.id ?? null
+}
+
+const loadProjectFromDatabase = async (): Promise<void> => {
+  if (!projectId.value) return
+
+  currentProject.value = (await window.api.invoke('project:get', {
+    projectId: projectId.value
+  })) as ProjectRecord | null
+}
+
+const loadWorkspaceFromDatabase = async (): Promise<void> => {
+  if (!projectId.value) return
+
+  const response = (await window.api.invoke('workspace:get', {
+    projectId: projectId.value
+  })) as {
+    folders: WorkspaceFolderResponse[]
+  }
+
+  folderItems.value = (response.folders ?? [])
+    .filter((folder) => folder.area_type === 'capture')
+    .map((folder) => ({
+    id: folder.id,
+    title: folder.title,
+    description: folder.description,
+    path: folder.path,
+    images: folder.screenshots.map((row) => ({
+      id: row.id,
+      src: row.image_src ?? toFileImageSrc(row.image_path),
+      filePath: row.image_path
+    }))
+  }))
+
+  ensureSelectedFolder()
+}
+
+const syncFoldersToDatabase = async (): Promise<void> => {
+  if (!projectId.value) return
+
+  await window.api.invoke('capture:syncFolders', {
+    projectId: projectId.value,
+    projectName: currentProject.value?.name ?? projectId.value,
+    projectDescription: currentProject.value?.description ?? '',
+    sourceUrl: currentUrl.value,
+    areaScope: 'capture',
+    folders: folderItems.value.map((item, index) => ({
+      id: item.id,
+      title: item.title,
+      areaType: 'capture',
+      description: item.description,
+      path: item.path,
+      sortOrder: index
+    }))
+  })
+}
 
 const navigate = (): void => {
   let url = urlInput.value.trim()
@@ -224,8 +312,14 @@ const goHome = async (): Promise<void> => {
     await router.push({ name: 'home' })
   }
 
-const goEditor = async (): Promise<void> => {
-  await router.push({ name: 'editor-index' })
+const goSelect = async (): Promise<void> => {
+  await router.push({
+    name: 'workspace-index',
+    query: {
+      projectId: projectId.value,
+      captureFolderId: selectedFolderId.value ?? undefined
+    }
+  })
 }
   
   const onCaptureWebview = async (): Promise<void> => {
@@ -244,6 +338,33 @@ const goEditor = async (): Promise<void> => {
 
   const image = await webview.capturePage()
   const dataUrl = image.toDataURL()
+  const activeFolder = folderItems.value.find((item) => item.id === activeFolderId)
+  if (!activeFolder) return
+
+  const result = (await window.api.invoke('capture:save', {
+    projectId: projectId.value,
+    projectName: currentProject.value?.name ?? projectId.value,
+    projectDescription: currentProject.value?.description ?? '',
+    folderId: activeFolder.id,
+    folderTitle: activeFolder.title,
+    sourceUrl: currentUrl.value,
+    pageTitle: currentUrl.value,
+    menuPath: activeFolder.path,
+    screenDescription: activeFolder.description,
+    functionalityDescription: '',
+    writerName: '',
+    dataUrl
+  })) as {
+    success: boolean
+    capture?: {
+      id: string
+      filePath: string
+      imageSrc: string
+    }
+  }
+
+  const capture = result.capture
+  if (!result.success || !capture) return
 
   folderItems.value = folderItems.value.map((item) =>
     item.id === activeFolderId
@@ -252,8 +373,9 @@ const goEditor = async (): Promise<void> => {
           images: [
             ...item.images,
             {
-              id: new Date().getTime().toString(),
-              dataUrl
+              id: capture.id,
+              src: capture.imageSrc,
+              filePath: capture.filePath
             }
           ]
         }
@@ -261,9 +383,20 @@ const goEditor = async (): Promise<void> => {
   )
 }
 
-const onRemoveCaptureImage = (id: string): void => {
+const onRemoveCaptureImage = async (id: string): Promise<void> => {
   const activeFolderId = selectedFolderId.value
   if (activeFolderId === null) return
+
+  const targetImage = folderItems.value
+    .find((item) => item.id === activeFolderId)
+    ?.images.find((image) => image.id === id)
+
+  if (targetImage?.filePath) {
+    await window.api.invoke('capture:remove', {
+      captureId: id,
+      filePath: targetImage.filePath
+    })
+  }
 
   folderItems.value = folderItems.value.map((item) =>
     item.id === activeFolderId
@@ -278,7 +411,7 @@ const onRemoveCaptureImage = (id: string): void => {
 const onCreateFolder = (): void => {
   const nextIndex = folderItems.value.length + 1
   const newFolder: CaptureFolder = {
-    id: Date.now(),
+    id: `folder-${Date.now()}`,
     title: `새 폴더 ${nextIndex}`,
     path: '',
     description: '',
@@ -287,9 +420,10 @@ const onCreateFolder = (): void => {
 
   folderItems.value = [...folderItems.value, newFolder]
   selectedFolderId.value = newFolder.id
+  void syncFoldersToDatabase()
 }
 
-const onRenameFolder = (payload: { id: number; title: string }): void => {
+const onRenameFolder = (payload: { id: string; title: string }): void => {
   folderItems.value = folderItems.value.map((item) =>
     item.id === payload.id
       ? {
@@ -298,24 +432,27 @@ const onRenameFolder = (payload: { id: number; title: string }): void => {
         }
       : item
   )
+  void syncFoldersToDatabase()
 }
 
-const onRemoveFolder = (id: number): void => {
+const onRemoveFolder = (id: string): void => {
   folderItems.value = folderItems.value.filter((item) => item.id !== id)
 
   if (selectedFolderId.value === id) {
     selectedFolderId.value = folderItems.value[0]?.id ?? null
   }
+
+  void syncFoldersToDatabase()
 }
 
-const onSelectFolder = (id: number): void => {
+const onSelectFolder = (id: string): void => {
   selectedFolderId.value = id
   isFolderDropdownOpen.value = false
 }
 
 let webviewCaptureListener: (() => void) | null = null
 
-onMounted(() => {
+onMounted(async () => {
   const webview = webviewRef.value
   if (!webview) return
 
@@ -343,6 +480,9 @@ onMounted(() => {
 
   window.api.invoke('shortcut:register', CAPTURE_SHORTCUT_KEY, 'shortcut:captureWebview')
   webviewCaptureListener = window.api.on('shortcut:captureWebview', onCaptureWebview)
+  await loadProjectFromDatabase()
+  await loadWorkspaceFromDatabase()
+  await syncFoldersToDatabase()
 })
 
 onUnmounted(() => {

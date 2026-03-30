@@ -19,6 +19,7 @@
       </div>
     </template>
 
+    <!-- 폴더명, 화면 경로, 화면 설명-->
     <div class="space-y-4 px-5 py-4">
       <label class="flex flex-col gap-1.5">
         <span class="text-sm font-medium text-slate-300">폴더명</span>
@@ -28,6 +29,9 @@
           class="input input-bordered h-11 w-full rounded-xl border-slate-600 bg-slate-800 text-white shadow-none placeholder:text-slate-500 focus:border-slate-400 focus:outline-none"
           placeholder="새 폴더"
         />
+        <span v-if="isDuplicateTitle" class="text-xs text-rose-300">
+          동일한 폴더명이 이미 있습니다.
+        </span>
       </label>
 
       <label class="flex flex-col gap-1.5">
@@ -55,8 +59,8 @@
       <div class="w-full border-t border-slate-700 px-5 py-4">
         <button
           type="button"
-          class="btn w-full border-0 bg-blue-900 text-white shadow-none hover:bg-blue-900"
-          :disabled="folderForm.title.trim().length === 0"
+          class="btn w-full border-0 bg-blue-900 text-white shadow-none hover:bg-blue-900 disabled:bg-slate-600 disabled:text-slate-300"
+          :disabled="folderForm.title.trim().length === 0 || isDuplicateTitle"
           @click="onSave"
         >
           {{ editingFolderId ? '변경사항 저장' : '저장' }}
@@ -67,18 +71,32 @@
 </template>
 
 <script setup lang="ts">
+const props = defineProps<{
+  existingFolders?: { id: string; title: string }[]
+}>()
+
 const emits = defineEmits<{
-  onSave: [{ id: number | null; title: string; path: string; description: string }]
+  onSave: [{ id: string | null; title: string; path: string; description: string }]
 }>()
 
 const modalRef = ref<ComponentRef<'ModalBase'> | null>(null)
-const editingFolderId = ref<number | null>(null)
+const editingFolderId = ref<string | null>(null)
 const folderForm = ref({
   title: '',
   path: '',
   description: ''
 })
 
+const normalizedTitle = computed(() => folderForm.value.title.trim().toLocaleLowerCase())
+const isDuplicateTitle = computed(() =>
+  (props.existingFolders ?? []).some(
+    (folder) =>
+      folder.id !== editingFolderId.value &&
+      folder.title.trim().toLocaleLowerCase() === normalizedTitle.value
+  )
+)
+
+// 폼 초기화
 const resetFolderForm = (): void => {
   editingFolderId.value = null
   folderForm.value = {
@@ -88,14 +106,16 @@ const resetFolderForm = (): void => {
   }
 }
 
+// 새폴더 생성
 const onOpenCreate = (nextIndex: number): void => {
   resetFolderForm()
   folderForm.value.title = `새 폴더 ${nextIndex}`
   modalRef.value?.onOpen()
 }
 
+// 기존폴더 수정
 const onOpenEdit = (payload: {
-  id: number
+  id: string
   title: string
   path: string
   description: string
@@ -107,11 +127,12 @@ const onOpenEdit = (payload: {
     description: payload.description
   }
   modalRef.value?.onOpen()
-}
-
+} 
+// 부모로 저장 이벤트
 const onSave = (): void => {
   const title = folderForm.value.title.trim()
   if (!title) return
+  if (isDuplicateTitle.value) return
 
   emits('onSave', {
     id: editingFolderId.value,

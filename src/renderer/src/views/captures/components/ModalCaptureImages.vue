@@ -38,16 +38,6 @@
             <i-lucide-chevron-right />
           </button>
 
-          <button
-            v-if="props.readonly"
-            class="btn btn-sm absolute right-3 top-3 z-20 border-0 shadow-none"
-            :class="isCurrentSelected ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-100'"
-            @click="toggleCurrentSelection"
-          >
-            <i-lucide-check class="text-sm" />
-            {{ isCurrentSelected ? '선택됨' : '선택' }}
-          </button>
-
           <div
             v-if="!props.readonly"
             class="absolute top-0 left-0 h-full w-full flex items-center justify-center group-hover:opacity-100 opacity-0 transition-opacity duration-300"
@@ -61,7 +51,7 @@
             </button>
           </div>
           <img
-            :src="currentZoomItem.dataUrl"
+            :src="currentZoomItem.src"
             alt="Capture Image"
             class="mx-auto max-h-full max-w-full rounded-md object-contain"
           />
@@ -81,13 +71,13 @@
               @mouseenter="
                 () => {
                   removeImageId = null
-                  selectedZoomImage = null
+                  selectedZoomImageId = null
                   selecteImageId = item.id
                 }
               "
               @mouseleave="selecteImageId = null"
             >
-              <img :src="item.dataUrl" alt="Capture Image" class="w-full h-full object-cover" />
+              <img :src="item.src" alt="Capture Image" class="w-full h-full object-cover" />
               <div
                 class="absolute top-0 left-0 w-full h-full flex items-center justify-center bg-black/50 opacity-0 transition-opacity duration-300"
                 :class="{
@@ -148,7 +138,6 @@
 import { computed, ref } from 'vue'
 const emits = defineEmits<{
   onRemoveImage: [id: string]
-  onToggleSelect: [id: string]
 }>()
 
 const modalRef = ref<ComponentRef<'ModalBase'> | null>(null)
@@ -157,11 +146,9 @@ const props = withDefaults(
     captureImageItems: import('@/types').CaptureImage[]
     title?: string
     readonly?: boolean
-    selectedImageIds?: string[]
   }>(),
   {
-    readonly: false,
-    selectedImageIds: () => []
+    readonly: false
   }
 )
 
@@ -178,12 +165,6 @@ const currentZoomItem = computed(() => {
   const index = currentZoomIndex.value
   if (index < 0) return null
   return props.captureImageItems[index] ?? null
-})
-
-const isCurrentSelected = computed(() => {
-  const id = currentZoomItem.value?.id
-  if (!id) return false
-  return props.selectedImageIds.includes(id)
 })
 
 const onOpen = (zoomImageId?: string): void => {
@@ -218,9 +199,4 @@ const showNextImage = (): void => {
   selectedZoomImageId.value = props.captureImageItems[nextIndex].id
 }
 
-const toggleCurrentSelection = (): void => {
-  const id = currentZoomItem.value?.id
-  if (!id) return
-  emits('onToggleSelect', id)
-}
 </script>
