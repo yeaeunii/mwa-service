@@ -9,6 +9,7 @@ import {
   deleteProject,
   copyCapturesToFolder,
   deleteCapture,
+  getLastCaptureUrlByFolderId,
   getDatabasePath,
   getProjectById,
   getProjectWorkspace,
@@ -416,6 +417,13 @@ app.whenReady().then(() => {
     }
   )
 
+  ipcMain.handle(
+    'capture:getLastUrl',
+    async (_, payload: { folderId: string }) => {
+    const url = getLastCaptureUrlByFolderId(payload.folderId)
+    return { url }
+  })
+  
   ipcMain.handle(
     'capture:remove',
     async (_, payload: { captureId: string; filePath: string }) => {

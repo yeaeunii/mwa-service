@@ -519,6 +519,20 @@ export const upsertFolder = (payload: {
   })
 }
 
+export const getLastCaptureUrlByFolderId = (folderId: string): string => {
+  const db = getDatabase()
+  const row = db.prepare(`
+    SELECT source_url
+    FROM captures
+    WHERE folder_id = ?
+    ORDER BY sort_order DESC, created_at DESC
+    LIMIT 1
+  `).get(folderId) as { source_url: string } | undefined
+
+  return row?.source_url ?? ''
+}
+
+
 export const markDeletedFolders = (
   projectId: string,
   activeFolderIds: string[],

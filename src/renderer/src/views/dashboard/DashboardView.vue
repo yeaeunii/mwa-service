@@ -565,7 +565,7 @@ const goCaptureArea = async (folderId: string): Promise<void> => {
     name: 'capture-index',
     query: {
       projectId: projectId.value,
-      folderId
+      captureFolderId: folderId
     }
   })
 }
@@ -575,7 +575,7 @@ const goDocumentArea = async (folderId: string): Promise<void> => {
     name: 'workspace-index',
     query: {
       projectId: projectId.value,
-      folderId
+      documentFolderId: folderId
     }
   })
 }

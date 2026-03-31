@@ -231,11 +231,10 @@ interface WorkspaceResponse {
 }
 
 const projectId = computed(() => String(route.query.projectId ?? ''))
+const captureFolderId = computed(() => String(route.query.captureFolderId ?? ''))
 const currentProject = ref<{ id: string; name: string; description: string } | null>(null)
 const folders = ref<WorkspaceFolder[]>([])
-const selectedFolderId = ref(
-  String(route.query.documentFolderId ?? route.query.folderId ?? route.query.captureFolderId ?? '') || null
-)
+const selectedFolderId = ref(String(route.query.documentFolderId ?? '') || null)
 const selectedScreenshotId = ref(String(route.query.screenshotId ?? ''))
 const isLeftSidebarOpen = ref(true)
 const isWorkspaceLoaded = ref(false)
@@ -344,8 +343,7 @@ const parsedFunctionalityItems = computed(() =>
 )
 
 const syncSelectionFromRoute = (): void => {
-  selectedFolderId.value =
-    String(route.query.documentFolderId ?? route.query.folderId ?? route.query.captureFolderId ?? '') || null
+  selectedFolderId.value = String(route.query.documentFolderId ?? '') || null
   selectedScreenshotId.value = String(route.query.screenshotId ?? '')
 }
 
@@ -487,7 +485,8 @@ const goWorkspace = async (): Promise<void> => {
     name: 'workspace-index',
     query: {
       projectId: projectId.value,
-      documentFolderId: selectedFolderId.value || undefined
+      documentFolderId: selectedFolderId.value || undefined,
+      captureFolderId: captureFolderId.value || undefined
     }
   })
 }
@@ -498,7 +497,8 @@ const openImageEditor = async (screenshotId: string): Promise<void> => {
     query: {
       projectId: projectId.value,
       documentFolderId: currentFolder.value.id,
-      screenshotId
+      screenshotId,
+      captureFolderId: captureFolderId.value || undefined
     }
   })
 }

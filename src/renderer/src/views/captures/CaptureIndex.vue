@@ -215,9 +215,10 @@ const isCaptureFlashVisible = ref(false)
 let captureFlashTimeout: ReturnType<typeof setTimeout> | null = null
 
 const projectId = computed(() => String(route.query.projectId ?? ''))
+const captureFolderId = computed(() => String(route.query.captureFolderId ?? ''))
 const currentProject = ref<ProjectRecord | null>(null)
 const folderItems = ref<CaptureFolder[]>([])
-const selectedFolderId = ref<string | null>(String(route.query.folderId ?? '') || null)
+const selectedFolderId = ref<string | null>(String(route.query.captureFolderId ?? '') || null)
 
 const selectedFolder = computed(() =>
   folderItems.value.find((item) => item.id === selectedFolderId.value) ?? null
@@ -317,7 +318,7 @@ const goSelect = async (): Promise<void> => {
     name: 'workspace-index',
     query: {
       projectId: projectId.value,
-      captureFolderId: selectedFolderId.value ?? undefined
+      captureFolderId: selectedFolderId.value 
     }
   })
 }
@@ -450,11 +451,27 @@ const onSelectFolder = (id: string): void => {
   isFolderDropdownOpen.value = false
 }
 
+const restoreLastUrl = async (): Promise<void> => {
+  const folderId = captureFolderId.value || ''
+  if (!folderId) return
+
+  const result = (await window.api.invoke('capture:getLastUrl', {
+    folderId
+  })) as { url: string }
+
+  if (!result?.url) return
+
+  currentUrl.value = result.url
+  urlInput.value = result.url
+  // selectedFolderId.value = folderId
+}
+
 let webviewCaptureListener: (() => void) | null = null
 
 onMounted(async () => {
   const webview = webviewRef.value
   if (!webview) return
+
 
   webview.addEventListener('did-start-loading', () => {
     isLoading.value = true
@@ -482,6 +499,7 @@ onMounted(async () => {
   webviewCaptureListener = window.api.on('shortcut:captureWebview', onCaptureWebview)
   await loadProjectFromDatabase()
   await loadWorkspaceFromDatabase()
+  await restoreLastUrl()
   await syncFoldersToDatabase()
 })
 

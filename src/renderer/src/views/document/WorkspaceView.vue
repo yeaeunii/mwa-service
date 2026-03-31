@@ -383,11 +383,12 @@ interface WorkspaceResponse {
 }
 
 const projectId = computed(() => String(route.query.projectId ?? ''))
+const captureFolderId = computed(() => String(route.query.captureFolderId ?? ''))
 const currentProject = ref<ProjectRecord | null>(null)
 const folders = ref<WorkspaceFolder[]>([])
 const captureSourceFolders = ref<WorkspaceFolder[]>([])
 const selectedFolderId = ref<string | null>(
-  String(route.query.documentFolderId ?? route.query.folderId ?? '') || null
+  String(route.query.documentFolderId ?? '') || null
 )
 const isLeftSidebarOpen = ref(true)
 const workspaceDragFromIndex = ref<number | null>(null)
@@ -738,19 +739,12 @@ const goHome = async (): Promise<void> => {
 }
 
 const goCapture = async (): Promise<void> => {
+
   await router.push({
     name: 'capture-index',
-    query: { projectId: projectId.value }
-  })
-}
-
-const goSelectStep = async (): Promise<void> => {
-  await router.push({
-    name: 'select-index',
-    query: {
-      projectId: projectId.value,
-      documentFolderId: selectedFolderId.value ?? undefined
-    }
+    query: { projectId: projectId.value,
+             captureFolderId: captureFolderId.value
+     }
   })
 }
 
@@ -758,10 +752,11 @@ const goSelectStep = async (): Promise<void> => {
 const openEditorWithScreenshot = async (screenshotId: string): Promise<void> => {
   await router.push({
     name: 'editor-index',
-      query: {
-        projectId: projectId.value,
-        documentFolderId: currentFolder.value.id,
-        screenshotId
+    query: {
+      projectId: projectId.value,
+      documentFolderId: currentFolder.value.id,
+      screenshotId,
+      captureFolderId: captureFolderId.value || undefined
     }
   })
 }

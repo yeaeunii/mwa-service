@@ -15,6 +15,7 @@ const INVOKE_CHANNELS = [
   'capture:syncFolders',
   'capture:list',
   'capture:save',
+  'capture:getLastUrl',
   'capture:updateMeta',
   'capture:overwriteImage',
   'capture:remove',

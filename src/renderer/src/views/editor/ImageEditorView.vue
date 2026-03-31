@@ -18,14 +18,6 @@
         </div>
       </div>
 
-      <button
-        type="button"
-        class="btn border-0 bg-slate-700 text-white shadow-none hover:bg-slate-600"
-        @click="goEditorOverview"
-      >
-        <i-lucide-layout-grid class="text-sm" />
-        화면 목록
-      </button>
     </div>
 
     <div class="relative flex min-h-0 flex-1 overflow-hidden">
@@ -48,7 +40,6 @@
             <div class="flex items-center gap-2 px-3 py-2">
               <button type="button" class="min-w-0 flex-1 text-left" @click="selectFolder(folder.id)">
                 <div class="truncate text-sm font-semibold text-white">{{ folder.title }}</div>
-                <div class="text-xs text-slate-400">{{ folder.screenshots.length }}개 선택됨</div>
               </button>
               <div class="badge border-0 bg-rose-500 text-white">{{ folder.screenshots.length }}</div>
               <button
@@ -149,14 +140,13 @@
             <div
               ref="canvasHostRef"
               class="absolute inset-0 overflow-hidden bg-slate-950"
-              @wheel.prevent="handleCanvasWheel"
               @contextmenu.prevent
             >
               <!-- Fabric canvas  -->
               <canvas ref="fabricCanvasRef" class="absolute inset-0 h-full w-full"></canvas>
             </div>
 
-
+            <!--
             <div class="pointer-events-none absolute inset-x-0 bottom-5 z-10 flex justify-center px-6">
               <div class="pointer-events-auto flex items-center gap-1 rounded-2xl border border-white/10 bg-slate-900/90 p-1.5 shadow-lg">
                 <button
@@ -182,6 +172,7 @@
                 </button>
               </div>
             </div>
+            -->
           </div>
         </section>
 
@@ -341,17 +332,17 @@ const MAX_RELATIVE_ZOOM = 8
 const ZOOM_STEP = 1.12
 
 const projectId = computed(() => String(route.query.projectId ?? ''))
+const captureFolderId = computed(() => String(route.query.captureFolderId ?? ''))
 const currentProject = ref<ProjectRecord | null>(null)
 const folders = ref<WorkspaceFolder[]>([])
 const selectedForManual = ref<Record<string, string[]>>({})
 const selectedFolders = computed(() => getSelectedFolders(folders.value, selectedForManual.value))
 
 
-const selectedFolderId = ref(String(route.query.documentFolderId ?? route.query.folderId ?? ''))
+const selectedFolderId = ref(String(route.query.documentFolderId ?? ''))
 const selectedScreenshotId = ref(String(route.query.screenshotId ?? ''))
 const isLeftSidebarOpen = ref(true)
 const isDescriptionOpen = ref(true)
-const isThumbnailOpen = ref(true)
 const expandedFolderIds = ref<string[]>([])
 const activeTool = ref<ToolMode>('number')
 const zoomScale = ref(1)
@@ -448,7 +439,7 @@ const getBaseZoom = (): number => {
 const getAbsoluteZoom = (): number => Math.max(getBaseZoom() * zoomScale.value, 0.0001)
 
 const syncSelectionFromRoute = (): void => {
-  selectedFolderId.value = String(route.query.documentFolderId ?? route.query.folderId ?? '')
+  selectedFolderId.value = String(route.query.documentFolderId ?? '')
   selectedScreenshotId.value = String(route.query.screenshotId ?? '')
 }
 
@@ -494,21 +485,25 @@ const applyViewport = (): void => {
   canvas.requestRenderAll()
 }
 
+
+///캔버스 상호작용 모드 갱신//////
 const updateCanvasInteractionMode = (): void => {
   const canvas = fabricCanvas.value
   if (!canvas) return
 
-  canvas.skipTargetFind = false
-  canvas.selection = false
+  canvas.skipTargetFind = false //캔버스 위에 있는 객체를 마우스로 인식할 수 있게 함함
+  canvas.selection = false //드래그로 여러 객체를 한꺼번에 선택하는 선택 박스 기능 끔
 
-  const background = backgroundImage.value
+  const background = backgroundImage.value // 배경이미지 꺼내기 
+
+
   canvas.getObjects().forEach((item) => {
     if (background && item === (background as unknown as typeof item)) return
 
     item.set({
       selectable: false,
       evented: true
-    })
+    })//사용자가 객체를 자유롭게 드래그해서 움직이는 건 막고 필요한 로직 이벤트만 받게 하려는 설정\
   })
 
   canvas.discardActiveObject()
@@ -516,41 +511,41 @@ const updateCanvasInteractionMode = (): void => {
   canvas.requestRenderAll()
 }
 
-const zoomAtViewportPoint = (point: Point, nextRelativeZoom: number): void => {
-  const canvas = fabricCanvas.value
-  if (!canvas) return
-
-  // 휠을 굴린 위치를 기준으로 zoomToPoint를 적용한다.
-  zoomScale.value = clampRelativeZoom(nextRelativeZoom)
-  canvas.zoomToPoint(point, getAbsoluteZoom())
-  clampViewport()
-  canvas.requestRenderAll()
-}
-
-const zoomIn = (): void => {
-  const { width, height } = getCanvasDimensions()
-  zoomAtViewportPoint(new Point(width / 2, height / 2), zoomScale.value * ZOOM_STEP)
-}
-
-const zoomOut = (): void => {
-  const { width, height } = getCanvasDimensions()
-  zoomAtViewportPoint(new Point(width / 2, height / 2), zoomScale.value / ZOOM_STEP)
-}
-
-const resetZoom = (): void => {
-  zoomScale.value = 1
-  applyViewport()
-}
-
-const handleCanvasWheel = (event: WheelEvent): void => {
-  const canvas = fabricCanvas.value
-  if (!canvas) return
-
-  // 확대/축소는 이미지와 도형이 함께 움직이도록 Fabric viewport에 직접 적용한다.
-  const pointer = canvas.getViewportPoint(event)
-  const nextRelativeZoom = event.deltaY < 0 ? zoomScale.value * ZOOM_STEP : zoomScale.value / ZOOM_STEP
-  zoomAtViewportPoint(pointer, nextRelativeZoom)
-}
+// const zoomAtViewportPoint = (point: Point, nextRelativeZoom: number): void => {
+//   const canvas = fabricCanvas.value
+//   if (!canvas) return
+//
+//   // 휠을 굴린 위치를 기준으로 zoomToPoint를 적용한다.
+//   zoomScale.value = clampRelativeZoom(nextRelativeZoom)
+//   canvas.zoomToPoint(point, getAbsoluteZoom())
+//   clampViewport()
+//   canvas.requestRenderAll()
+// }
+//
+// const zoomIn = (): void => {
+//   const { width, height } = getCanvasDimensions()
+//   zoomAtViewportPoint(new Point(width / 2, height / 2), zoomScale.value * ZOOM_STEP)
+// }
+//
+// const zoomOut = (): void => {
+//   const { width, height } = getCanvasDimensions()
+//   zoomAtViewportPoint(new Point(width / 2, height / 2), zoomScale.value / ZOOM_STEP)
+// }
+//
+// const resetZoom = (): void => {
+//   zoomScale.value = 1
+//   applyViewport()
+// }
+//
+// const handleCanvasWheel = (event: WheelEvent): void => {
+//   const canvas = fabricCanvas.value
+//   if (!canvas) return
+//
+//   // 확대/축소는 이미지와 도형이 함께 움직이도록 Fabric viewport에 직접 적용한다.
+//   const pointer = canvas.getViewportPoint(event)
+//   const nextRelativeZoom = event.deltaY < 0 ? zoomScale.value * ZOOM_STEP : zoomScale.value / ZOOM_STEP
+//   zoomAtViewportPoint(pointer, nextRelativeZoom)
+// }
 
 const loadWorkspaceFromDatabase = async (): Promise<void> => {
   if (!projectId.value) return
@@ -701,14 +696,15 @@ const createNumberObject = (annotation: WorkspaceAnnotation): Group => {
   return group
 }
 
+/////////
 const redrawFabricObjects = (): void => {
   const canvas = fabricCanvas.value
   if (!canvas) return
 
-  // 현재 screenshot의 annotation 배열을 기준으로 Fabric object를 전부 다시 만든다.
+  
   const background = backgroundImage.value
   const removableObjects = canvas
-    .getObjects()
+    .getObjects() //캔버스 안의 모든 객체 가져오기
     .filter((item) => !background || item !== (background as unknown as typeof item))
   removableObjects.forEach((item) => canvas.remove(item))
 
@@ -773,10 +769,11 @@ const focusAnnotation = async (annotationId: string): Promise<void> => {
   inputRefs.value[annotationId]?.focus()
 }
 
+//////// 숫자마커 생성
 const addNumberAnnotation = (left: number, top: number): void => {
-  // number 도구는 클릭 위치를 비율 좌표로 저장해서 해상도가 바뀌어도 위치를 유지한다.
+
   const nextAnnotation: WorkspaceAnnotation = {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    id: `${Math.random().toString(36).slice(2, 6)}`,
     number: currentAnnotations.value.length + 1,
     x: Math.min(Math.max(left / sceneWidth.value, 0.01), 0.99),
     y: Math.min(Math.max(top / sceneHeight.value, 0.01), 0.99),
@@ -908,19 +905,6 @@ const saveDescriptions = async (): Promise<void> => {
   await goEditorOverview()
 }
 
-const updateFolderPath = (path: string): void => {
-  patchCurrentFolder((folder) => ({
-    ...folder,
-    path
-  }))
-}
-
-const updateFolderDescription = (description: string): void => {
-  patchCurrentFolder((folder) => ({
-    ...folder,
-    description
-  }))
-}
 
 const selectFolder = (id: string): void => {
   selectedFolderId.value = id
@@ -953,7 +937,8 @@ const goWorkspace = async (): Promise<void> => {
     name: 'editor-index',
     query: {
       projectId: projectId.value,
-      documentFolderId: selectedFolderId.value || undefined
+      documentFolderId: selectedFolderId.value || undefined,
+      captureFolderId: captureFolderId.value || undefined
     }
   })
 }
@@ -965,18 +950,20 @@ const goEditorOverview = async (): Promise<void> => {
       projectId: projectId.value,
       documentFolderId: selectedFolderId.value || undefined,
       screenshotId: selectedScreenshotId.value || undefined,
+      captureFolderId: captureFolderId.value || undefined,
       refreshTs: String(Date.now())
     }
   })
 }
-
+//////////////////////////////
 const setActiveTool = (tool: ToolMode): void => {
-  // 툴을 바꾸면 Fabric 선택 가능 여부도 같이 바꿔준다.
   activeTool.value = tool
   const canvas = fabricCanvas.value
+
   if (!canvas) return
-  canvas.discardActiveObject()
-  focusedAnnotationId.value = null
+
+  canvas.discardActiveObject() //현재 선택되어 있는 객체를 선택 해제
+  focusedAnnotationId.value = null //현재 포커스된 annotation(주석/마커/박스)의 ID를 비우
   updateCanvasInteractionMode()
 }
 
@@ -1046,26 +1033,18 @@ const setupCanvasEvents = (): void => {
   canvas.on('mouse:down', (event) => {
     const target = event.target as FabricEditorObject | undefined
 
-    // 우클릭 삭제
-    if ((event.e as MouseEvent).button === 2) {
-      const annotationId = target && (target as unknown as { annotationId?: string }).annotationId
-      if (annotationId) {
-        removeMarker(annotationId)
-      }
-      return
-    }
-
     // 기존 도형 위에 새로 만들지X
     if (target) {
-      
       return
     }
 
-    const pointer = canvas.getScenePoint(event.e)
+    const pointer = canvas.getScenePoint(event.e) //마우스를 클릭한 위치를 캔버스 좌표로 바꾸는 것
     if (activeTool.value === 'number') {
       addNumberAnnotation(pointer.x, pointer.y)
       return
     }
+
+    //box
   })
 
   canvas.on('selection:created', () => {
