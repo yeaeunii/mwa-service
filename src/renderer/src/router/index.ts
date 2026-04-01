@@ -4,7 +4,7 @@ import CaptureIndex from '@/views/captures/CaptureIndex.vue'
 import EditorView from '@/views/editor/EditorView.vue'
 import ImageEditorView from '@/views/editor/ImageEditorView.vue'
 import DashboardView from '@/views/dashboard/DashboardView.vue'
-import SelectView from '@/views/document/SelectImageView.vue'
+// import SelectView from '@/views/document/SelectImageView.vue'
 import WorkspaceView from '@/views/document/WorkspaceView.vue'
 
 const router = createRouter({
@@ -25,11 +25,11 @@ const router = createRouter({
       name: 'dashboard-index',
       component: DashboardView
     },
-    {
-      path: '/select',
-      name: 'select-index',
-      component: SelectView
-    },
+    // {
+    //   path: '/select',
+    //   name: 'select-index',
+    //   component: SelectView
+    // },
     {
       path: '/workspace',
       name: 'workspace-index',

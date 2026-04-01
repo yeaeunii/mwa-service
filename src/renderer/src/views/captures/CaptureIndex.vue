@@ -4,12 +4,12 @@
     <div class="drawer-content">
       <div class="flex h-[100vh] flex-col">
         <div class="flex items-center gap-3 border-b border-white/10 bg-slate-900 p-2">
-            <button
-              type="button"
-              class="flex h-12 w-12 items-center justify-center rounded-none bg-slate-900 text-white transition-colors hover:bg-slate-900"
-              @click="goHome"
-            >
-            <i-lucide-house class="text-lg" />
+          <button
+            type="button"
+            class="flex h-12 w-12 items-center justify-center rounded-none bg-slate-900 text-white transition-colors hover:bg-slate-900"
+            @click="router.push({ name: 'dashboard-index' })"
+          >
+            <i-lucide-arrow-left class="text-lg" />
           </button>
 
           <div class="flex grow items-center gap-2">
@@ -35,17 +35,17 @@
             </form>
           </div>
 
-            <div class="flex items-center gap-2 md:w-1/2 lg:w-[28rem]">
-              <div
-                class="flex h-8 grow items-center rounded-lg border border-white/30 bg-white/5 text-white"
-              >
-                <details class="dropdown dropdown-bottom" :open="isFolderDropdownOpen">
-                  <summary
-                    class="flex h-8 w-12 cursor-pointer items-center justify-center border-r border-white/20"
-                    @click.prevent="isFolderDropdownOpen = !isFolderDropdownOpen"
-                  >
-                    <i-lucide-chevron-down class="text-sm" />
-                  </summary>
+          <div class="flex items-center gap-2 md:w-1/2 lg:w-[28rem]">
+            <div
+              class="flex h-8 grow items-center rounded-lg border border-white/30 bg-white/5 text-white"
+            >
+              <details class="dropdown dropdown-bottom" :open="isFolderDropdownOpen">
+                <summary
+                  class="flex h-8 w-12 cursor-pointer items-center justify-center border-r border-white/20"
+                  @click.prevent="isFolderDropdownOpen = !isFolderDropdownOpen"
+                >
+                  <i-lucide-chevron-down class="text-sm" />
+                </summary>
                 <ul
                   class="dropdown-content menu z-50 mt-2 w-64 rounded-box border border-white/10 bg-slate-800 p-2 shadow-xl"
                 >
@@ -66,17 +66,17 @@
                   </li>
                 </ul>
               </details>
-                <div class="flex min-w-0 flex-1 items-center justify-start px-3">
-                  <span class="truncate text-xs font-semibold">
-                    {{ selectedFolder?.title ?? '폴더를 선택하세요' }}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  class="mr-2 flex h-6 min-w-10 items-center justify-center rounded-full px-2 text-xs font-bold"
-                  :class="
-                    selectedFolderImages.length > 0
-                      ? 'bg-rose-500 text-white'
+              <div class="flex min-w-0 flex-1 items-center justify-start px-3">
+                <span class="truncate text-xs font-semibold">
+                  {{ selectedFolder?.title ?? '폴더를 선택하세요' }}
+                </span>
+              </div>
+              <button
+                type="button"
+                class="mr-2 flex h-6 min-w-10 items-center justify-center rounded-full px-2 text-xs font-bold"
+                :class="
+                  selectedFolderImages.length > 0
+                    ? 'bg-rose-500 text-white'
                     : 'bg-white/10 text-slate-300'
                 "
                 :disabled="selectedFolderId === null"
@@ -85,15 +85,15 @@
                 + {{ selectedFolderImages.length }}
               </button>
             </div>
-              <button
-                type="button"
-                class="btn btn-sm shrink-0 border border-blue-900 bg-white px-3 text-xs text-blue-900 shadow-none hover:bg-blue-900 hover:text-white"
-                :disabled="selectedFolderId === null"
-                @click="goSelect"
-              >
-                문서 생성 시작하기
-                <i-lucide-arrow-right class="text-sm" />
-              </button>
+            <button
+              type="button"
+              class="btn btn-sm shrink-0 border border-blue-900 bg-white px-3 text-xs text-blue-900 shadow-none hover:bg-blue-900 hover:text-white"
+              :disabled="selectedFolderId === null"
+              @click="goSelect"
+            >
+              문서 생성 시작하기
+              <i-lucide-arrow-right class="text-sm" />
+            </button>
           </div>
         </div>
 
@@ -219,13 +219,16 @@ const currentProject = ref<ProjectRecord | null>(null)
 const folderItems = ref<CaptureFolder[]>([])
 const selectedFolderId = ref<string | null>(String(route.query.folderId ?? '') || null)
 
-const selectedFolder = computed(() =>
-  folderItems.value.find((item) => item.id === selectedFolderId.value) ?? null
+const selectedFolder = computed(
+  () => folderItems.value.find((item) => item.id === selectedFolderId.value) ?? null
 )
 const selectedFolderImages = computed(() => selectedFolder.value?.images ?? [])
 
 const ensureSelectedFolder = (): void => {
-  if (selectedFolderId.value && folderItems.value.some((item) => item.id === selectedFolderId.value)) {
+  if (
+    selectedFolderId.value &&
+    folderItems.value.some((item) => item.id === selectedFolderId.value)
+  ) {
     return
   }
 
@@ -252,16 +255,16 @@ const loadWorkspaceFromDatabase = async (): Promise<void> => {
   folderItems.value = (response.folders ?? [])
     .filter((folder) => folder.area_type === 'capture')
     .map((folder) => ({
-    id: folder.id,
-    title: folder.title,
-    description: folder.description,
-    path: folder.path,
-    images: folder.screenshots.map((row) => ({
-      id: row.id,
-      src: row.image_src ?? toFileImageSrc(row.image_path),
-      filePath: row.image_path
+      id: folder.id,
+      title: folder.title,
+      description: folder.description,
+      path: folder.path,
+      images: folder.screenshots.map((row) => ({
+        id: row.id,
+        src: row.image_src ?? toFileImageSrc(row.image_path),
+        filePath: row.image_path
+      }))
     }))
-  }))
 
   ensureSelectedFolder()
 }
@@ -309,8 +312,8 @@ const reload = (): void => {
 }
 
 const goHome = async (): Promise<void> => {
-    await router.push({ name: 'home' })
-  }
+  await router.push({ name: 'home' })
+}
 
 const goSelect = async (): Promise<void> => {
   await router.push({
@@ -321,8 +324,8 @@ const goSelect = async (): Promise<void> => {
     }
   })
 }
-  
-  const onCaptureWebview = async (): Promise<void> => {
+
+const onCaptureWebview = async (): Promise<void> => {
   const webview = webviewRef.value
   const activeFolderId = selectedFolderId.value
   if (!webview || activeFolderId === null) return

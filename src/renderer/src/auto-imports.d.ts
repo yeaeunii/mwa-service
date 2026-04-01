@@ -93,6 +93,9 @@ declare global {
   // @ts-ignore
   export type { CaptureImage } from './types/index'
   import('./types/index')
+  // @ts-ignore
+  export type { ProjectRecord, FolderRecord, CaptureRecord, AnnotationRecord, WorkspaceCaptureRecord, WorkspaceFolderRecord, ProjectWorkspaceRecord } from '../../interfaces/db.schema'
+  import('../../interfaces/db.schema')
 }
 
 // for vue template auto import

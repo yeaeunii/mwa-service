@@ -30,6 +30,7 @@ declare module 'vue' {
     ILucideChevronLeft: typeof import('~icons/lucide/chevron-left')['default']
     ILucideChevronRight: typeof import('~icons/lucide/chevron-right')['default']
     ILucideChevronUp: typeof import('~icons/lucide/chevron-up')['default']
+    ILucideClose: typeof import('~icons/lucide/close')['default']
     ILucideDownload: typeof import('~icons/lucide/download')['default']
     ILucideEllipsisVertical: typeof import('~icons/lucide/ellipsis-vertical')['default']
     ILucideExpand: typeof import('~icons/lucide/expand')['default']

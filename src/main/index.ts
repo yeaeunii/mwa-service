@@ -232,19 +232,16 @@ app.whenReady().then(() => {
     }
   )
 
-  ipcMain.handle(
-    'capture:list',
-    async (_, payload: { projectId: string }) => {
-      const rows = listCapturesByProject(payload.projectId)
+  ipcMain.handle('capture:list', async (_, payload: { projectId: string }) => {
+    const rows = listCapturesByProject(payload.projectId)
 
-      return Promise.all(
-        rows.map(async (row) => ({
-          ...row,
-          image_src: await filePathToDataUrl(row.image_path)
-        }))
-      )
-    }
-  )
+    return Promise.all(
+      rows.map(async (row) => ({
+        ...row,
+        image_src: await filePathToDataUrl(row.image_path)
+      }))
+    )
+  })
 
   ipcMain.handle('workspace:get', async (_, payload: { projectId: string }) => {
     const workspace = getProjectWorkspace(payload.projectId)
@@ -416,20 +413,17 @@ app.whenReady().then(() => {
     }
   )
 
-  ipcMain.handle(
-    'capture:remove',
-    async (_, payload: { captureId: string; filePath: string }) => {
-      deleteCapture(payload.captureId)
+  ipcMain.handle('capture:remove', async (_, payload: { captureId: string; filePath: string }) => {
+    deleteCapture(payload.captureId)
 
-      try {
-        await unlink(payload.filePath)
-      } catch {
-        // File may already be removed or unavailable; DB delete is the primary action.
-      }
-
-      return { success: true }
+    try {
+      await unlink(payload.filePath)
+    } catch {
+      // File may already be removed or unavailable; DB delete is the primary action.
     }
-  )
+
+    return { success: true }
+  })
 
   ipcMain.handle(
     'capture:importToFolder',

@@ -3,313 +3,25 @@ import { app } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync } from 'fs'
 import { dirname, extname, join } from 'path'
+import type {
+  AnnotationRecord,
+  CaptureRecord,
+  FolderRecord,
+  ProjectRecord,
+  ProjectWorkspaceRecord
+} from '../../interfaces/db.schema'
 import schemaSql from './schema.sql?raw'
 
-let database: Database.Database | null = null
+import { selectOne, selectList, runQuery, transaction } from './connector'
+
 const CAPTURE_ROOT_DIR = 'screenshots'
 const CAPTURE_AREA_DIR = '캡쳐폴더'
 const DOCUMENT_AREA_DIR = '문서폴더'
-const SCHEMA_VERSION = 6
-
-export interface ProjectRecord {
-  id: string
-  name: string
-  description: string
-  status: 'draft' | 'in_progress' | 'completed' | 'archived'
-  source_url: string
-  progress: number
-  delete_yn: 'Y' | 'N'
-  created_at: string
-  updated_at: string
-}
-
-export interface FolderRecord {
-  id: string
-  project_id: string
-  title: string
-  path: string
-  description: string
-  area_type: 'capture' | 'document'
-  sort_order: number
-  created_at: string
-  updated_at: string
-}
-
-export interface CaptureRecord {
-  id: string
-  folder_id: string
-  file_name: string
-  image_path: string
-  source_url: string
-  page_title: string
-  menu_path: string
-  screen_description: string
-  functionality_description: string
-  writer_name: string
-  page_no: number
-  sort_order: number
-  is_selected: number
-  created_at: string
-}
-
-export interface AnnotationRecord {
-  id: string
-  capture_id: string
-  tool_type: 'number' | 'box'
-  marker_no: number | null
-  x: number
-  y: number
-  width: number | null
-  height: number | null
-  description: string
-}
-
-export interface WorkspaceCaptureRecord extends CaptureRecord {
-  annotations: AnnotationRecord[]
-}
-
-export interface WorkspaceFolderRecord extends FolderRecord {
-  screenshots: WorkspaceCaptureRecord[]
-}
-
-export interface ProjectWorkspaceRecord {
-  project: ProjectRecord | null
-  folders: WorkspaceFolderRecord[]
-}
-
-export const getDatabasePath = (): string => join(app.getPath('userData'), 'miso-mwa.db')
-
-const migrateDatabase = (db: Database.Database, currentSchemaVersion: number): void => {
-  if (currentSchemaVersion === 0) {
-    db.exec(schemaSql)
-    return
-  }
-
-  if (currentSchemaVersion < 4) {
-    db.exec(`
-      ALTER TABLE folders ADD COLUMN path TEXT NOT NULL DEFAULT '';
-      ALTER TABLE folders ADD COLUMN description TEXT NOT NULL DEFAULT '';
-    `)
-  }
-
-  if (currentSchemaVersion < 5) {
-    db.exec(`
-      PRAGMA foreign_keys = OFF;
-
-      ALTER TABLE folders RENAME TO folders_legacy;
-
-      CREATE TABLE folders (
-        id TEXT PRIMARY KEY,
-        project_id TEXT NOT NULL,
-        title TEXT NOT NULL,
-        path TEXT NOT NULL DEFAULT '',
-        description TEXT NOT NULL DEFAULT '',
-        area_type TEXT NOT NULL DEFAULT 'capture'
-          CHECK (area_type IN ('capture', 'document')),
-        sort_order INTEGER NOT NULL DEFAULT 0,
-        delete_yn TEXT NOT NULL DEFAULT 'N'
-          CHECK (delete_yn IN ('Y', 'N')),
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-      );
-
-      INSERT INTO folders (
-        id,
-        project_id,
-        title,
-        path,
-        description,
-        area_type,
-        sort_order,
-        delete_yn,
-        created_at,
-        updated_at
-      )
-      SELECT
-        id,
-        project_id,
-        title,
-        COALESCE(path, ''),
-        COALESCE(description, ''),
-        area_type,
-        sort_order,
-        delete_yn,
-        created_at,
-        updated_at
-      FROM folders_legacy;
-
-      DROP TABLE folders_legacy;
-
-      CREATE INDEX idx_folders_project_id
-        ON folders(project_id);
-
-      CREATE INDEX idx_folders_project_delete_yn
-        ON folders(project_id, delete_yn);
-
-      CREATE UNIQUE INDEX uq_folders_project_area_title_active
-        ON folders(project_id, area_type, title)
-        WHERE delete_yn = 'N';
-
-      CREATE TRIGGER trg_folders_updated_at
-      AFTER UPDATE ON folders
-      FOR EACH ROW
-      BEGIN
-        UPDATE folders
-        SET updated_at = datetime('now')
-        WHERE id = NEW.id;
-      END;
-
-      PRAGMA foreign_keys = ON;
-      PRAGMA user_version = 5;
-    `)
-  }
-
-  if (currentSchemaVersion < 6) {
-    db.exec(`
-      PRAGMA foreign_keys = OFF;
-
-      CREATE TABLE captures_new (
-        id TEXT PRIMARY KEY,
-        project_id TEXT NOT NULL,
-        folder_id TEXT NOT NULL,
-        file_name TEXT NOT NULL,
-        image_path TEXT NOT NULL,
-        source_url TEXT NOT NULL DEFAULT '',
-        page_title TEXT NOT NULL DEFAULT '',
-        menu_path TEXT NOT NULL DEFAULT '',
-        screen_description TEXT NOT NULL DEFAULT '',
-        functionality_description TEXT NOT NULL DEFAULT '',
-        writer_name TEXT NOT NULL DEFAULT '',
-        page_no INTEGER NOT NULL DEFAULT 1,
-        mime_type TEXT NOT NULL DEFAULT 'image/png',
-        width INTEGER,
-        height INTEGER,
-        file_size INTEGER,
-        sort_order INTEGER NOT NULL DEFAULT 0,
-        is_selected INTEGER NOT NULL DEFAULT 0
-          CHECK (is_selected IN (0, 1)),
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
-        FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE
-      );
-
-      INSERT INTO captures_new (
-        id,
-        project_id,
-        folder_id,
-        file_name,
-        image_path,
-        source_url,
-        page_title,
-        menu_path,
-        screen_description,
-        functionality_description,
-        writer_name,
-        page_no,
-        mime_type,
-        width,
-        height,
-        file_size,
-        sort_order,
-        is_selected,
-        created_at,
-        updated_at
-      )
-      SELECT
-        id,
-        project_id,
-        folder_id,
-        file_name,
-        image_path,
-        source_url,
-        page_title,
-        menu_path,
-        screen_description,
-        functionality_description,
-        writer_name,
-        page_no,
-        COALESCE(mime_type, 'image/png'),
-        width,
-        height,
-        file_size,
-        sort_order,
-        is_selected,
-        created_at,
-        updated_at
-      FROM captures;
-
-      DROP TABLE captures;
-
-      ALTER TABLE captures_new RENAME TO captures;
-
-      CREATE INDEX idx_captures_project_folder
-        ON captures(project_id, folder_id);
-
-      CREATE INDEX idx_captures_selected
-        ON captures(project_id, is_selected);
-
-      CREATE INDEX idx_captures_image_path
-        ON captures(image_path);
-
-      CREATE TRIGGER trg_captures_updated_at
-      AFTER UPDATE ON captures
-      FOR EACH ROW
-      BEGIN
-        UPDATE captures
-        SET updated_at = datetime('now')
-        WHERE id = NEW.id;
-      END;
-
-      PRAGMA foreign_keys = ON;
-      PRAGMA user_version = 6;
-    `)
-  }
-}
-
-export const initDatabase = (): Database.Database => {
-  if (database) return database
-
-  const dbPath = getDatabasePath()
-  const dbDir = dirname(dbPath)
-
-  if (!existsSync(dbDir)) {
-    mkdirSync(dbDir, { recursive: true })
-  }
-
-  database = new Database(dbPath)
-  database.pragma('foreign_keys = ON')
-  const currentSchemaVersion = Number(database.pragma('user_version', { simple: true }) ?? 0)
-
-  if (currentSchemaVersion < SCHEMA_VERSION) {
-    migrateDatabase(database, currentSchemaVersion)
-  }
-
-  return database
-}
-
-export const getDatabase = (): Database.Database => {
-  if (!database) {
-    return initDatabase()
-  }
-
-  return database
-}
-
-export const closeDatabase = (): void => {
-  if (!database) return
-
-  database.close()
-  database = null
-}
 
 const getProjectIdByCaptureId = (captureId: string): string | null => {
-  const db = getDatabase()
-  const row = db
-    .prepare(`SELECT project_id FROM captures WHERE id = ?`)
-    .get(captureId) as { project_id: string } | undefined
-
+  const row = selectOne<{ project_id: string }>(`SELECT project_id FROM captures WHERE id = ?`, [
+    captureId
+  ])
   return row?.project_id ?? null
 }
 
@@ -319,12 +31,13 @@ const calculateProjectProgress = (
   progress: number
   status: ProjectRecord['status']
 } => {
-  const db = getDatabase()
-
-  const counts = db
-    .prepare(
-      `
-        SELECT
+  const row = selectOne<{
+    capture_count: number | null
+    selected_count: number | null
+    annotated_selected_count: number | null
+  }>(
+    `
+    SELECT
           COUNT(c.id) AS capture_count,
           SUM(CASE WHEN c.is_selected = 1 THEN 1 ELSE 0 END) AS selected_count,
           SUM(
@@ -346,9 +59,9 @@ const calculateProjectProgress = (
           ON f.id = c.folder_id
          AND f.delete_yn = 'N'
         WHERE c.project_id = ?
-      `
-    )
-    .get(projectId) as
+  `,
+    [projectId]
+  ) as
     | {
         capture_count: number | null
         selected_count: number | null
@@ -356,9 +69,9 @@ const calculateProjectProgress = (
       }
     | undefined
 
-  const captureCount = Number(counts?.capture_count ?? 0)
-  const selectedCount = Number(counts?.selected_count ?? 0)
-  const annotatedSelectedCount = Number(counts?.annotated_selected_count ?? 0)
+  const captureCount = Number(row?.capture_count ?? 0)
+  const selectedCount = Number(row?.selected_count ?? 0)
+  const annotatedSelectedCount = Number(row?.annotated_selected_count ?? 0)
 
   if (captureCount === 0) {
     return { progress: 0, status: 'draft' }
@@ -376,16 +89,13 @@ const calculateProjectProgress = (
 }
 
 const refreshProjectProgress = (projectId: string): void => {
-  const db = getDatabase()
   const { progress, status } = calculateProjectProgress(projectId)
 
-  db.prepare(
-    `
-      UPDATE projects
-      SET progress = ?, status = ?, delete_yn = 'N'
-      WHERE id = ?
-    `
-  ).run(progress, status, projectId)
+  runQuery(`UPDATE projects SET progress = ?, status = ?, delete_yn = 'N' WHERE id = ?`, [
+    progress,
+    status,
+    projectId
+  ])
 }
 
 export const upsertProject = (payload: {
@@ -394,9 +104,7 @@ export const upsertProject = (payload: {
   description?: string
   sourceUrl?: string
 }): void => {
-  const db = getDatabase()
-
-  db.prepare(
+  runQuery(
     `
       INSERT INTO projects (id, name, description, source_url, status, progress, delete_yn)
       VALUES (@id, @name, @description, @sourceUrl, 'draft', 0, 'N')
@@ -405,13 +113,14 @@ export const upsertProject = (payload: {
         description = excluded.description,
         source_url = excluded.source_url,
         delete_yn = 'N'
-    `
-  ).run({
-    id: payload.id,
-    name: payload.name,
-    description: payload.description ?? '',
-    sourceUrl: payload.sourceUrl ?? ''
-  })
+    `,
+    {
+      id: payload.id,
+      name: payload.name,
+      description: payload.description ?? '',
+      sourceUrl: payload.sourceUrl ?? ''
+    }
+  )
 }
 
 export const updateProject = (payload: {
@@ -419,69 +128,51 @@ export const updateProject = (payload: {
   name: string
   description?: string
 }): void => {
-  const db = getDatabase()
-
-  db.prepare(
+  runQuery(
     `
       UPDATE projects
-      SET
-        name = @name,
-        description = @description,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = @id
-        AND delete_yn = 'N'
-    `
-  ).run({
-    id: payload.id,
-    name: payload.name,
-    description: payload.description ?? ''
-  })
+      SET name = @name, description = @description, updated_at = CURRENT_TIMESTAMP
+      WHERE id = @id AND delete_yn = 'N'
+    `,
+    {
+      id: payload.id,
+      name: payload.name,
+      description: payload.description ?? ''
+    }
+  )
 }
 
 export const listProjects = (): ProjectRecord[] => {
-  const db = getDatabase()
-
-  return db
-    .prepare(
-      `
-        SELECT id, name, description, status, source_url, progress, delete_yn, created_at, updated_at
-        FROM projects
-        WHERE delete_yn = 'N'
-        ORDER BY updated_at DESC, created_at DESC
-      `
-    )
-    .all() as ProjectRecord[]
+  return selectList<ProjectRecord>(
+    `
+      SELECT id, name, description, status, source_url, progress, delete_yn, created_at, updated_at
+      FROM projects
+      WHERE delete_yn = 'N'
+      ORDER BY updated_at DESC, created_at DESC
+    `
+  )
 }
 
 export const getProjectById = (projectId: string): ProjectRecord | null => {
-  const db = getDatabase()
-
-  return (
-    (db
-      .prepare(
-        `
-          SELECT id, name, description, status, source_url, progress, delete_yn, created_at, updated_at
-          FROM projects
-          WHERE id = ?
-            AND delete_yn = 'N'
-        `
-      )
-      .get(projectId) as ProjectRecord | undefined) ?? null
+  return selectOne<ProjectRecord>(
+    `
+      SELECT id, name, description, status, source_url, progress, delete_yn, created_at, updated_at
+      FROM projects
+      WHERE id = ? AND delete_yn = 'N'
+    `,
+    [projectId]
   )
 }
 
 export const deleteProject = (projectId: string): void => {
-  const db = getDatabase()
-
-  db.prepare(
+  runQuery(
     `
       UPDATE projects
-      SET
-        delete_yn = 'Y',
-        updated_at = CURRENT_TIMESTAMP
+      SET delete_yn = 'Y', updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `
-  ).run(projectId)
+    `,
+    [projectId]
+  )
 }
 
 export const upsertFolder = (payload: {
@@ -493,9 +184,7 @@ export const upsertFolder = (payload: {
   sortOrder?: number
   areaType?: 'capture' | 'document'
 }): void => {
-  const db = getDatabase()
-
-  db.prepare(
+  runQuery(
     `
       INSERT INTO folders (id, project_id, title, path, description, area_type, sort_order, delete_yn)
       VALUES (@id, @projectId, @title, @path, @description, @areaType, @sortOrder, 'N')
@@ -507,16 +196,17 @@ export const upsertFolder = (payload: {
         area_type = excluded.area_type,
         sort_order = excluded.sort_order,
         delete_yn = 'N'
-    `
-  ).run({
-    id: payload.id,
-    projectId: payload.projectId,
-    title: payload.title,
-    path: payload.path ?? '',
-    description: payload.description ?? '',
-    areaType: payload.areaType ?? 'capture',
-    sortOrder: payload.sortOrder ?? 0
-  })
+    `,
+    {
+      id: payload.id,
+      projectId: payload.projectId,
+      title: payload.title,
+      path: payload.path ?? '',
+      description: payload.description ?? '',
+      areaType: payload.areaType ?? 'capture',
+      sortOrder: payload.sortOrder ?? 0
+    }
+  )
 }
 
 export const markDeletedFolders = (
@@ -524,42 +214,39 @@ export const markDeletedFolders = (
   activeFolderIds: string[],
   areaType?: 'capture' | 'document'
 ): void => {
-  const db = getDatabase()
   const activeIds = activeFolderIds.filter(Boolean)
   const areaCondition = areaType ? ` AND area_type = ?` : ''
   const conditionParams = areaType ? [areaType] : []
 
   if (activeIds.length === 0) {
-    db.prepare(`UPDATE folders SET delete_yn = 'Y' WHERE project_id = ?${areaCondition}`).run(
+    runQuery(`UPDATE folders SET delete_yn = 'Y' WHERE project_id = ?${areaCondition}`, [
       projectId,
       ...conditionParams
-    )
+    ])
     refreshProjectProgress(projectId)
     return
   }
 
   const placeholders = activeIds.map(() => '?').join(', ')
-  db.prepare(
-    `UPDATE folders SET delete_yn = 'Y' WHERE project_id = ?${areaCondition} AND id NOT IN (${placeholders})`
-  ).run(projectId, ...conditionParams, ...activeIds)
+  runQuery(
+    `UPDATE folders SET delete_yn = 'Y' WHERE project_id = ?${areaCondition} AND id NOT IN (${placeholders})`,
+    [projectId, ...conditionParams, ...activeIds]
+  )
 
   refreshProjectProgress(projectId)
 }
 
 export const listFoldersByProject = (projectId: string): FolderRecord[] => {
-  const db = getDatabase()
-
-  return db
-    .prepare(
-      `
-        SELECT id, project_id, title, path, description, area_type, sort_order, created_at, updated_at
-        FROM folders
-        WHERE project_id = ?
-          AND delete_yn = 'N'
-        ORDER BY area_type ASC, sort_order ASC, created_at ASC
-      `
-    )
-    .all(projectId) as FolderRecord[]
+  return selectList<FolderRecord>(
+    `
+      SELECT id, project_id, title, path, description, area_type, sort_order, created_at, updated_at
+      FROM folders
+      WHERE project_id = ?
+        AND delete_yn = 'N'
+      ORDER BY area_type ASC, sort_order ASC, created_at ASC
+    `,
+    [projectId]
+  )
 }
 
 export const insertCapture = (payload: {
@@ -576,12 +263,12 @@ export const insertCapture = (payload: {
   writerName?: string
   pageNo?: number
 }): void => {
-  const db = getDatabase()
-  const sortRow = db
-    .prepare(`SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_sort_order FROM captures WHERE folder_id = ?`)
-    .get(payload.folderId) as { next_sort_order: number } | undefined
+  const sortRow = selectOne<{ next_sort_order: number }>(
+    `SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_sort_order FROM captures WHERE folder_id = ?`,
+    [payload.folderId]
+  )
 
-  db.prepare(
+  runQuery(
     `
       INSERT INTO captures (
         id, project_id, folder_id, file_name, image_path, source_url, page_title,
@@ -591,22 +278,23 @@ export const insertCapture = (payload: {
         @id, @projectId, @folderId, @fileName, @imagePath, @sourceUrl, @pageTitle,
         @menuPath, @screenDescription, @functionalityDescription, @writerName, @pageNo, @sortOrder, 0
       )
-    `
-  ).run({
-    id: payload.id,
-    projectId: payload.projectId,
-    folderId: payload.folderId,
-    fileName: payload.fileName,
-    imagePath: payload.imagePath,
-    sourceUrl: payload.sourceUrl ?? '',
-    pageTitle: payload.pageTitle ?? '',
-    menuPath: payload.menuPath ?? '',
-    screenDescription: payload.screenDescription ?? '',
-    functionalityDescription: payload.functionalityDescription ?? '',
-    writerName: payload.writerName ?? '',
-    pageNo: payload.pageNo ?? (sortRow?.next_sort_order ?? 0) + 1,
-    sortOrder: sortRow?.next_sort_order ?? 0
-  })
+    `,
+    {
+      id: payload.id,
+      projectId: payload.projectId,
+      folderId: payload.folderId,
+      fileName: payload.fileName,
+      imagePath: payload.imagePath,
+      sourceUrl: payload.sourceUrl ?? '',
+      pageTitle: payload.pageTitle ?? '',
+      menuPath: payload.menuPath ?? '',
+      screenDescription: payload.screenDescription ?? '',
+      functionalityDescription: payload.functionalityDescription ?? '',
+      writerName: payload.writerName ?? '',
+      pageNo: payload.pageNo ?? (sortRow?.next_sort_order ?? 0) + 1,
+      sortOrder: sortRow?.next_sort_order ?? 0
+    }
+  )
 
   refreshProjectProgress(payload.projectId)
 }
@@ -628,7 +316,6 @@ export const copyCapturesToFolder = (payload: {
   folderDescription?: string
   captureIds: string[]
 }): CaptureRecord[] => {
-  const db = getDatabase()
   const sourceIds = [...new Set(payload.captureIds.filter(Boolean))]
   console.log('[db/import] start', {
     ...payload,
@@ -641,24 +328,23 @@ export const copyCapturesToFolder = (payload: {
   }
 
   const placeholders = sourceIds.map(() => '?').join(', ')
-  const sourceRows = db
-    .prepare(
-      `
-        SELECT
-          c.id,
-          c.folder_id,
-          c.file_name,
-          c.image_path,
-          c.source_url,
-          c.page_title,
-          c.menu_path,
-          c.screen_description,
-          c.functionality_description,
-          c.writer_name,
-          c.page_no,
-          c.sort_order,
-          c.is_selected,
-          c.created_at
+  const sourceRows = selectList<CaptureRecord>(
+    `
+      SELECT
+        c.id,
+        c.folder_id,
+        c.file_name,
+        c.image_path,
+        c.source_url,
+        c.page_title,
+        c.menu_path,
+        c.screen_description,
+        c.functionality_description,
+        c.writer_name,
+        c.page_no,
+        c.sort_order,
+        c.is_selected,
+        c.created_at
         FROM captures c
         INNER JOIN folders f
           ON f.id = c.folder_id
@@ -666,9 +352,9 @@ export const copyCapturesToFolder = (payload: {
         WHERE c.project_id = ?
           AND c.id IN (${placeholders})
         ORDER BY c.sort_order ASC, c.created_at ASC
-      `
-    )
-    .all(payload.projectId, ...sourceIds) as CaptureRecord[]
+    `,
+    [payload.projectId, ...sourceIds]
+  )
 
   if (sourceRows.length === 0) {
     console.warn('[db/import] no source rows found', sourceIds)
@@ -680,9 +366,10 @@ export const copyCapturesToFolder = (payload: {
     sourceRows
   })
 
-  const nextSortOrderRow = db
-    .prepare(`SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_sort_order FROM captures WHERE folder_id = ?`)
-    .get(payload.targetFolderId) as { next_sort_order: number } | undefined
+  const nextSortOrderRow = selectOne<{ next_sort_order: number }>(
+    `SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_sort_order FROM captures WHERE folder_id = ?`,
+    [payload.targetFolderId]
+  )
 
   const insertStatement = db.prepare(
     `
