@@ -33,7 +33,7 @@ const INVOKE_CHANNELS = [
 const SEND_CHANNELS: string[] = []
 
 // Listener channels
-const ON_CHANNELS = ['update:available', 'update:downloaded', 'shortcut:captureWebview']
+const ON_CHANNELS = ['update:available', 'update:downloaded', 'shortcut:captureWebview', 'capture:webviewWindowOpen']
 
 const systemInfo = {
   platform: process.platform,

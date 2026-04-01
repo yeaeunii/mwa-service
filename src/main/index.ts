@@ -62,11 +62,15 @@ function createWindow(): void {
     mainWindow.show()
   })
 
-  mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
-    return { action: 'deny' }
+  mainWindow.webContents.on('did-attach-webview', (_event, guestContents) => {
+    console.log('webview attached')
+    guestContents.setWindowOpenHandler(({ url }) => {
+      console.log('popup url from guest', url)
+      mainWindow.webContents.send('capture:webviewWindowOpen', { url })
+      return { action: 'deny' }
+    })
   })
-
+  
   // HMR for renderer base on electron-vite cli.
   // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {

@@ -99,10 +99,18 @@
 
         <div class="relative flex-1">
           <webview
+            v-if="isWebviewReady"
             ref="webviewRef"
             :src="currentUrl"
+             allowpopups
             class="absolute inset-0 h-full w-full bg-white"
           ></webview>
+          <div
+            v-else
+            class="absolute inset-0 flex items-center justify-center bg-white text-sm text-slate-500"
+          >
+            작업 화면을 준비하는 중입니다.
+          </div>
           <div
             class="pointer-events-none absolute inset-0 bg-white transition-opacity duration-150"
             :class="isCaptureFlashVisible ? 'opacity-80' : 'opacity-0'"
@@ -157,6 +165,11 @@ interface WebviewElement extends HTMLElement {
   addEventListener: (event: string, listener: (e: unknown) => void) => void
 }
 
+interface WebviewWindowOpenEvent {
+  url: string
+  preventDefault?: () => void
+}
+
 interface CaptureFolder {
   id: string
   title: string
@@ -204,14 +217,15 @@ const modalCaptureImagesRef = ref<ComponentRef<'ModalCaptureImages'> | null>(nul
 const router = useRouter()
 const route = useRoute()
 
-const urlInput = ref(START_PAGE_URL)
-const currentUrl = ref(START_PAGE_URL)
+const urlInput = ref('')
+const currentUrl = ref('')
 const isLoading = ref(false)
 const canGoBack = ref(false)
 const canGoForward = ref(false)
 const isDrawerOpen = ref(false)
 const isFolderDropdownOpen = ref(false)
 const isCaptureFlashVisible = ref(false)
+const isWebviewReady = ref(false)
 let captureFlashTimeout: ReturnType<typeof setTimeout> | null = null
 
 const projectId = computed(() => String(route.query.projectId ?? ''))
@@ -307,6 +321,12 @@ const goForward = (): void => {
 
 const reload = (): void => {
   webviewRef.value?.reload()
+}
+
+const navigateToWebviewUrl = (url: string): void => {
+  if (!url) return
+  urlInput.value = url
+  currentUrl.value = url
 }
 
 const goHome = async (): Promise<void> => {
@@ -451,31 +471,40 @@ const onSelectFolder = (id: string): void => {
   isFolderDropdownOpen.value = false
 }
 
-const restoreLastUrl = async (): Promise<void> => {
+const resolveInitialUrl = async (): Promise<string> => {
   const folderId = captureFolderId.value || ''
-  if (!folderId) return
+  if (!folderId) return START_PAGE_URL
 
   const result = (await window.api.invoke('capture:getLastUrl', {
     folderId
   })) as { url: string }
 
-  if (!result?.url) return
+  selectedFolderId.value = folderId
 
-  currentUrl.value = result.url
-  urlInput.value = result.url
-  // selectedFolderId.value = folderId
+  return result?.url || START_PAGE_URL
 }
 
 let webviewCaptureListener: (() => void) | null = null
+let popupUrlListener: (() => void) | null = null
 
 onMounted(async () => {
+  await loadProjectFromDatabase()
+  await loadWorkspaceFromDatabase()
+
+  const initialUrl = await resolveInitialUrl()
+  currentUrl.value = initialUrl
+  urlInput.value = initialUrl
+  isWebviewReady.value = true
+
+  await nextTick()
+
   const webview = webviewRef.value
   if (!webview) return
-
 
   webview.addEventListener('did-start-loading', () => {
     isLoading.value = true
   })
+
 
   webview.addEventListener('did-stop-loading', () => {
     isLoading.value = false
@@ -484,23 +513,44 @@ onMounted(async () => {
   })
 
   webview.addEventListener('did-navigate', (e: unknown) => {
-    urlInput.value = (e as { url: string }).url
+    const event = e as { url: string; isMainFrame?: boolean }
+    if (!event.isMainFrame) return
+
+    currentUrl.value = event.url
+    urlInput.value = event.url
     canGoBack.value = webview.canGoBack()
     canGoForward.value = webview.canGoForward()
   })
 
   webview.addEventListener('did-navigate-in-page', (e: unknown) => {
-    urlInput.value = (e as { url: string }).url
+    const event = e as { url: string; isMainFrame?: boolean }
+    console.log('???', event)
+
+    if (!event.isMainFrame) return
+
+    currentUrl.value = event.url
+    urlInput.value = event.url
     canGoBack.value = webview.canGoBack()
     canGoForward.value = webview.canGoForward()
   })
 
+
+
   window.api.invoke('shortcut:register', CAPTURE_SHORTCUT_KEY, 'shortcut:captureWebview')
   webviewCaptureListener = window.api.on('shortcut:captureWebview', onCaptureWebview)
-  await loadProjectFromDatabase()
-  await loadWorkspaceFromDatabase()
-  await restoreLastUrl()
+  
+  popupUrlListener = window.api.on('capture:webviewWindowOpen', (payload) => {
+    const url = (payload as { url?: string })?.url ?? ''
+    if (!url) return
+    console.log('urlpop',url)
+    navigateToWebviewUrl(url)
+  })
+  
   await syncFoldersToDatabase()
+
+
+
+
 })
 
 onUnmounted(() => {
@@ -510,6 +560,11 @@ onUnmounted(() => {
   }
   webviewCaptureListener?.()
   webviewCaptureListener = null
+
+  popupUrlListener?.()
+  popupUrlListener = null
+
+
   window.api.invoke('shortcut:unregister', CAPTURE_SHORTCUT_KEY)
 })
 </script>
