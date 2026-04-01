@@ -449,12 +449,30 @@ const onRemoveFolder = (id: string): void => {
 const onSelectFolder = (id: string): void => {
   selectedFolderId.value = id
   isFolderDropdownOpen.value = false
+  void restoreLastUrlForFolder(id)
+}
+
+const getLastUrlForFolder = async (folderId: string): Promise<string> => {
+  if (!folderId) return ''
+  const result = (await window.api.invoke('capture:getLastUrl', {
+    folderId
+  })) as { url: string }
+
+  return result?.url || ''
+}
+
+const restoreLastUrlForFolder = async (folderId: string): Promise<void> => {
+  const lastUrl = await getLastUrlForFolder(folderId)
+  if (!lastUrl) return
+
+  navigateToWebviewUrl(lastUrl)
 }
 
 const restoreLastUrl = async (): Promise<void> => {
   const folderId = captureFolderId.value || ''
   if (!folderId) return
 
+<<<<<<< Updated upstream
   const result = (await window.api.invoke('capture:getLastUrl', {
     folderId
   })) as { url: string }
@@ -464,6 +482,11 @@ const restoreLastUrl = async (): Promise<void> => {
   currentUrl.value = result.url
   urlInput.value = result.url
   // selectedFolderId.value = folderId
+=======
+  selectedFolderId.value = folderId
+
+  return (await getLastUrlForFolder(folderId)) || START_PAGE_URL
+>>>>>>> Stashed changes
 }
 
 let webviewCaptureListener: (() => void) | null = null
