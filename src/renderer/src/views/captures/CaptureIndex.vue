@@ -469,19 +469,32 @@ const onRemoveFolder = (id: string): void => {
 const onSelectFolder = (id: string): void => {
   selectedFolderId.value = id
   isFolderDropdownOpen.value = false
+  void restoreLastUrlForFolder(id)
+}
+
+const getLastUrlForFolder = async (folderId: string): Promise<string> => {
+  if (!folderId) return ''
+  const result = (await window.api.invoke('capture:getLastUrl', {
+    folderId
+  })) as { url: string }
+
+  return result?.url || ''
+}
+
+const restoreLastUrlForFolder = async (folderId: string): Promise<void> => {
+  const lastUrl = await getLastUrlForFolder(folderId)
+  if (!lastUrl) return
+
+  navigateToWebviewUrl(lastUrl)
 }
 
 const resolveInitialUrl = async (): Promise<string> => {
   const folderId = captureFolderId.value || ''
   if (!folderId) return START_PAGE_URL
 
-  const result = (await window.api.invoke('capture:getLastUrl', {
-    folderId
-  })) as { url: string }
-
   selectedFolderId.value = folderId
 
-  return result?.url || START_PAGE_URL
+  return (await getLastUrlForFolder(folderId)) || START_PAGE_URL
 }
 
 let webviewCaptureListener: (() => void) | null = null
