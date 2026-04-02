@@ -12,11 +12,12 @@ declare global {
   const computed: typeof import('vue').computed
   const createApp: typeof import('vue').createApp
   const createPinia: typeof import('pinia').createPinia
-  const createProject: typeof import('../../database/dao').createProject
+  const createProject: typeof import('./database/index').createProject
   const customRef: typeof import('vue').customRef
   const defineAsyncComponent: typeof import('vue').defineAsyncComponent
   const defineComponent: typeof import('vue').defineComponent
   const defineStore: typeof import('pinia').defineStore
+  const deleteProject: typeof import('./database/index').deleteProject
   const effectScope: typeof import('vue').effectScope
   const getActivePinia: typeof import('pinia').getActivePinia
   const getCurrentInstance: typeof import('vue').getCurrentInstance
@@ -24,7 +25,9 @@ declare global {
   const getCurrentWatcher: typeof import('vue').getCurrentWatcher
   const getDatabase: typeof import('../../database/conn').getDatabase
   const getDatabasePath: typeof import('../../database/conn').getDatabasePath
+  const getProject: typeof import('./database/index').getProject
   const getProjectList: typeof import('../../database/dao').getProjectList
+  const getProjects: typeof import('./database/index').getProjects
   const h: typeof import('vue').h
   const initDatabase: typeof import('../../database/conn').initDatabase
   const inject: typeof import('vue').inject
@@ -80,6 +83,7 @@ declare global {
   const transaction: typeof import('../../database/conn').transaction
   const triggerRef: typeof import('vue').triggerRef
   const unref: typeof import('vue').unref
+  const updateProject: typeof import('./database/index').updateProject
   const useAttrs: typeof import('vue').useAttrs
   const useCounterStore: typeof import('./stores/counter').useCounterStore
   const useCssModule: typeof import('vue').useCssModule
@@ -121,11 +125,12 @@ declare module 'vue' {
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
     readonly createApp: UnwrapRef<typeof import('vue')['createApp']>
     readonly createPinia: UnwrapRef<typeof import('pinia')['createPinia']>
-    readonly createProject: UnwrapRef<typeof import('../../database/dao')['createProject']>
+    readonly createProject: UnwrapRef<typeof import('./database/index')['createProject']>
     readonly customRef: UnwrapRef<typeof import('vue')['customRef']>
     readonly defineAsyncComponent: UnwrapRef<typeof import('vue')['defineAsyncComponent']>
     readonly defineComponent: UnwrapRef<typeof import('vue')['defineComponent']>
     readonly defineStore: UnwrapRef<typeof import('pinia')['defineStore']>
+    readonly deleteProject: UnwrapRef<typeof import('./database/index')['deleteProject']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly getActivePinia: UnwrapRef<typeof import('pinia')['getActivePinia']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
@@ -133,7 +138,9 @@ declare module 'vue' {
     readonly getCurrentWatcher: UnwrapRef<typeof import('vue')['getCurrentWatcher']>
     readonly getDatabase: UnwrapRef<typeof import('../../database/conn')['getDatabase']>
     readonly getDatabasePath: UnwrapRef<typeof import('../../database/conn')['getDatabasePath']>
+    readonly getProject: UnwrapRef<typeof import('./database/index')['getProject']>
     readonly getProjectList: UnwrapRef<typeof import('../../database/dao')['getProjectList']>
+    readonly getProjects: UnwrapRef<typeof import('./database/index')['getProjects']>
     readonly h: UnwrapRef<typeof import('vue')['h']>
     readonly initDatabase: UnwrapRef<typeof import('../../database/conn')['initDatabase']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
@@ -188,6 +195,7 @@ declare module 'vue' {
     readonly transaction: UnwrapRef<typeof import('../../database/conn')['transaction']>
     readonly triggerRef: UnwrapRef<typeof import('vue')['triggerRef']>
     readonly unref: UnwrapRef<typeof import('vue')['unref']>
+    readonly updateProject: UnwrapRef<typeof import('./database/index')['updateProject']>
     readonly useAttrs: UnwrapRef<typeof import('vue')['useAttrs']>
     readonly useCounterStore: UnwrapRef<typeof import('./stores/counter')['useCounterStore']>
     readonly useCssModule: UnwrapRef<typeof import('vue')['useCssModule']>

@@ -187,10 +187,7 @@ const toProjectCard = (project: ProjectRecord): ProjectCard => {
 const projects = ref<ProjectCard[]>([])
 
 const loadProjects = async (): Promise<void> => {
-  const rows = (await window.api.invoke('dao:call', 'getProjectList', {
-    limit: 10,
-    offset: 0
-  })) as ProjectRecord[]
+  const rows = await getProjects({ limit: 10, offset: 0 })
   console.log(rows)
   // projects.value = rows.map(toProjectCard)
 }
