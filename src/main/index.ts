@@ -1,46 +1,34 @@
-import { app, shell, BrowserWindow, ipcMain, dialog, globalShortcut } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, globalShortcut, protocol, net } from 'electron'
 import { join } from 'path'
-import { mkdir, readFile, unlink, writeFile } from 'fs/promises'
+import { readFile, writeFile } from 'fs/promises'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
-import {
-  closeDatabase,
-  deleteProject,
-  copyCapturesToFolder,
-  deleteCapture,
-  getDatabasePath,
-  getProjectById,
-  getProjectWorkspace,
-  initDatabase,
-  insertCapture,
-  listCapturesByProject,
-  listProjects,
-  markDeletedFolders,
-  replaceCaptureAnnotations,
-  updateProject,
-  updateCaptureMetadata,
-  updateCaptureSelections,
-  updateCaptureSortOrders,
-  upsertFolder,
-  upsertProject
-} from './db/database'
+import { initDatabase, closeDatabase } from '../database/conn'
+import * as DAO from '../database/dao'
+import path from 'path'
+import { pathToFileURL } from 'url'
+import { existsSync, mkdirSync } from 'fs'
 
-const CAPTURE_ROOT_DIR = 'screenshots'
-const CAPTURE_AREA_DIR = '캡쳐폴더'
+const IMG_SCHEME = 'image'
+
+// 1. (필수) 앱이 준비되기 전에 스키마 권한을 등록해야 합니다.
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: IMG_SCHEME,
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      bypassCSP: true
+    }
+  }
+])
 
 const filePathToDataUrl = async (filePath: string, mimeType = 'image/png'): Promise<string> => {
   const fileBuffer = await readFile(filePath)
   return `data:${mimeType};base64,${fileBuffer.toString('base64')}`
 }
-
-const sanitizeFileSegment = (value: string): string =>
-  value
-    .trim()
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '') || 'default'
 
 function createWindow(): void {
   // Create the browser window.
@@ -102,6 +90,39 @@ app.whenReady().then(() => {
 
   initDatabase()
 
+  const imagesDir = path.join(app.getPath('userData'), 'images')
+  if (!existsSync(imagesDir)) {
+    mkdirSync(imagesDir, { recursive: true })
+  }
+
+  protocol.handle(IMG_SCHEME, (request) => {
+    try {
+      const url = new URL(request.url)
+      // Support both IMG_SCHEME://1.png and IMG_SCHEME:///1.png formats.
+      const rawPath = url.pathname && url.pathname !== '/' ? url.pathname : url.hostname
+      const relativePath = decodeURIComponent(rawPath).replace(/^\/+/, '').replace(/\\/g, '/')
+      if (!relativePath) {
+        return new Response('Bad Request', { status: 400 })
+      }
+
+      const absPath = path.resolve(imagesDir, relativePath)
+      const normalizedBase = path.resolve(imagesDir) + path.sep
+      const isInsideBase = absPath === path.resolve(imagesDir) || absPath.startsWith(normalizedBase)
+      if (!isInsideBase) {
+        return new Response('Forbidden', { status: 403 })
+      }
+
+      if (!existsSync(absPath)) {
+        return new Response('Not Found', { status: 404 })
+      }
+
+      return net.fetch(pathToFileURL(absPath).toString())
+    } catch (error) {
+      console.error('Failed to handle protocol:', error)
+      return new Response('Not Found', { status: 404 })
+    }
+  })
+
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
@@ -129,198 +150,16 @@ app.whenReady().then(() => {
     return app.getVersion()
   })
 
-  ipcMain.handle('db:getPath', () => {
-    return getDatabasePath()
+  ipcMain.handle('dao:call', (_, method: string, ...args: unknown[]) => {
+    const daoMethod = (DAO as Record<string, unknown>)[method]
+    if (!daoMethod) {
+      throw new Error(`NotFound dao method: ${method}`)
+    } else if (typeof daoMethod !== 'function') {
+      throw new Error(`Unknown dao method: ${method}`)
+    }
+
+    return (daoMethod as (...params: unknown[]) => unknown)(...args)
   })
-
-  ipcMain.handle('project:list', () => {
-    return listProjects()
-  })
-
-  ipcMain.handle(
-    'project:create',
-    (
-      _,
-      payload: {
-        id: string
-        name: string
-        description?: string
-        sourceUrl?: string
-      }
-    ) => {
-      upsertProject({
-        id: payload.id,
-        name: payload.name,
-        description: payload.description,
-        sourceUrl: payload.sourceUrl
-      })
-
-      return getProjectById(payload.id)
-    }
-  )
-
-  ipcMain.handle('project:get', (_, payload: { projectId: string }) => {
-    return getProjectById(payload.projectId)
-  })
-
-  ipcMain.handle(
-    'project:update',
-    (
-      _,
-      payload: {
-        id: string
-        name: string
-        description?: string
-      }
-    ) => {
-      updateProject(payload)
-      return getProjectById(payload.id)
-    }
-  )
-
-  ipcMain.handle('project:delete', (_, payload: { projectId: string }) => {
-    deleteProject(payload.projectId)
-    return { success: true }
-  })
-
-  ipcMain.handle(
-    'capture:syncFolders',
-    (
-      _,
-      payload: {
-        projectId: string
-        projectName: string
-        projectDescription?: string
-        sourceUrl?: string
-        areaScope?: 'capture' | 'document'
-        folders: Array<{
-          id: string
-          title: string
-          description?: string
-          path?: string
-          areaType?: 'capture' | 'document'
-          sortOrder?: number
-        }>
-      }
-    ) => {
-      upsertProject({
-        id: payload.projectId,
-        name: payload.projectName,
-        description: payload.projectDescription,
-        sourceUrl: payload.sourceUrl
-      })
-
-      payload.folders.forEach((folder) => {
-        upsertFolder({
-          id: folder.id,
-          projectId: payload.projectId,
-          title: folder.title,
-          path: folder.path,
-          description: folder.description,
-          areaType: folder.areaType,
-          sortOrder: folder.sortOrder
-        })
-      })
-
-      markDeletedFolders(
-        payload.projectId,
-        payload.folders.map((folder) => folder.id),
-        payload.areaScope
-      )
-
-      return { success: true }
-    }
-  )
-
-  ipcMain.handle('capture:list', async (_, payload: { projectId: string }) => {
-    const rows = listCapturesByProject(payload.projectId)
-
-    return Promise.all(
-      rows.map(async (row) => ({
-        ...row,
-        image_src: await filePathToDataUrl(row.image_path)
-      }))
-    )
-  })
-
-  ipcMain.handle('workspace:get', async (_, payload: { projectId: string }) => {
-    const workspace = getProjectWorkspace(payload.projectId)
-
-    const folders = await Promise.all(
-      workspace.folders.map(async (folder) => ({
-        ...folder,
-        screenshots: await Promise.all(
-          folder.screenshots.map(async (screenshot) => ({
-            ...screenshot,
-            image_src: await filePathToDataUrl(screenshot.image_path)
-          }))
-        )
-      }))
-    )
-
-    return {
-      ...workspace,
-      folders
-    }
-  })
-
-  ipcMain.handle(
-    'workspace:updateSelection',
-    (_, payload: { projectId: string; selectedCaptureIds: string[] }) => {
-      updateCaptureSelections(payload.projectId, payload.selectedCaptureIds)
-      return { success: true }
-    }
-  )
-
-  ipcMain.handle(
-    'workspace:updateCaptureOrder',
-    (_, payload: { folderId: string; orderedCaptureIds: string[] }) => {
-      updateCaptureSortOrders(payload.folderId, payload.orderedCaptureIds)
-      return { success: true }
-    }
-  )
-
-  ipcMain.handle(
-    'annotation:replace',
-    (
-      _,
-      payload: {
-        captureId: string
-        annotations: Array<{
-          id: string
-          toolType: 'number' | 'box'
-          markerNo: number | null
-          x: number
-          y: number
-          width?: number | null
-          height?: number | null
-          description?: string
-        }>
-      }
-    ) => {
-      replaceCaptureAnnotations(payload.captureId, payload.annotations)
-      return { success: true }
-    }
-  )
-
-  ipcMain.handle(
-    'capture:updateMeta',
-    (
-      _,
-      payload: {
-        captureId: string
-        pageTitle?: string
-        menuPath?: string
-        screenDescription?: string
-        functionalityDescription?: string
-        writerName?: string
-        pageNo?: number
-      }
-    ) => {
-      updateCaptureMetadata(payload)
-      return { success: true }
-    }
-  )
 
   ipcMain.handle(
     'capture:overwriteImage',
@@ -334,124 +173,6 @@ app.whenReady().then(() => {
       const base64Data = payload.dataUrl.replace(/^data:image\/\w+;base64,/, '')
       await writeFile(payload.filePath, Buffer.from(base64Data, 'base64'))
       return { success: true }
-    }
-  )
-
-  ipcMain.handle(
-    'capture:save',
-    async (
-      _,
-      payload: {
-        projectId: string
-        projectName: string
-        projectDescription?: string
-        folderId: string
-        folderTitle: string
-        sourceUrl?: string
-        pageTitle?: string
-        menuPath?: string
-        screenDescription?: string
-        functionalityDescription?: string
-        writerName?: string
-        pageNo?: number
-        dataUrl: string
-      }
-    ) => {
-      upsertProject({
-        id: payload.projectId,
-        name: payload.projectName,
-        description: payload.projectDescription,
-        sourceUrl: payload.sourceUrl
-      })
-
-      upsertFolder({
-        id: payload.folderId,
-        projectId: payload.projectId,
-        title: payload.folderTitle,
-        areaType: 'capture'
-      })
-
-      const captureId = `capture-${Date.now()}`
-      const fileName = `${captureId}.png`
-      const targetDir = join(
-        app.getPath('userData'),
-        CAPTURE_ROOT_DIR,
-        sanitizeFileSegment(payload.projectName),
-        CAPTURE_AREA_DIR,
-        sanitizeFileSegment(payload.folderTitle)
-      )
-
-      await mkdir(targetDir, { recursive: true })
-
-      const filePath = join(targetDir, fileName)
-      const base64Data = payload.dataUrl.replace(/^data:image\/\w+;base64,/, '')
-      await writeFile(filePath, Buffer.from(base64Data, 'base64'))
-
-      insertCapture({
-        id: captureId,
-        projectId: payload.projectId,
-        folderId: payload.folderId,
-        fileName,
-        imagePath: filePath,
-        sourceUrl: payload.sourceUrl,
-        pageTitle: payload.folderTitle,
-        menuPath: payload.menuPath || payload.folderTitle,
-        screenDescription: payload.screenDescription,
-        functionalityDescription: payload.functionalityDescription,
-        writerName: payload.writerName,
-        pageNo: payload.pageNo
-      })
-
-      return {
-        success: true,
-        capture: {
-          id: captureId,
-          filePath,
-          imageSrc: payload.dataUrl
-        }
-      }
-    }
-  )
-
-  ipcMain.handle('capture:remove', async (_, payload: { captureId: string; filePath: string }) => {
-    deleteCapture(payload.captureId)
-
-    try {
-      await unlink(payload.filePath)
-    } catch {
-      // File may already be removed or unavailable; DB delete is the primary action.
-    }
-
-    return { success: true }
-  })
-
-  ipcMain.handle(
-    'capture:importToFolder',
-    async (
-      _,
-      payload: {
-        projectId: string
-        targetFolderId: string
-        projectName: string
-        folderTitle: string
-        folderPath?: string
-        folderDescription?: string
-        captureIds: string[]
-      }
-    ) => {
-      console.log('[main/import] request', payload)
-      const rows = copyCapturesToFolder(payload)
-      console.log('[main/import] db rows', {
-        rowCount: rows.length,
-        rows
-      })
-
-      return Promise.all(
-        rows.map(async (row) => ({
-          ...row,
-          image_src: await filePathToDataUrl(row.image_path)
-        }))
-      )
     }
   )
 

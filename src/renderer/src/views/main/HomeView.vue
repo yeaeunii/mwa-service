@@ -1,5 +1,6 @@
 <template>
   <div class="min-h-screen bg-[#f6f8fc] px-5 py-7 text-slate-800 md:px-8" @click="closeProjectMenu">
+    <!-- <img :src="'image://1.png'" alt="logo" /> -->
     <div class="mx-auto flex max-w-7xl flex-col gap-6">
       <header class="space-y-2 pt-20">
         <h1 class="text-4xl font-black tracking-tight text-slate-900">내 프로젝트</h1>
@@ -186,8 +187,12 @@ const toProjectCard = (project: ProjectRecord): ProjectCard => {
 const projects = ref<ProjectCard[]>([])
 
 const loadProjects = async (): Promise<void> => {
-  const rows = (await window.api.invoke('project:list')) as ProjectRecord[]
-  projects.value = rows.map(toProjectCard)
+  const rows = (await window.api.invoke('dao:call', 'getProjectList', {
+    limit: 10,
+    offset: 0
+  })) as ProjectRecord[]
+  console.log(rows)
+  // projects.value = rows.map(toProjectCard)
 }
 
 const filteredProjects = computed(() => {

@@ -1,6 +1,6 @@
 {
   "name": "miso-mwa-electron",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Miso Manual Writing Assistant",
   "main": "./out/main/index.js",
   "author": "example.com",

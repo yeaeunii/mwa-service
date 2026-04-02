@@ -1,28 +1,31 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
+import * as DAO from '../database/dao'
+
 // Invoke channels
 const INVOKE_CHANNELS = [
   'dialog:openFile',
   'shell:openExternal',
   'app:getVersion',
   'db:getPath',
-  'project:list',
-  'project:create',
-  'project:get',
-  'project:update',
-  'project:delete',
-  'capture:syncFolders',
-  'capture:list',
-  'capture:save',
-  'capture:updateMeta',
-  'capture:overwriteImage',
-  'capture:remove',
-  'capture:importToFolder',
-  'workspace:get',
-  'workspace:updateSelection',
-  'workspace:updateCaptureOrder',
-  'annotation:replace',
+  'dao:call',
+  // 'project:list',
+  // 'project:create',
+  // 'project:get',
+  // 'project:update',
+  // 'project:delete',
+  // 'capture:syncFolders',
+  // 'capture:list',
+  // 'capture:save',
+  // 'capture:updateMeta',
+  // 'capture:overwriteImage',
+  // 'capture:remove',
+  // 'capture:importToFolder',
+  // 'workspace:get',
+  // 'workspace:updateSelection',
+  // 'workspace:updateCaptureOrder',
+  // 'annotation:replace',
   'webview:saveCapture',
   'shortcut:register',
   'shortcut:unregister'
@@ -81,4 +84,6 @@ if (process.contextIsolated) {
   window.electron = electronAPI
   // @ts-ignore (define in dts)
   window.api = api
+  // @ts-ignore (define in dts)
+  window.dao = DAO
 }
