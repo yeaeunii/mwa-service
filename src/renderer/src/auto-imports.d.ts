@@ -109,9 +109,6 @@ declare global {
   // @ts-ignore
   export type { CaptureImage } from './types/index'
   import('./types/index')
-  // @ts-ignore
-  export type { Project, DocGroup, Doc, CaptureGroup, CaptureImg, UsedCaptureImg } from '../../database/dto'
-  import('../../database/dto')
 }
 
 // for vue template auto import
@@ -121,7 +118,6 @@ declare module 'vue' {
   interface ComponentCustomProperties {
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
     readonly acceptHMRUpdate: UnwrapRef<typeof import('pinia')['acceptHMRUpdate']>
-    readonly closeDatabase: UnwrapRef<typeof import('../../database/conn')['closeDatabase']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
     readonly createApp: UnwrapRef<typeof import('vue')['createApp']>
     readonly createPinia: UnwrapRef<typeof import('pinia')['createPinia']>
@@ -136,13 +132,9 @@ declare module 'vue' {
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
     readonly getCurrentWatcher: UnwrapRef<typeof import('vue')['getCurrentWatcher']>
-    readonly getDatabase: UnwrapRef<typeof import('../../database/conn')['getDatabase']>
-    readonly getDatabasePath: UnwrapRef<typeof import('../../database/conn')['getDatabasePath']>
     readonly getProject: UnwrapRef<typeof import('./database/index')['getProject']>
-    readonly getProjectList: UnwrapRef<typeof import('../../database/dao')['getProjectList']>
     readonly getProjects: UnwrapRef<typeof import('./database/index')['getProjects']>
     readonly h: UnwrapRef<typeof import('vue')['h']>
-    readonly initDatabase: UnwrapRef<typeof import('../../database/conn')['initDatabase']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
     readonly isProxy: UnwrapRef<typeof import('vue')['isProxy']>
     readonly isReactive: UnwrapRef<typeof import('vue')['isReactive']>
@@ -155,7 +147,6 @@ declare module 'vue' {
     readonly mapStores: UnwrapRef<typeof import('pinia')['mapStores']>
     readonly mapWritableState: UnwrapRef<typeof import('pinia')['mapWritableState']>
     readonly markRaw: UnwrapRef<typeof import('vue')['markRaw']>
-    readonly migrate: UnwrapRef<typeof import('../../database/migrate')['default']>
     readonly nextTick: UnwrapRef<typeof import('vue')['nextTick']>
     readonly onActivated: UnwrapRef<typeof import('vue')['onActivated']>
     readonly onBeforeMount: UnwrapRef<typeof import('vue')['onBeforeMount']>
@@ -179,9 +170,6 @@ declare module 'vue' {
     readonly readonly: UnwrapRef<typeof import('vue')['readonly']>
     readonly ref: UnwrapRef<typeof import('vue')['ref']>
     readonly resolveComponent: UnwrapRef<typeof import('vue')['resolveComponent']>
-    readonly runQuery: UnwrapRef<typeof import('../../database/conn')['runQuery']>
-    readonly selectList: UnwrapRef<typeof import('../../database/conn')['selectList']>
-    readonly selectOne: UnwrapRef<typeof import('../../database/conn')['selectOne']>
     readonly setActivePinia: UnwrapRef<typeof import('pinia')['setActivePinia']>
     readonly setMapStoreSuffix: UnwrapRef<typeof import('pinia')['setMapStoreSuffix']>
     readonly shallowReactive: UnwrapRef<typeof import('vue')['shallowReactive']>
@@ -192,7 +180,6 @@ declare module 'vue' {
     readonly toRef: UnwrapRef<typeof import('vue')['toRef']>
     readonly toRefs: UnwrapRef<typeof import('vue')['toRefs']>
     readonly toValue: UnwrapRef<typeof import('vue')['toValue']>
-    readonly transaction: UnwrapRef<typeof import('../../database/conn')['transaction']>
     readonly triggerRef: UnwrapRef<typeof import('vue')['triggerRef']>
     readonly unref: UnwrapRef<typeof import('vue')['unref']>
     readonly updateProject: UnwrapRef<typeof import('./database/index')['updateProject']>

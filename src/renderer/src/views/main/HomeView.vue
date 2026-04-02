@@ -106,7 +106,7 @@
 
         <button
           type="button"
-          class="flex min-h-[300px] flex-col items-center justify-center gap-5 rounded-[28px] border-2 border-dashed border-[#d7dfef] bg-white text-slate-500 transition-colors duration-200 hover:border-[#8f92ff] hover:text-[#5f59c6]"
+          class="flex min-h-[300px] flex-col items-center justify-center gap-5 rounded-md border-2 border-dashed border-slate-300 bg-white text-slate-500 transition-colors duration-200 hover:border-primary hover:text-primary"
           @click.stop="modalCreateProjectRef?.onOpen()"
         >
           <span
@@ -125,19 +125,8 @@
 </template>
 
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
-
 type Filter = '전체' | '진행중' | '완료'
 type ProjectStatus = 'draft' | 'in_progress' | 'completed' | 'archived'
-
-interface ProjectRecord {
-  id: string
-  name: string
-  description: string
-  status: ProjectStatus
-  progress: number
-  updated_at: string
-}
 
 interface ProjectCard {
   id: string
@@ -159,30 +148,30 @@ const modalConfirmRef = ref<ComponentRef<'ModalConfirm'> | null>(null)
 const openedProjectMenuId = ref<string | null>(null)
 const deletingProjectId = ref<string | null>(null)
 
-const formatDate = (value: string): string => {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '-'
+// const formatDate = (value: string): string => {
+//   const date = new Date(value)
+//   if (Number.isNaN(date.getTime())) return '-'
 
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}.${month}.${day}`
-}
+//   const year = date.getFullYear()
+//   const month = String(date.getMonth() + 1).padStart(2, '0')
+//   const day = String(date.getDate()).padStart(2, '0')
+//   return `${year}.${month}.${day}`
+// }
 
-const toProjectCard = (project: ProjectRecord): ProjectCard => {
-  const status = project.status === 'completed' ? '완료' : '진행중'
+// const toProjectCard = (project: ProjectRecord): ProjectCard => {
+//   const status = project.status === 'completed' ? '완료' : '진행중'
 
-  return {
-    id: project.id,
-    title: project.name,
-    updatedAt: formatDate(project.updated_at),
-    progress: project.progress,
-    description: project.description || EMPTY_DESCRIPTION,
-    rawDescription: project.description || '',
-    status,
-    filter: status
-  }
-}
+//   return {
+//     id: project.id,
+//     title: project.name,
+//     updatedAt: formatDate(project.updated_at),
+//     progress: project.progress,
+//     description: project.description || EMPTY_DESCRIPTION,
+//     rawDescription: project.description || '',
+//     status,
+//     filter: status
+//   }
+// }
 
 const projects = ref<ProjectCard[]>([])
 
