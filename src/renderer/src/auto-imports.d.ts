@@ -7,6 +7,7 @@
 export {}
 declare global {
   const EffectScope: typeof import('vue').EffectScope
+  const VueDraggable: typeof import('vue-draggable-plus').VueDraggable
   const acceptHMRUpdate: typeof import('pinia').acceptHMRUpdate
   const closeDatabase: typeof import('../../database/conn').closeDatabase
   const computed: typeof import('vue').computed
@@ -85,9 +86,14 @@ declare global {
   const unref: typeof import('vue').unref
   const updateProject: typeof import('./database/index').updateProject
   const useAttrs: typeof import('vue').useAttrs
+  const useContextMenu: typeof import('./composables/useContextMenu').useContextMenu
   const useCounterStore: typeof import('./stores/counter').useCounterStore
   const useCssModule: typeof import('vue').useCssModule
   const useCssVars: typeof import('vue').useCssVars
+  const useDragSelect: typeof import('./composables/useDragSelect').useDragSelect
+  const useDragSource: typeof import('./composables/useCrossDrag').useDragSource
+  const useDraggable: typeof import('vue-draggable-plus').useDraggable
+  const useDropZone: typeof import('./composables/useCrossDrag').useDropZone
   const useElectron: typeof import('./composables/useElectron').useElectron
   const useId: typeof import('vue').useId
   const useLink: typeof import('vue-router').useLink
@@ -96,6 +102,7 @@ declare global {
   const useRouter: typeof import('vue-router').useRouter
   const useSlots: typeof import('vue').useSlots
   const useTemplateRef: typeof import('vue').useTemplateRef
+  const vDraggable: typeof import('vue-draggable-plus').vDraggable
   const watch: typeof import('vue').watch
   const watchEffect: typeof import('vue').watchEffect
   const watchPostEffect: typeof import('vue').watchPostEffect
@@ -106,6 +113,12 @@ declare global {
   // @ts-ignore
   export type { Component, Slot, Slots, ComponentPublicInstance, ComputedRef, DirectiveBinding, ExtractDefaultPropTypes, ExtractPropTypes, ExtractPublicPropTypes, InjectionKey, PropType, Ref, ShallowRef, MaybeRef, MaybeRefOrGetter, VNode, WritableComputedRef } from 'vue'
   import('vue')
+  // @ts-ignore
+  export type { UseDragSourceOptions, UseDragSourceReturn, UseDropZoneOptions, UseDropZoneReturn } from './composables/useCrossDrag'
+  import('./composables/useCrossDrag')
+  // @ts-ignore
+  export type { UseDragSelectOptions, UseDragSelectReturn } from './composables/useDragSelect'
+  import('./composables/useDragSelect')
   // @ts-ignore
   export type { CaptureImage } from './types/index'
   import('./types/index')
@@ -184,9 +197,14 @@ declare module 'vue' {
     readonly unref: UnwrapRef<typeof import('vue')['unref']>
     readonly updateProject: UnwrapRef<typeof import('./database/index')['updateProject']>
     readonly useAttrs: UnwrapRef<typeof import('vue')['useAttrs']>
+    readonly useContextMenu: UnwrapRef<typeof import('./composables/useContextMenu')['useContextMenu']>
     readonly useCounterStore: UnwrapRef<typeof import('./stores/counter')['useCounterStore']>
     readonly useCssModule: UnwrapRef<typeof import('vue')['useCssModule']>
     readonly useCssVars: UnwrapRef<typeof import('vue')['useCssVars']>
+    readonly useDragSelect: UnwrapRef<typeof import('./composables/useDragSelect')['useDragSelect']>
+    readonly useDragSource: UnwrapRef<typeof import('./composables/useCrossDrag')['useDragSource']>
+    readonly useDraggable: UnwrapRef<typeof import('vue-draggable-plus')['useDraggable']>
+    readonly useDropZone: UnwrapRef<typeof import('./composables/useCrossDrag')['useDropZone']>
     readonly useElectron: UnwrapRef<typeof import('./composables/useElectron')['useElectron']>
     readonly useId: UnwrapRef<typeof import('vue')['useId']>
     readonly useLink: UnwrapRef<typeof import('vue-router')['useLink']>

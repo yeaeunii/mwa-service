@@ -1,4 +1,14 @@
-import { app, shell, BrowserWindow, ipcMain, dialog, globalShortcut, protocol, net } from 'electron'
+import {
+  app,
+  shell,
+  BrowserWindow,
+  ipcMain,
+  dialog,
+  globalShortcut,
+  protocol,
+  net,
+  nativeTheme
+} from 'electron'
 import { join } from 'path'
 import { readFile, writeFile } from 'fs/promises'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -11,6 +21,9 @@ import { pathToFileURL } from 'url'
 import { existsSync, mkdirSync } from 'fs'
 
 const IMG_SCHEME = 'image'
+
+//Light 테마 고정
+nativeTheme.themeSource = 'light'
 
 // 1. (필수) 앱이 준비되기 전에 스키마 권한을 등록해야 합니다.
 protocol.registerSchemesAsPrivileged([

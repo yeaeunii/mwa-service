@@ -1,28 +1,35 @@
 <script setup lang="ts">
 const emits = defineEmits<{
-  onSubmit: [{ id?: string; name: string; description: string }]
+  onSubmit: [{ id?: string; name: string; description: string; thumbnail: string | null }]
 }>()
 
 const modalRef = ref<ComponentRef<'ModalBase'> | null>(null)
 const editingProjectId = ref<string | null>(null)
 const projectName = ref('')
 const projectDescription = ref('')
-
+const projectThumbnail = ref<string | null>(null)
+const fileInputRef = ref<HTMLInputElement | null>(null)
 
 const onOpen = (): void => {
   editingProjectId.value = null
   projectName.value = ''
   projectDescription.value = ''
+  projectThumbnail.value = null
   modalRef.value?.onOpen()
 }
 
-const onOpenEdit = (payload: { id: string; name: string; description?: string }): void => {
+const onOpenEdit = (payload: {
+  id: string
+  name: string
+  description?: string
+  thumbnail?: string | null
+}): void => {
   editingProjectId.value = payload.id
   projectName.value = payload.name
   projectDescription.value = payload.description ?? ''
+  projectThumbnail.value = payload.thumbnail ?? null
   modalRef.value?.onOpen()
 }
-
 
 const onClose = (): void => {
   modalRef.value?.onClose()
@@ -32,9 +39,31 @@ const onSubmit = (): void => {
   emits('onSubmit', {
     id: editingProjectId.value ?? undefined,
     name: projectName.value.trim(),
-    description: projectDescription.value.trim()
+    description: projectDescription.value.trim(),
+    thumbnail: projectThumbnail.value
   })
   onClose()
+}
+
+const onClickThumbnail = (): void => {
+  fileInputRef.value?.click()
+}
+
+const onFileChange = (e: Event): void => {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  const reader = new FileReader()
+  reader.onload = () => {
+    projectThumbnail.value = reader.result as string
+  }
+  reader.readAsDataURL(file)
+  input.value = ''
+}
+
+const onRemoveThumbnail = (): void => {
+  projectThumbnail.value = null
 }
 
 defineExpose({
@@ -59,7 +88,7 @@ defineExpose({
           <p class="text-sm font-medium text-slate-500">
             {{
               editingProjectId
-                ? '프로젝트 이름과 설명을 수정하세요.'
+                ? '프로젝트 정보를 수정하세요.'
                 : '매뉴얼 제작을 위한 새로운 프로젝트를 시작하세요.'
             }}
           </p>
@@ -74,8 +103,56 @@ defineExpose({
       </div>
     </template>
 
-    
     <div class="space-y-6 px-6 py-6">
+      <!-- Thumbnail -->
+      <div class="flex flex-col gap-2">
+        <span class="text-sm font-bold text-slate-700">썸네일 (선택 사항)</span>
+        <input
+          ref="fileInputRef"
+          type="file"
+          accept="image/*"
+          class="hidden"
+          @change="onFileChange"
+        />
+        <div v-if="projectThumbnail" class="group relative overflow-hidden rounded-xl">
+          <img
+            :src="projectThumbnail"
+            alt="thumbnail preview"
+            class="h-40 w-full rounded-xl object-cover"
+          />
+          <div
+            class="absolute inset-0 flex items-center justify-center gap-2 bg-black/0 transition-colors group-hover:bg-black/40"
+          >
+            <button
+              type="button"
+              class="btn btn-sm border-none bg-white/90 text-slate-700 shadow-sm opacity-0 transition-opacity hover:bg-white group-hover:opacity-100"
+              @click="onClickThumbnail"
+            >
+              <i-lucide-image-plus class="h-4 w-4" />
+              변경
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm border-none bg-white/90 text-error shadow-sm opacity-0 transition-opacity hover:bg-white group-hover:opacity-100"
+              @click="onRemoveThumbnail"
+            >
+              <i-lucide-trash-2 class="h-4 w-4" />
+              삭제
+            </button>
+          </div>
+        </div>
+        <button
+          v-else
+          type="button"
+          class="flex h-40 w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 transition-colors hover:border-primary/40 hover:bg-primary/5"
+          @click="onClickThumbnail"
+        >
+          <i-lucide-image-plus class="h-8 w-8 text-slate-300" />
+          <span class="text-xs font-medium text-slate-400">클릭하여 이미지를 선택하세요</span>
+        </button>
+      </div>
+
+      <!-- Name -->
       <label class="flex flex-col gap-2">
         <span class="text-sm font-bold text-slate-700">프로젝트 이름 *</span>
         <input
@@ -86,11 +163,12 @@ defineExpose({
         />
       </label>
 
+      <!-- Description -->
       <label class="flex flex-col gap-2">
         <span class="text-sm font-bold text-slate-700">프로젝트 설명 (선택 사항)</span>
         <textarea
           v-model="projectDescription"
-          rows="5"
+          rows="4"
           class="textarea textarea-bordered w-full rounded-xl border-slate-200 bg-slate-50 text-slate-800 shadow-none outline-none focus:border-blue-400 focus:outline-none"
           placeholder="프로젝트에 대한 간단한 설명을 입력하세요"
         ></textarea>
@@ -98,7 +176,6 @@ defineExpose({
     </div>
 
     <template #footer="{ close }">
-      
       <div class="flex w-full items-center justify-end gap-3 border-t border-slate-200 px-6 py-4">
         <button
           type="button"

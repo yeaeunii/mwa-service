@@ -1,150 +1,116 @@
 <template>
-  <div class="drawer drawer-end">
-    <input id="drawerRight" v-model="isDrawerOpen" type="checkbox" class="drawer-toggle" />
-    <div class="drawer-content">
-      <div class="flex h-[100vh] flex-col">
-        <div class="flex items-center gap-3 border-b border-white/10 bg-slate-900 p-2">
-          <button
-            type="button"
-            class="flex h-12 w-12 items-center justify-center rounded-none bg-slate-900 text-white transition-colors hover:bg-slate-900"
-            @click="router.push({ name: 'dashboard-index' })"
-          >
-            <i-lucide-arrow-left class="text-lg" />
-          </button>
-
-          <div class="flex grow items-center gap-2">
-            <div class="flex gap-1">
-              <button :disabled="!canGoBack" class="btn btn-sm btn-ghost" @click="goBack">
-                <i-lucide-chevron-left />
+  <div class="flex gap-1 bg-slate-200">
+    <div class="flex h-[100vh] flex-col flex-1">
+      <!-- Toolbar -->
+      <div
+        class="flex items-center gap-3 border-b border-base-content/10 bg-slate-200 shadow-md p-2"
+      >
+        <div class="flex grow items-center gap-2">
+          <div class="flex gap-1">
+            <div class="tooltip tooltip-bottom" data-tip="뒤로 가기">
+              <button
+                :disabled="!canGoBack"
+                class="btn btn-sm btn-ghost border-none shadow-none rounded-full hover:text-neutral"
+                @click="goBack"
+              >
+                <i-lucide-chevron-left class="text-lg" />
               </button>
-              <button :disabled="!canGoForward" class="btn btn-sm btn-ghost" @click="goForward">
-                <i-lucide-chevron-right />
+            </div>
+            <div class="tooltip tooltip-bottom" data-tip="앞으로 가기">
+              <button
+                :disabled="!canGoForward"
+                class="btn btn-sm btn-ghost border-none shadow-none rounded-full hover:text-neutral"
+                @click="goForward"
+              >
+                <i-lucide-chevron-right class="text-lg" />
               </button>
+            </div>
+            <div class="tooltip tooltip-bottom" data-tip="새로고침">
               <button class="btn btn-sm btn-ghost" :disabled="isLoading" @click="reload">
                 <div v-if="isLoading" class="loading loading-spinner loading-sm"></div>
                 <i-lucide-refresh-cw />
               </button>
             </div>
-            <form class="flex flex-1 gap-2" @submit.prevent="navigate">
-              <input
-                v-model="urlInput"
-                type="text"
-                class="input input-sm input-bordered w-full font-mono text-sm"
-                placeholder="https://example.com"
-              />
-            </form>
           </div>
+          <form class="flex flex-1 gap-2" @submit.prevent="navigate">
+            <input
+              v-model="urlInput"
+              type="text"
+              class="input input-sm input-bordered w-full font-mono text-sm"
+              placeholder="https://example.com"
+            />
+          </form>
+        </div>
+        <div class="tooltip tooltip-bottom" data-tip="나가기">
+          <button type="button" class="btn btn-ghost" @click="router.back()">
+            <i-lucide-square-arrow-right-exit class="text-lg" />
+          </button>
+        </div>
+      </div>
+      <!-- Toolbar -->
 
-          <div class="flex items-center gap-2 md:w-1/2 lg:w-[28rem]">
-            <div
-              class="flex h-8 grow items-center rounded-lg border border-white/30 bg-white/5 text-white"
-            >
-              <details class="dropdown dropdown-bottom" :open="isFolderDropdownOpen">
-                <summary
-                  class="flex h-8 w-12 cursor-pointer items-center justify-center border-r border-white/20"
-                  @click.prevent="isFolderDropdownOpen = !isFolderDropdownOpen"
-                >
-                  <i-lucide-chevron-down class="text-sm" />
-                </summary>
-                <ul
-                  class="dropdown-content menu z-50 mt-2 w-64 rounded-box border border-white/10 bg-slate-800 p-2 shadow-xl"
-                >
-                  <li v-if="folderItems.length === 0" class="pointer-events-none opacity-60">
-                    <span>폴더가 없습니다.</span>
-                  </li>
-                  <li v-for="folder in folderItems" :key="folder.id">
-                    <button
-                      type="button"
-                      class="flex items-center justify-between text-white"
-                      @click="onSelectFolder(folder.id)"
-                    >
-                      <span class="truncate">{{ folder.title }}</span>
-                      <span class="badge badge-xs border-0 bg-white/10 text-slate-200">
-                        {{ folder.images.length }}
-                      </span>
-                    </button>
-                  </li>
-                </ul>
-              </details>
-              <div class="flex min-w-0 flex-1 items-center justify-start px-3">
-                <span class="truncate text-xs font-semibold">
-                  {{ selectedFolder?.title ?? '폴더를 선택하세요' }}
-                </span>
-              </div>
-              <button
-                type="button"
-                class="mr-2 flex h-6 min-w-10 items-center justify-center rounded-full px-2 text-xs font-bold"
-                :class="
-                  selectedFolderImages.length > 0
-                    ? 'bg-rose-500 text-white'
-                    : 'bg-white/10 text-slate-300'
-                "
-                :disabled="selectedFolderId === null"
-                @click="modalCaptureImagesRef?.onOpen()"
+      <!-- Webview -->
+      <div class="relative flex-1">
+        <webview
+          ref="webviewRef"
+          :src="currentUrl"
+          class="absolute inset-0 h-full w-full bg-white"
+        ></webview>
+        <div
+          class="pointer-events-none absolute inset-0 bg-white transition-opacity duration-150"
+          :class="isCaptureFlashVisible ? 'opacity-80' : 'opacity-0'"
+        ></div>
+      </div>
+      <!-- Webview -->
+    </div>
+    <div class="w-100 bg-base-100 flex-shrink-0 p-3 flex flex-col">
+      <div class="breadcrumbs mb-3">
+        <ul>
+          <li>
+            <a>
+              <i-lucide-layout-dashboard />
+              Project명
+            </a>
+          </li>
+          <li>
+            <a>
+              <i-lucide-folder />
+              Workspace명
+            </a>
+          </li>
+        </ul>
+      </div>
+      <div class="overflow-y-auto w-full p-3 bg-slate-50 rounded-md flex-1">
+        <div class="grid grid-cols-2 gap-4">
+          <div v-for="image in captureImages" :key="image.id" class="group">
+            <div class="overflow-hidden border border-gray-300 rounded-md shadow-sm h-30 relative">
+              <img :src="image.src" :alt="image.name" class="object-cover w-full h-full" />
+              <div
+                class="absolute bottom-0 left-0 w-full h-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center"
               >
-                + {{ selectedFolderImages.length }}
-              </button>
+                <div class="flex gap-2">
+                  <button class="btn btn-sm btn-circle">
+                    <i-lucide-pencil />
+                  </button>
+                  <button class="btn btn-sm btn-circle">
+                    <i-lucide-trash />
+                  </button>
+                </div>
+              </div>
             </div>
-            <button
-              type="button"
-              class="btn btn-sm shrink-0 border border-blue-900 bg-white px-3 text-xs text-blue-900 shadow-none hover:bg-blue-900 hover:text-white"
-              :disabled="selectedFolderId === null"
-              @click="goSelect"
-            >
-              문서 생성 시작하기
-              <i-lucide-arrow-right class="text-sm" />
-            </button>
+            <div class="text-sm text-center mt-2 overflow-hidden text-ellipsis whitespace-nowrap">
+              {{ image.name }}
+            </div>
           </div>
         </div>
-
-        <div class="relative flex-1">
-          <webview
-            ref="webviewRef"
-            :src="currentUrl"
-            class="absolute inset-0 h-full w-full bg-white"
-          ></webview>
-          <div
-            class="pointer-events-none absolute inset-0 bg-white transition-opacity duration-150"
-            :class="isCaptureFlashVisible ? 'opacity-80' : 'opacity-0'"
-          ></div>
-          <label
-            for="drawerRight"
-            class="absolute top-1/2 z-40 flex h-16 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-l-xl bg-slate-900 text-slate-200 shadow-md transition-all duration-200 hover:bg-slate-800"
-            :class="isDrawerOpen ? 'right-80' : 'right-0'"
-          >
-            <i-lucide-chevron-right v-if="isDrawerOpen" class="text-sm" />
-            <i-lucide-chevron-left v-else class="text-sm" />
-          </label>
-        </div>
-
-        <ModalCaptureImages
-          ref="modalCaptureImagesRef"
-          :captureImageItems="selectedFolderImages"
-          :title="selectedFolder?.title ?? '선택된 폴더'"
-          @onRemoveImage="onRemoveCaptureImage"
-        />
       </div>
     </div>
-
-    <div class="drawer-side pointer-events-none z-30 top-16 h-[calc(100vh-4rem)]">
-      <div class="pointer-events-auto h-full">
-        <PanelCaptureGroup
-          :folderItems="folderItems"
-          :selectedFolderId="selectedFolderId"
-          @onCreateFolder="onCreateFolder"
-          @onOpenCaptureModal="modalCaptureImagesRef?.onOpen()"
-          @onRenameFolder="onRenameFolder"
-          @onRemoveFolder="onRemoveFolder"
-          @onSelectFolder="onSelectFolder"
-        />
-      </div>
-    </div>
+    <ModalCaptureName ref="modalCaptureNameRef" @onConfirm="onCaptureWebviewConfirm" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { useRoute, useRouter } from 'vue-router'
-import { toFileImageSrc } from '@/utils/manualWorkspace'
+const modalCaptureNameRef = ref<ComponentRef<'ModalCaptureName'> | null>(null)
 
 interface WebviewElement extends HTMLElement {
   src: string
@@ -154,140 +120,26 @@ interface WebviewElement extends HTMLElement {
   canGoBack: () => boolean
   canGoForward: () => boolean
   capturePage: () => Promise<{ toDataURL: () => string }>
+  executeJavaScript: (code: string) => Promise<unknown>
   addEventListener: (event: string, listener: (e: unknown) => void) => void
-}
-
-interface CaptureFolder {
-  id: string
-  title: string
-  description: string
-  path: string
-  images: import('@/types').CaptureImage[]
-}
-
-interface ProjectRecord {
-  id: string
-  name: string
-  description: string
-  progress: number
-  status: 'draft' | 'in_progress' | 'completed' | 'archived'
-}
-
-interface WorkspaceFolderResponse {
-  id: string
-  title: string
-  description: string
-  path: string
-  area_type: 'capture' | 'document'
-  sort_order: number
-  screenshots: SavedCaptureRecord[]
-}
-
-interface SavedCaptureRecord {
-  id: string
-  folder_id: string
-  file_name: string
-  image_path: string
-  image_src?: string
-  source_url: string
-  page_title: string
-  sort_order: number
-  is_selected: number
-  created_at: string
+  openDevTools: () => void
 }
 
 const START_PAGE_URL = 'https://www.google.com'
 const CAPTURE_SHORTCUT_KEY = 'CommandOrControl+Shift+S'
 
 const webviewRef = ref<WebviewElement | null>(null)
-const modalCaptureImagesRef = ref<ComponentRef<'ModalCaptureImages'> | null>(null)
 const router = useRouter()
-const route = useRoute()
 
 const urlInput = ref(START_PAGE_URL)
 const currentUrl = ref(START_PAGE_URL)
 const isLoading = ref(false)
 const canGoBack = ref(false)
 const canGoForward = ref(false)
-const isDrawerOpen = ref(false)
-const isFolderDropdownOpen = ref(false)
 const isCaptureFlashVisible = ref(false)
 let captureFlashTimeout: ReturnType<typeof setTimeout> | null = null
 
-const projectId = computed(() => String(route.query.projectId ?? ''))
-const currentProject = ref<ProjectRecord | null>(null)
-const folderItems = ref<CaptureFolder[]>([])
-const selectedFolderId = ref<string | null>(String(route.query.folderId ?? '') || null)
-
-const selectedFolder = computed(
-  () => folderItems.value.find((item) => item.id === selectedFolderId.value) ?? null
-)
-const selectedFolderImages = computed(() => selectedFolder.value?.images ?? [])
-
-const ensureSelectedFolder = (): void => {
-  if (
-    selectedFolderId.value &&
-    folderItems.value.some((item) => item.id === selectedFolderId.value)
-  ) {
-    return
-  }
-
-  selectedFolderId.value = folderItems.value[0]?.id ?? null
-}
-
-const loadProjectFromDatabase = async (): Promise<void> => {
-  if (!projectId.value) return
-
-  currentProject.value = (await window.api.invoke('project:get', {
-    projectId: projectId.value
-  })) as ProjectRecord | null
-}
-
-const loadWorkspaceFromDatabase = async (): Promise<void> => {
-  if (!projectId.value) return
-
-  const response = (await window.api.invoke('workspace:get', {
-    projectId: projectId.value
-  })) as {
-    folders: WorkspaceFolderResponse[]
-  }
-
-  folderItems.value = (response.folders ?? [])
-    .filter((folder) => folder.area_type === 'capture')
-    .map((folder) => ({
-      id: folder.id,
-      title: folder.title,
-      description: folder.description,
-      path: folder.path,
-      images: folder.screenshots.map((row) => ({
-        id: row.id,
-        src: row.image_src ?? toFileImageSrc(row.image_path),
-        filePath: row.image_path
-      }))
-    }))
-
-  ensureSelectedFolder()
-}
-
-const syncFoldersToDatabase = async (): Promise<void> => {
-  if (!projectId.value) return
-
-  await window.api.invoke('capture:syncFolders', {
-    projectId: projectId.value,
-    projectName: currentProject.value?.name ?? projectId.value,
-    projectDescription: currentProject.value?.description ?? '',
-    sourceUrl: currentUrl.value,
-    areaScope: 'capture',
-    folders: folderItems.value.map((item, index) => ({
-      id: item.id,
-      title: item.title,
-      areaType: 'capture',
-      description: item.description,
-      path: item.path,
-      sortOrder: index
-    }))
-  })
-}
+const captureImages = ref<CaptureImage[]>([])
 
 const navigate = (): void => {
   let url = urlInput.value.trim()
@@ -311,25 +163,7 @@ const reload = (): void => {
   webviewRef.value?.reload()
 }
 
-const goHome = async (): Promise<void> => {
-  await router.push({ name: 'home' })
-}
-
-const goSelect = async (): Promise<void> => {
-  await router.push({
-    name: 'workspace-index',
-    query: {
-      projectId: projectId.value,
-      captureFolderId: selectedFolderId.value ?? undefined
-    }
-  })
-}
-
-const onCaptureWebview = async (): Promise<void> => {
-  const webview = webviewRef.value
-  const activeFolderId = selectedFolderId.value
-  if (!webview || activeFolderId === null) return
-
+const getCaptureImageDataURL = async (): Promise<string | null> => {
   if (captureFlashTimeout) {
     clearTimeout(captureFlashTimeout)
   }
@@ -339,125 +173,27 @@ const onCaptureWebview = async (): Promise<void> => {
     captureFlashTimeout = null
   }, 140)
 
-  const image = await webview.capturePage()
-  const dataUrl = image.toDataURL()
-  const activeFolder = folderItems.value.find((item) => item.id === activeFolderId)
-  if (!activeFolder) return
-
-  const result = (await window.api.invoke('capture:save', {
-    projectId: projectId.value,
-    projectName: currentProject.value?.name ?? projectId.value,
-    projectDescription: currentProject.value?.description ?? '',
-    folderId: activeFolder.id,
-    folderTitle: activeFolder.title,
-    sourceUrl: currentUrl.value,
-    pageTitle: currentUrl.value,
-    menuPath: activeFolder.path,
-    screenDescription: activeFolder.description,
-    functionalityDescription: '',
-    writerName: '',
-    dataUrl
-  })) as {
-    success: boolean
-    capture?: {
-      id: string
-      filePath: string
-      imageSrc: string
-    }
-  }
-
-  const capture = result.capture
-  if (!result.success || !capture) return
-
-  folderItems.value = folderItems.value.map((item) =>
-    item.id === activeFolderId
-      ? {
-          ...item,
-          images: [
-            ...item.images,
-            {
-              id: capture.id,
-              src: capture.imageSrc,
-              filePath: capture.filePath
-            }
-          ]
-        }
-      : item
-  )
-}
-
-const onRemoveCaptureImage = async (id: string): Promise<void> => {
-  const activeFolderId = selectedFolderId.value
-  if (activeFolderId === null) return
-
-  const targetImage = folderItems.value
-    .find((item) => item.id === activeFolderId)
-    ?.images.find((image) => image.id === id)
-
-  if (targetImage?.filePath) {
-    await window.api.invoke('capture:remove', {
-      captureId: id,
-      filePath: targetImage.filePath
-    })
-  }
-
-  folderItems.value = folderItems.value.map((item) =>
-    item.id === activeFolderId
-      ? {
-          ...item,
-          images: item.images.filter((image) => image.id !== id)
-        }
-      : item
-  )
-}
-
-const onCreateFolder = (): void => {
-  const nextIndex = folderItems.value.length + 1
-  const newFolder: CaptureFolder = {
-    id: `folder-${Date.now()}`,
-    title: `새 폴더 ${nextIndex}`,
-    path: '',
-    description: '',
-    images: []
-  }
-
-  folderItems.value = [...folderItems.value, newFolder]
-  selectedFolderId.value = newFolder.id
-  void syncFoldersToDatabase()
-}
-
-const onRenameFolder = (payload: { id: string; title: string }): void => {
-  folderItems.value = folderItems.value.map((item) =>
-    item.id === payload.id
-      ? {
-          ...item,
-          title: payload.title
-        }
-      : item
-  )
-  void syncFoldersToDatabase()
-}
-
-const onRemoveFolder = (id: string): void => {
-  folderItems.value = folderItems.value.filter((item) => item.id !== id)
-
-  if (selectedFolderId.value === id) {
-    selectedFolderId.value = folderItems.value[0]?.id ?? null
-  }
-
-  void syncFoldersToDatabase()
-}
-
-const onSelectFolder = (id: string): void => {
-  selectedFolderId.value = id
-  isFolderDropdownOpen.value = false
+  const image = await webviewRef.value?.capturePage()
+  return image?.toDataURL() ?? null
 }
 
 let webviewCaptureListener: (() => void) | null = null
 
-onMounted(async () => {
+const initWebview = (): void => {
   const webview = webviewRef.value
   if (!webview) return
+
+  webview.addEventListener('dom-ready', async () => {
+    // webview.openDevTools()
+    // const script = `
+    // (function() {
+    //   let theme= window.matchMedia('(prefers-color-scheme: dark)').matches;
+    //   console.log('theme', theme);
+    // })()
+    // `
+    // const result = await webview.executeJavaScript(script)
+    // console.log('result', result)
+  })
 
   webview.addEventListener('did-start-loading', () => {
     isLoading.value = true
@@ -480,12 +216,29 @@ onMounted(async () => {
     canGoBack.value = webview.canGoBack()
     canGoForward.value = webview.canGoForward()
   })
+}
 
+const onCaptureWebview = async (): Promise<void> => {
+  const webview = webviewRef.value
+  if (!webview) return
+  modalCaptureNameRef.value?.onOpen()
+}
+
+const onCaptureWebviewConfirm = async (name: string): Promise<void> => {
+  console.log('onCaptureWebviewConfirm')
+  const imageDataURL = await getCaptureImageDataURL()
+  if (!imageDataURL) return
+  captureImages.value.push({
+    id: captureImages.value.length + 1,
+    name,
+    src: imageDataURL
+  })
+}
+
+onMounted(async () => {
+  initWebview()
   window.api.invoke('shortcut:register', CAPTURE_SHORTCUT_KEY, 'shortcut:captureWebview')
   webviewCaptureListener = window.api.on('shortcut:captureWebview', onCaptureWebview)
-  await loadProjectFromDatabase()
-  await loadWorkspaceFromDatabase()
-  await syncFoldersToDatabase()
 })
 
 onUnmounted(() => {

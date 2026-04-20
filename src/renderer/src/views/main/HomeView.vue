@@ -1,23 +1,35 @@
 <template>
-  <div class="min-h-screen bg-[#f6f8fc] px-5 py-7 text-slate-800 md:px-8" @click="closeProjectMenu">
-    <!-- <img :src="'image://1.png'" alt="logo" /> -->
-    <div class="mx-auto flex max-w-7xl flex-col gap-6">
-      <header class="space-y-2 pt-20">
-        <h1 class="text-4xl font-black tracking-tight text-slate-900">내 프로젝트</h1>
-        <p class="text-sm font-medium text-slate-500">
-          최근 작업한 매뉴얼 프로젝트를 확인하고 관리하세요.
-        </p>
+  <div class="min-h-screen bg-base-200 text-base-content" @click="closeProjectMenu">
+    <div class="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8 md:px-10">
+      <!-- Header -->
+      <header class="pt-12">
+        <div class="flex items-end justify-between">
+          <div>
+            <h1 class="text-3xl font-black tracking-tight">내 프로젝트</h1>
+            <p class="mt-1.5 text-sm text-base-content/50">
+              최근 작업한 매뉴얼 프로젝트를 확인하고 관리하세요.
+            </p>
+          </div>
+          <button
+            class="btn btn-primary btn-sm gap-1.5"
+            @click.stop="modalCreateProjectRef?.onOpen()"
+          >
+            <i-lucide-plus class="h-4 w-4" />
+            새 프로젝트
+          </button>
+        </div>
       </header>
 
-      <div class="flex flex-wrap gap-3">
+      <!-- Filters -->
+      <div class="flex items-center gap-2">
         <button
           v-for="filter in filters"
           :key="filter"
-          class="btn h-10 rounded-full border-0 px-5 text-sm font-semibold shadow-none"
+          class="btn btn-sm rounded-full border-0 px-5 font-semibold shadow-none transition-all"
           :class="
             selectedFilter === filter
-              ? 'bg-[#5f59c6] text-white hover:bg-[#5550b7]'
-              : 'bg-white text-slate-500 hover:bg-slate-100'
+              ? 'bg-primary text-primary-content hover:bg-primary/90'
+              : 'bg-base-100 text-base-content/60 hover:bg-base-300/50'
           "
           @click.stop="selectedFilter = filter"
         >
@@ -25,114 +37,96 @@
         </button>
       </div>
 
-      <section class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-        <article
+      <!-- Project Grid -->
+      <section class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <!-- Project Card -->
+        <div
           v-for="project in filteredProjects"
           :key="project.id"
-          class="group relative flex min-h-[300px] cursor-pointer flex-col rounded-[28px] border border-[#e6eaf4] bg-white p-5 text-left shadow-[0_16px_32px_rgba(76,92,152,0.08)] transition duration-200 hover:-translate-y-1 hover:shadow-[0_20px_36px_rgba(76,92,152,0.12)]"
-          role="button"
-          tabindex="0"
-          @click="goToDashboard(project.id)"
-          @keydown.enter.prevent="goToDashboard(project.id)"
-          @keydown.space.prevent="goToDashboard(project.id)"
+          class="group cursor-pointer overflow-hidden rounded-xl border border-base-content/10 bg-base-100 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-primary/30"
+          @click="router.push({ name: 'projects-index', params: { id: project.id } })"
         >
-          <div class="flex items-start justify-between">
-            <span
-              class="inline-flex rounded-full px-3.5 py-1.5 text-[11px] font-bold"
-              :class="
-                project.status === '진행중'
-                  ? 'bg-[#fff1bf] text-[#bf8a00]'
-                  : 'bg-[#e8f7ec] text-[#2f9a58]'
-              "
-            >
-              {{ project.status }}
-            </span>
-
-            <div class="relative" @click.stop>
-              <button
-                type="button"
-                class="flex h-9 w-9 items-center justify-center rounded-full text-lg text-[#b9c3db] transition hover:bg-slate-100 hover:text-[#7f8bad]"
-                @click.stop="toggleProjectMenu(project.id)"
+          <!-- Thumbnail -->
+          <div class="relative overflow-hidden">
+            <img
+              src="https://placehold.co/600x300/f1f5f9/94a3b8?text=thumbnail"
+              alt="project thumbnail"
+              class="h-44 w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+            <div
+              class="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
+            />
+            <div class="absolute right-2.5 top-2.5">
+              <span
+                class="badge badge-sm font-bold shadow-sm"
+                :class="project.filter === '완료' ? 'badge-primary' : 'badge-success'"
               >
-                <i-lucide-ellipsis-vertical />
-              </button>
+                {{ project.status }}
+              </span>
+            </div>
+          </div>
 
-              <div
-                v-if="openedProjectMenuId === project.id"
-                class="absolute top-11 right-0 z-20 min-w-28 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_18px_40px_rgba(15,23,42,0.14)]"
-              >
-                <button
-                  type="button"
-                  class="flex w-full items-center rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-                  @click.stop="openEditProject(project)"
-                >
-                  수정
-                </button>
-                <button
-                  type="button"
-                  class="flex w-full items-center rounded-xl px-3 py-2 text-sm font-semibold text-red-500 transition hover:bg-red-50"
-                  @click.stop="openDeleteProject(project)"
-                >
-                  삭제
-                </button>
+          <!-- Info -->
+          <div class="p-4">
+            <h3 class="mb-1.5 text-base font-bold leading-tight line-clamp-1">
+              {{ project.title }}
+            </h3>
+            <p class="mb-4 h-10 text-xs leading-relaxed text-base-content/45 line-clamp-2">
+              {{ project.description || EMPTY_DESCRIPTION }}
+            </p>
+            <div class="flex items-center justify-between border-t border-base-content/5 pt-3">
+              <div class="flex items-center gap-1 text-xs text-base-content/40">
+                <i-lucide-clock class="h-3 w-3" />
+                {{ project.updatedAt }}
+              </div>
+              <div class="flex items-center gap-1 text-xs text-base-content/40">
+                <i-lucide-file-check class="h-3 w-3" />
+                {{ project.progress }}
               </div>
             </div>
           </div>
+        </div>
 
-          <div class="mt-6 space-y-4">
-            <div class="space-y-3">
-              <h2 class="text-[1.7rem] leading-tight font-black tracking-[-0.03em] text-[#102348]">
-                {{ project.title }}
-              </h2>
-              <p class="text-base leading-[1.55] font-bold tracking-[-0.02em] text-[#9aa8c0]">
-                {{ project.description }}
-              </p>
-            </div>
-          </div>
-
-          <div class="mt-auto space-y-2.5 pt-8">
-            <div class="flex items-center justify-between text-sm font-bold text-[#8f9db8]">
-              <span>진행률</span>
-              <span class="text-[#5f59c6]">{{ project.progress }}%</span>
-            </div>
-            <div class="h-2.5 rounded-full bg-[#edf1f8]">
-              <div
-                class="h-full rounded-full bg-[#5f59c6]"
-                :style="{ width: `${project.progress}%` }"
-              ></div>
-            </div>
-          </div>
-        </article>
-
+        <!-- New Project Card -->
         <button
           type="button"
-          class="flex min-h-[300px] flex-col items-center justify-center gap-5 rounded-md border-2 border-dashed border-slate-300 bg-white text-slate-500 transition-colors duration-200 hover:border-primary hover:text-primary"
+          class="flex min-h-72 flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed border-base-content/15 bg-base-100/50 transition-all duration-200 hover:border-primary/40 hover:bg-primary/5"
           @click.stop="modalCreateProjectRef?.onOpen()"
         >
-          <span
-            class="flex h-14 w-14 items-center justify-center rounded-full bg-[#f2f4fb] text-2xl"
+          <div
+            class="flex h-14 w-14 items-center justify-center rounded-full bg-base-content/10 transition-colors group-hover:bg-primary/20"
           >
-            <i-lucide-plus />
-          </span>
-          <span class="text-lg font-extrabold">새 프로젝트 만들기</span>
+            <i-lucide-plus class="h-6 w-6 text-base-content/40" />
+          </div>
+          <span class="text-sm font-bold text-base-content/40">새 프로젝트 만들기</span>
         </button>
       </section>
+
+      <!-- Empty State -->
+      <div
+        v-if="filteredProjects.length === 0 && projects.length > 0"
+        class="flex flex-col items-center gap-3 py-20 text-base-content/30"
+      >
+        <i-lucide-search-x class="h-12 w-12" />
+        <p class="text-sm font-medium">
+          '{{ selectedFilter }}' 필터에 해당하는 프로젝트가 없습니다.
+        </p>
+      </div>
     </div>
 
-    <ModalCreateProject ref="modalCreateProjectRef" @on-submit="onSubmitProject" />
+    <ModalNewProject ref="modalCreateProjectRef" @on-submit="onSubmitProject" />
     <ModalConfirm ref="modalConfirmRef" @on-confirm="onConfirmDeleteProject" />
   </div>
 </template>
 
 <script setup lang="ts">
 type Filter = '전체' | '진행중' | '완료'
-type ProjectStatus = 'draft' | 'in_progress' | 'completed' | 'archived'
 
 interface ProjectCard {
   id: string
   title: string
   updatedAt: string
-  progress: number
+  progress: string
   description: string
   rawDescription: string
   status: '진행중' | '완료'
@@ -148,78 +142,105 @@ const modalConfirmRef = ref<ComponentRef<'ModalConfirm'> | null>(null)
 const openedProjectMenuId = ref<string | null>(null)
 const deletingProjectId = ref<string | null>(null)
 
-// const formatDate = (value: string): string => {
-//   const date = new Date(value)
-//   if (Number.isNaN(date.getTime())) return '-'
-
-//   const year = date.getFullYear()
-//   const month = String(date.getMonth() + 1).padStart(2, '0')
-//   const day = String(date.getDate()).padStart(2, '0')
-//   return `${year}.${month}.${day}`
-// }
-
-// const toProjectCard = (project: ProjectRecord): ProjectCard => {
-//   const status = project.status === 'completed' ? '완료' : '진행중'
-
-//   return {
-//     id: project.id,
-//     title: project.name,
-//     updatedAt: formatDate(project.updated_at),
-//     progress: project.progress,
-//     description: project.description || EMPTY_DESCRIPTION,
-//     rawDescription: project.description || '',
-//     status,
-//     filter: status
-//   }
-// }
+const DUMMY_PROJECTS: ProjectCard[] = [
+  {
+    id: 'project-1',
+    title: 'AI 마켓 솔루션 구매',
+    updatedAt: '2026.04.10 14:30',
+    progress: '13 / 15',
+    description: 'AI 마켓에서 솔루션을 검색하고 구매하는 전체 프로세스에 대한 매뉴얼 문서입니다.',
+    rawDescription: '',
+    status: '진행중',
+    filter: '진행중'
+  },
+  {
+    id: 'project-2',
+    title: '사용자 권한 관리 시스템',
+    updatedAt: '2026.04.08 09:15',
+    progress: '8 / 8',
+    description:
+      '관리자 페이지에서 사용자 역할 및 권한을 설정하고 관리하는 기능에 대한 문서입니다.',
+    rawDescription: '',
+    status: '완료',
+    filter: '완료'
+  },
+  {
+    id: 'project-3',
+    title: '대시보드 리포트 생성',
+    updatedAt: '2026.04.07 16:42',
+    progress: '5 / 12',
+    description: '데이터 분석 대시보드에서 커스텀 리포트를 생성하고 공유하는 기능 매뉴얼입니다.',
+    rawDescription: '',
+    status: '진행중',
+    filter: '진행중'
+  },
+  {
+    id: 'project-4',
+    title: '결제 시스템 연동 가이드',
+    updatedAt: '2026.04.05 11:00',
+    progress: '20 / 20',
+    description: 'PG사 연동 및 결제 프로세스 전반에 대한 기술 문서 및 사용자 매뉴얼입니다.',
+    rawDescription: '',
+    status: '완료',
+    filter: '완료'
+  },
+  {
+    id: 'project-5',
+    title: '회원가입 및 로그인 플로우',
+    updatedAt: '2026.04.03 13:20',
+    progress: '6 / 10',
+    description: '소셜 로그인, 이메일 인증, 비밀번호 재설정 등 인증 관련 전체 플로우를 다룹니다.',
+    rawDescription: '',
+    status: '진행중',
+    filter: '진행중'
+  },
+  {
+    id: 'project-6',
+    title: '알림 센터 운영 매뉴얼',
+    updatedAt: '2026.03.28 10:05',
+    progress: '4 / 4',
+    description: '푸시 알림, 인앱 알림, 이메일 알림 설정 및 관리에 대한 운영 매뉴얼입니다.',
+    rawDescription: '',
+    status: '완료',
+    filter: '완료'
+  },
+  {
+    id: 'project-7',
+    title: '파일 업로드 및 관리',
+    updatedAt: '2026.03.25 17:30',
+    progress: '2 / 7',
+    description: '대용량 파일 업로드, 미리보기, 버전 관리 기능에 대한 사용자 가이드입니다.',
+    rawDescription: '',
+    status: '진행중',
+    filter: '진행중'
+  }
+]
 
 const projects = ref<ProjectCard[]>([])
 
 const loadProjects = async (): Promise<void> => {
   const rows = await getProjects({ limit: 10, offset: 0 })
   console.log(rows)
-  // projects.value = rows.map(toProjectCard)
+  projects.value = DUMMY_PROJECTS
 }
 
 const filteredProjects = computed(() => {
   switch (selectedFilter.value) {
     case '진행중':
-      return projects.value.filter((project) => project.filter === '진행중')
+      return projects.value.filter((p) => p.filter === '진행중')
     case '완료':
-      return projects.value.filter((project) => project.filter === '완료')
+      return projects.value.filter((p) => p.filter === '완료')
     default:
       return projects.value
   }
 })
 
 const goToDashboard = async (projectId: string): Promise<void> => {
-  await router.push({
-    name: 'dashboard-index',
-    query: { projectId }
-  })
+  await router.push({ name: 'dashboard-index', query: { projectId } })
 }
 
 const closeProjectMenu = (): void => {
   openedProjectMenuId.value = null
-}
-
-const toggleProjectMenu = (projectId: string): void => {
-  openedProjectMenuId.value = openedProjectMenuId.value === projectId ? null : projectId
-}
-
-const openEditProject = (project: ProjectCard): void => {
-  closeProjectMenu()
-  modalCreateProjectRef.value?.onOpenEdit({
-    id: project.id,
-    name: project.title,
-    description: project.rawDescription
-  })
-}
-
-const openDeleteProject = (project: ProjectCard): void => {
-  closeProjectMenu()
-  deletingProjectId.value = project.id
-  modalConfirmRef.value?.onOpen(`'${project.title}' 프로젝트를 삭제하시겠습니까?`)
 }
 
 const onSubmitProject = async (payload: {

@@ -1,11 +1,12 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import HomeView from '@/views/main/HomeView.vue'
 import CaptureIndex from '@/views/captures/CaptureIndex.vue'
-import EditorView from '@/views/editor/EditorView.vue'
-import ImageEditorView from '@/views/editor/ImageEditorView.vue'
-import DashboardView from '@/views/dashboard/DashboardView.vue'
+import DashboardIndex from '@/views/dashboard/DashboardIndex.vue'
 // import SelectView from '@/views/document/SelectImageView.vue'
-import WorkspaceView from '@/views/document/WorkspaceView.vue'
+import WorkspaceDetail from '@/views/workspace/WorkspaceDetail.vue'
+import ProjectIndex from '@/views/projects/ProjectIndex.vue'
+import DocsIndex from '@/views/documents/DocsIndex.vue'
+import DocsAnnotation from '@/views/documents/DocsAnnotation.vue'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -16,6 +17,11 @@ const router = createRouter({
       component: HomeView
     },
     {
+      path: '/projects/:id',
+      name: 'projects-index',
+      component: ProjectIndex
+    },
+    {
       path: '/capture',
       name: 'capture-index',
       component: CaptureIndex
@@ -23,7 +29,7 @@ const router = createRouter({
     {
       path: '/dashboard',
       name: 'dashboard-index',
-      component: DashboardView
+      component: DashboardIndex
     },
     // {
     //   path: '/select',
@@ -31,19 +37,24 @@ const router = createRouter({
     //   component: SelectView
     // },
     {
-      path: '/workspace',
-      name: 'workspace-index',
-      component: WorkspaceView
+      path: '/workspace/:id',
+      name: 'workspace-detail',
+      component: WorkspaceDetail
     },
     {
-      path: '/editor',
-      name: 'editor-index',
-      component: EditorView
+      path: '/workspace/:id/documents',
+      name: 'docs-index',
+      component: DocsIndex
     },
     {
-      path: '/image-editor',
-      name: 'image-editor-index',
-      component: ImageEditorView
+      path: '/documents/:docId/annotation',
+      name: 'docs-annotation',
+      component: DocsAnnotation
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      component: () => import('@/views/errors/NotFound.vue')
     }
   ]
 })

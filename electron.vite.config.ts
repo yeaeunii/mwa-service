@@ -15,7 +15,8 @@ export default defineConfig({
     resolve: {
       alias: {
         '@renderer': resolve('src/renderer/src'),
-        '@': resolve('src/renderer/src')
+        '@': resolve('src/renderer/src'),
+        '@database': resolve('src/database')
       }
     },
     plugins: [
@@ -28,7 +29,14 @@ export default defineConfig({
       }),
       tailwindcss(),
       AutoImport({
-        imports: ['vue', 'vue-router', 'pinia'],
+        imports: [
+          'vue',
+          'vue-router',
+          'pinia',
+          {
+            'vue-draggable-plus': ['useDraggable']
+          }
+        ],
         dts: 'src/auto-imports.d.ts',
         dirs: ['src/composables', 'src/stores', 'src/types', 'src/database'],
         dirsScanOptions: {
