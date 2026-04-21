@@ -1,8 +1,7 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import HomeView from '@/views/main/HomeView.vue'
 import CaptureIndex from '@/views/captures/CaptureIndex.vue'
-import DashboardIndex from '@/views/dashboard/DashboardIndex.vue'
-// import SelectView from '@/views/document/SelectImageView.vue'
+// import DashboardIndex from '@/views/dashboard/DashboardIndex.vue'
 import WorkspaceDetail from '@/views/workspace/WorkspaceDetail.vue'
 import ProjectIndex from '@/views/projects/ProjectIndex.vue'
 import DocsIndex from '@/views/documents/DocsIndex.vue'
@@ -26,15 +25,10 @@ const router = createRouter({
       name: 'capture-index',
       component: CaptureIndex
     },
-    {
-      path: '/dashboard',
-      name: 'dashboard-index',
-      component: DashboardIndex
-    },
     // {
-    //   path: '/select',
-    //   name: 'select-index',
-    //   component: SelectView
+    //   path: '/dashboard',
+    //   name: 'dashboard-index',
+    //   component: DashboardIndex
     // },
     {
       path: '/workspace/:id',

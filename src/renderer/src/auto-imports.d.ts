@@ -7,13 +7,12 @@
 export {}
 declare global {
   const EffectScope: typeof import('vue').EffectScope
-  const VueDraggable: typeof import('vue-draggable-plus').VueDraggable
   const acceptHMRUpdate: typeof import('pinia').acceptHMRUpdate
-  const closeDatabase: typeof import('../../database/conn').closeDatabase
   const computed: typeof import('vue').computed
   const createApp: typeof import('vue').createApp
   const createPinia: typeof import('pinia').createPinia
   const createProject: typeof import('./database/index').createProject
+  const createWorkspace: typeof import('./database/index').createWorkspace
   const customRef: typeof import('vue').customRef
   const defineAsyncComponent: typeof import('vue').defineAsyncComponent
   const defineComponent: typeof import('vue').defineComponent
@@ -24,13 +23,10 @@ declare global {
   const getCurrentInstance: typeof import('vue').getCurrentInstance
   const getCurrentScope: typeof import('vue').getCurrentScope
   const getCurrentWatcher: typeof import('vue').getCurrentWatcher
-  const getDatabase: typeof import('../../database/conn').getDatabase
-  const getDatabasePath: typeof import('../../database/conn').getDatabasePath
   const getProject: typeof import('./database/index').getProject
-  const getProjectList: typeof import('../../database/dao').getProjectList
   const getProjects: typeof import('./database/index').getProjects
+  const getWorkspaces: typeof import('./database/index').getWorkspaces
   const h: typeof import('vue').h
-  const initDatabase: typeof import('../../database/conn').initDatabase
   const inject: typeof import('vue').inject
   const isProxy: typeof import('vue').isProxy
   const isReactive: typeof import('vue').isReactive
@@ -43,7 +39,6 @@ declare global {
   const mapStores: typeof import('pinia').mapStores
   const mapWritableState: typeof import('pinia').mapWritableState
   const markRaw: typeof import('vue').markRaw
-  const migrate: typeof import('../../database/migrate').default
   const nextTick: typeof import('vue').nextTick
   const onActivated: typeof import('vue').onActivated
   const onBeforeMount: typeof import('vue').onBeforeMount
@@ -62,15 +57,11 @@ declare global {
   const onUpdated: typeof import('vue').onUpdated
   const onWatcherCleanup: typeof import('vue').onWatcherCleanup
   const pinia: typeof import('./stores/index').pinia
-  const projectList: typeof import('../../database/dao').projectList
   const provide: typeof import('vue').provide
   const reactive: typeof import('vue').reactive
   const readonly: typeof import('vue').readonly
   const ref: typeof import('vue').ref
   const resolveComponent: typeof import('vue').resolveComponent
-  const runQuery: typeof import('../../database/conn').runQuery
-  const selectList: typeof import('../../database/conn').selectList
-  const selectOne: typeof import('../../database/conn').selectOne
   const setActivePinia: typeof import('pinia').setActivePinia
   const setMapStoreSuffix: typeof import('pinia').setMapStoreSuffix
   const shallowReactive: typeof import('vue').shallowReactive
@@ -81,7 +72,6 @@ declare global {
   const toRef: typeof import('vue').toRef
   const toRefs: typeof import('vue').toRefs
   const toValue: typeof import('vue').toValue
-  const transaction: typeof import('../../database/conn').transaction
   const triggerRef: typeof import('vue').triggerRef
   const unref: typeof import('vue').unref
   const updateProject: typeof import('./database/index').updateProject
@@ -102,7 +92,6 @@ declare global {
   const useRouter: typeof import('vue-router').useRouter
   const useSlots: typeof import('vue').useSlots
   const useTemplateRef: typeof import('vue').useTemplateRef
-  const vDraggable: typeof import('vue-draggable-plus').vDraggable
   const watch: typeof import('vue').watch
   const watchEffect: typeof import('vue').watchEffect
   const watchPostEffect: typeof import('vue').watchPostEffect
@@ -135,6 +124,7 @@ declare module 'vue' {
     readonly createApp: UnwrapRef<typeof import('vue')['createApp']>
     readonly createPinia: UnwrapRef<typeof import('pinia')['createPinia']>
     readonly createProject: UnwrapRef<typeof import('./database/index')['createProject']>
+    readonly createWorkspace: UnwrapRef<typeof import('./database/index')['createWorkspace']>
     readonly customRef: UnwrapRef<typeof import('vue')['customRef']>
     readonly defineAsyncComponent: UnwrapRef<typeof import('vue')['defineAsyncComponent']>
     readonly defineComponent: UnwrapRef<typeof import('vue')['defineComponent']>
@@ -145,8 +135,8 @@ declare module 'vue' {
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
     readonly getCurrentWatcher: UnwrapRef<typeof import('vue')['getCurrentWatcher']>
-    readonly getProject: UnwrapRef<typeof import('./database/index')['getProject']>
     readonly getProjects: UnwrapRef<typeof import('./database/index')['getProjects']>
+    readonly getWorkspaces: UnwrapRef<typeof import('./database/index')['getWorkspaces']>
     readonly h: UnwrapRef<typeof import('vue')['h']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
     readonly isProxy: UnwrapRef<typeof import('vue')['isProxy']>

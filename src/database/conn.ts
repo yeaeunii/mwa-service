@@ -11,9 +11,12 @@ export const getDatabasePath = (): string => join(app.getPath('userData'), 'miso
 export const initDatabase = (): Database => {
   if (database) return database
 
+  
   const dbPath = getDatabasePath()
   const dbDir = dirname(dbPath)
 
+  console.log('dbPath', dbPath)
+  
   if (!existsSync(dbDir)) {
     mkdirSync(dbDir, { recursive: true })
   }
@@ -53,6 +56,7 @@ export const selectList = <T = Record<string, unknown>>(
   params?: Record<string, unknown> | unknown[]
 ): T[] => {
   const db = getDatabase()
+
   const statement = db.prepare(query)
 
   if (!params) {

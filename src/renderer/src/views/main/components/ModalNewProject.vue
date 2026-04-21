@@ -1,78 +1,3 @@
-<script setup lang="ts">
-const emits = defineEmits<{
-  onSubmit: [{ id?: string; name: string; description: string; thumbnail: string | null }]
-}>()
-
-const modalRef = ref<ComponentRef<'ModalBase'> | null>(null)
-const editingProjectId = ref<string | null>(null)
-const projectName = ref('')
-const projectDescription = ref('')
-const projectThumbnail = ref<string | null>(null)
-const fileInputRef = ref<HTMLInputElement | null>(null)
-
-const onOpen = (): void => {
-  editingProjectId.value = null
-  projectName.value = ''
-  projectDescription.value = ''
-  projectThumbnail.value = null
-  modalRef.value?.onOpen()
-}
-
-const onOpenEdit = (payload: {
-  id: string
-  name: string
-  description?: string
-  thumbnail?: string | null
-}): void => {
-  editingProjectId.value = payload.id
-  projectName.value = payload.name
-  projectDescription.value = payload.description ?? ''
-  projectThumbnail.value = payload.thumbnail ?? null
-  modalRef.value?.onOpen()
-}
-
-const onClose = (): void => {
-  modalRef.value?.onClose()
-}
-
-const onSubmit = (): void => {
-  emits('onSubmit', {
-    id: editingProjectId.value ?? undefined,
-    name: projectName.value.trim(),
-    description: projectDescription.value.trim(),
-    thumbnail: projectThumbnail.value
-  })
-  onClose()
-}
-
-const onClickThumbnail = (): void => {
-  fileInputRef.value?.click()
-}
-
-const onFileChange = (e: Event): void => {
-  const input = e.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-
-  const reader = new FileReader()
-  reader.onload = () => {
-    projectThumbnail.value = reader.result as string
-  }
-  reader.readAsDataURL(file)
-  input.value = ''
-}
-
-const onRemoveThumbnail = (): void => {
-  projectThumbnail.value = null
-}
-
-defineExpose({
-  onOpen,
-  onOpenEdit,
-  onClose
-})
-</script>
-
 <template>
   <ModalBase
     ref="modalRef"
@@ -173,6 +98,19 @@ defineExpose({
           placeholder="프로젝트에 대한 간단한 설명을 입력하세요"
         ></textarea>
       </label>
+
+      <label class="flex flex-col gap-2">
+        <span class="text-sm font-bold text-slate-700">대표 URL (선택 사항)</span>
+        <input
+          v-model="projectUrl"
+          type="url"
+          class="input input-bordered h-12 w-full rounded-xl border-slate-200 bg-slate-50 text-slate-800 shadow-none outline-none focus:border-blue-400 focus:outline-none"
+          placeholder="https://service.example.com"
+        />
+        <span class="text-xs leading-relaxed text-slate-400">
+          프로젝트를 열었을 때 가장 먼저 진입할 화면 주소를 입력하세요.
+        </span>
+      </label>
     </div>
 
     <template #footer="{ close }">
@@ -196,3 +134,86 @@ defineExpose({
     </template>
   </ModalBase>
 </template>
+
+
+<script setup lang="ts">
+const emits = defineEmits<{
+  onSubmit: [
+    { id?: string; name: string; description: string; url: string; thumbnail: string | null }
+  ]
+}>()
+
+const modalRef = ref<ComponentRef<'ModalBase'> | null>(null)
+const editingProjectId = ref<string | null>(null)
+const projectName = ref('')
+const projectDescription = ref('')
+const projectUrl = ref('')
+const projectThumbnail = ref<string | null>(null)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+const onOpen = (): void => {
+  editingProjectId.value = null
+  projectName.value = ''
+  projectDescription.value = ''
+  projectUrl.value = ''
+  projectThumbnail.value = null
+  modalRef.value?.onOpen()
+}
+
+const onOpenEdit = (payload: {
+  id: string
+  name: string
+  description?: string
+  url?: string
+  thumbnail?: string | null
+}): void => {
+  editingProjectId.value = payload.id
+  projectName.value = payload.name
+  projectDescription.value = payload.description ?? ''
+  projectUrl.value = payload.url ?? ''
+  projectThumbnail.value = payload.thumbnail ?? null
+  modalRef.value?.onOpen()
+}
+
+const onClose = (): void => {
+  modalRef.value?.onClose()
+}
+
+const onSubmit = (): void => {
+  emits('onSubmit', {
+    id: editingProjectId.value ?? undefined,
+    name: projectName.value.trim(),
+    description: projectDescription.value.trim(),
+    url: projectUrl.value.trim(),
+    thumbnail: projectThumbnail.value
+  })
+  onClose()
+}
+
+const onClickThumbnail = (): void => {
+  fileInputRef.value?.click()
+}
+
+const onFileChange = (e: Event): void => {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  const reader = new FileReader()
+  reader.onload = () => {
+    projectThumbnail.value = reader.result as string
+  }
+  reader.readAsDataURL(file)
+  input.value = ''
+}
+
+const onRemoveThumbnail = (): void => {
+  projectThumbnail.value = null
+}
+
+defineExpose({
+  onOpen,
+  onOpenEdit,
+  onClose
+})
+</script>

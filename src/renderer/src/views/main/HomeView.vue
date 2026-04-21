@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-base-200 text-base-content" @click="closeProjectMenu">
+  <div class="min-h-screen bg-base-200 text-base-content">
     <div class="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-8 md:px-10">
       <!-- Header -->
       <header class="pt-12">
@@ -114,12 +114,16 @@
       </div>
     </div>
 
-    <ModalNewProject ref="modalCreateProjectRef" @on-submit="onSubmitProject" />
+    <ModalNewProject ref="modalCreateProjectRef" @on-submit="CreateProject" />
     <ModalConfirm ref="modalConfirmRef" @on-confirm="onConfirmDeleteProject" />
   </div>
 </template>
 
 <script setup lang="ts">
+import type { Project } from '@database/dto'
+import { getProjects } from '@/database'
+import { formatDate } from '@/utils/datetime'
+
 type Filter = '전체' | '진행중' | '완료'
 
 interface ProjectCard {
@@ -139,89 +143,41 @@ const selectedFilter = ref<Filter>('전체')
 const router = useRouter()
 const modalCreateProjectRef = ref<ComponentRef<'ModalCreateProject'> | null>(null)
 const modalConfirmRef = ref<ComponentRef<'ModalConfirm'> | null>(null)
-const openedProjectMenuId = ref<string | null>(null)
 const deletingProjectId = ref<string | null>(null)
-
-const DUMMY_PROJECTS: ProjectCard[] = [
-  {
-    id: 'project-1',
-    title: 'AI 마켓 솔루션 구매',
-    updatedAt: '2026.04.10 14:30',
-    progress: '13 / 15',
-    description: 'AI 마켓에서 솔루션을 검색하고 구매하는 전체 프로세스에 대한 매뉴얼 문서입니다.',
-    rawDescription: '',
-    status: '진행중',
-    filter: '진행중'
-  },
-  {
-    id: 'project-2',
-    title: '사용자 권한 관리 시스템',
-    updatedAt: '2026.04.08 09:15',
-    progress: '8 / 8',
-    description:
-      '관리자 페이지에서 사용자 역할 및 권한을 설정하고 관리하는 기능에 대한 문서입니다.',
-    rawDescription: '',
-    status: '완료',
-    filter: '완료'
-  },
-  {
-    id: 'project-3',
-    title: '대시보드 리포트 생성',
-    updatedAt: '2026.04.07 16:42',
-    progress: '5 / 12',
-    description: '데이터 분석 대시보드에서 커스텀 리포트를 생성하고 공유하는 기능 매뉴얼입니다.',
-    rawDescription: '',
-    status: '진행중',
-    filter: '진행중'
-  },
-  {
-    id: 'project-4',
-    title: '결제 시스템 연동 가이드',
-    updatedAt: '2026.04.05 11:00',
-    progress: '20 / 20',
-    description: 'PG사 연동 및 결제 프로세스 전반에 대한 기술 문서 및 사용자 매뉴얼입니다.',
-    rawDescription: '',
-    status: '완료',
-    filter: '완료'
-  },
-  {
-    id: 'project-5',
-    title: '회원가입 및 로그인 플로우',
-    updatedAt: '2026.04.03 13:20',
-    progress: '6 / 10',
-    description: '소셜 로그인, 이메일 인증, 비밀번호 재설정 등 인증 관련 전체 플로우를 다룹니다.',
-    rawDescription: '',
-    status: '진행중',
-    filter: '진행중'
-  },
-  {
-    id: 'project-6',
-    title: '알림 센터 운영 매뉴얼',
-    updatedAt: '2026.03.28 10:05',
-    progress: '4 / 4',
-    description: '푸시 알림, 인앱 알림, 이메일 알림 설정 및 관리에 대한 운영 매뉴얼입니다.',
-    rawDescription: '',
-    status: '완료',
-    filter: '완료'
-  },
-  {
-    id: 'project-7',
-    title: '파일 업로드 및 관리',
-    updatedAt: '2026.03.25 17:30',
-    progress: '2 / 7',
-    description: '대용량 파일 업로드, 미리보기, 버전 관리 기능에 대한 사용자 가이드입니다.',
-    rawDescription: '',
-    status: '진행중',
-    filter: '진행중'
-  }
-]
 
 const projects = ref<ProjectCard[]>([])
 
+const normalizeProjectStatus = (status: string): ProjectCard['status'] => {
+  return status === '완료' ? '완료' : '진행중'
+}
+
+const mapProjectToCard = (project: Project): ProjectCard => {
+  const status = normalizeProjectStatus(project.status)
+
+  return {
+    id: String(project.id),
+    title: project.name,
+    updatedAt: formatDate(new Date(project.updated_at), 'YYYY.MM.DD HH:mm'),
+    progress: '-',
+    description: project.description ?? '',
+    rawDescription: project.description ?? '',
+    status,
+    filter: status
+  }
+}
+
+// workspace 목록 화면으로 이동
+const goToWorkspace = async (projectId: string): Promise<void> => {
+  await router.push({ name: 'projects-index', params: { id: projectId } })
+}
+
+
+// 프로젝트 조회
 const loadProjects = async (): Promise<void> => {
+
   const rows = await getProjects({ limit: 10, offset: 0 })
-  console.log(rows)
-  projects.value = DUMMY_PROJECTS
+  console.log('loaded rows:', rows)
+  projects.value = rows.map(mapProjectToCard)
 }
 
 const filteredProjects = computed(() => {
@@ -235,39 +191,22 @@ const filteredProjects = computed(() => {
   }
 })
 
-const goToDashboard = async (projectId: string): Promise<void> => {
-  await router.push({ name: 'dashboard-index', query: { projectId } })
-}
 
-const closeProjectMenu = (): void => {
-  openedProjectMenuId.value = null
-}
-
-const onSubmitProject = async (payload: {
-  id?: string
+//프로젝트 생성
+const CreateProject = async (payload: {
   name: string
   description: string
+  url: string
 }): Promise<void> => {
-  if (payload.id) {
-    await window.api.invoke('project:update', {
-      id: payload.id,
-      name: payload.name,
-      description: payload.description
-    })
-    await loadProjects()
-    return
-  }
-
-  const projectId = `project-${Date.now()}`
-
-  await window.api.invoke('project:create', {
-    id: projectId,
+  const projectId = (await window.api.invoke('dao:call', 'createProject', {
     name: payload.name,
-    description: payload.description
-  })
+    description: payload.description,
+    serv_url: payload.url
+  })) as number
 
+console.log('created projectId:', projectId)
   await loadProjects()
-  await goToDashboard(projectId)
+  await goToWorkspace(String(projectId))
 }
 
 const onConfirmDeleteProject = async (): Promise<void> => {

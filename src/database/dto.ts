@@ -2,61 +2,42 @@ export interface Project {
   id: number
   name: string
   description: string
-  status: string
   serv_url: string
-  delete_yn: number
+  status: string
+  delete_yn: string
   created_at: string
   updated_at: string
 }
 
-export interface DocGroup {
+export interface Workspace {
   id: number
-  title: string
-  description: string
-  doc_meta_json: string
-  content_json: string
-  annotation_json: string
-  draw_img_src: string
-  orgn_img_src: string
-  sort_order: number
-  created_at: string
-  updated_at: string
-  group_id: number
-}
-
-export interface Doc {
-  id: number
-  title: string
-  description: string
-  doc_meta_json: string
-  content_json: string
-  annotation_json: string
-  draw_img_src: string
-  orgn_img_src: string
-  sort_order: number
-  created_at: string
-  updated_at: string
-  group_id: number
-}
-
-export interface CaptureGroup {
-  id: number
+  project_id: number
   name: string
-  sort_order: number
   latest_src_url: string
   created_at: string
   updated_at: string
-  project_id: number
 }
 
-export interface CaptureImg {
+export interface Capture {
   id: number
-  group_id: number
+  workspace_id: number
+  name: string
   img_path: string
   created_at: string
 }
 
-export interface UsedCaptureImg {
-  capture_img_id: number
-  doc_id: number
+export interface Doc {
+  id: number
+  workspace_id: number
+  section_id: number
+  title: string
+  description: string
+  doc_meta_json: string
+  content_json: string
+  annotation_json: string
+  orgn_img_path: string
+  draw_img_path: string
+  sort_order: number
+  created_at: string
+  updated_at: string
 }

@@ -39,7 +39,7 @@
                 </a>
               </li>
               <li>
-                <a v-blur class="rounded-lg text-sm text-error" @click="onClickDeleteProject">
+                <a v-blur class="rounded-lg text-sm text-error" @click="onDeleteProject">
                   <i-lucide-trash-2 class="h-4 w-4 opacity-60" />
                   프로젝트 삭제
                 </a>
@@ -56,7 +56,7 @@
             {{ curProject?.name }}
           </h1>
           <p class="text-sm text-white/70">
-            {{ curProject?.description }}
+            {{ curProject?.description || '프로젝트 설명을 아직 작성하지 않았습니다' }}
           </p>
         </div>
       </div>
@@ -114,7 +114,7 @@
           <button
             type="button"
             class="flex min-h-56 flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-base-content/15 bg-base-100/50 transition-all duration-200 hover:border-primary/40 hover:bg-primary/5"
-            @click="onClickNewWorkspace"
+            @click="onCreateWorkspace"
           >
             <div class="flex h-12 w-12 items-center justify-center rounded-full bg-base-content/10">
               <i-lucide-plus class="h-5 w-5 text-base-content/40" />
@@ -132,20 +132,20 @@
       ref="modalConfirmRef"
       ok-text="예"
       cancel-text="아니오"
-      @confirm="onConfirmCallback"
+      @on-confirm="onConfirmCallback?.()"
     >
       <template #message>
-        <div :vue-dompurify-html="confirmMsgHtml"></div>
+        <div v-dompurify-html="confirmMsgHtml"></div>
       </template>
     </modal-confirm>
   </div>
 </template>
 
 <script setup lang="ts">
-import ModalConfirm from '@renderer/components/ui/modal/ModalConfirm.vue'
-import ModalNewWorkspace from './components/ModalNewWorkspace.vue'
 import type { WorkspacePayload } from './components/ModalNewWorkspace.vue'
-import { Project } from '@database/dto'
+import type { Project, Workspace as DbWorkspace } from '@database/dto'
+import { createWorkspace, deleteProject, getProjects, getWorkspaces, updateProject } from '@/database'
+import { formatDate } from '@/utils/datetime'
 import { useRouter } from 'vue-router'
 
 interface Workspace {
@@ -158,102 +158,119 @@ interface Workspace {
 }
 
 const router = useRouter()
+
+const route = useRoute()
+
 let onConfirmCallback: (() => void) | null = null
 const modalConfirmRef = ref<InstanceType<typeof ModalConfirm> | null>(null)
 const modalEditProjectRef = ref<ComponentRef<'ModalNewProject'> | null>(null)
 const modalNewWorkspaceRef = ref<InstanceType<typeof ModalNewWorkspace> | null>(null)
 const confirmMsgHtml = ref<string>('')
 const projectThumbnail = ref<string | null>(null)
+const workspaces = ref<Workspace[]>([])
+const curProject = ref<Project | null>(null)
 
-let nextWsId = 3
-const workspaces = ref<Workspace[]>([
-  {
-    id: 1,
-    name: 'AI 솔루션',
+const mapWorkspaceToCard = (workspace: DbWorkspace): Workspace => {
+  return {
+    id: workspace.id,
+    name: workspace.name,
     thumbnail: null,
-    createdAt: '2026-04-04 10:00',
-    imageCount: 5,
-    docCount: 5
-  },
-  {
-    id: 2,
-    name: '구매 프로세스',
-    thumbnail: null,
-    createdAt: '2026-04-08 14:30',
-    imageCount: 3,
-    docCount: 2
+    createdAt: formatDate(new Date(workspace.created_at), 'YYYY-MM-DD HH:mm'),
+    imageCount: 0,
+    docCount: 0
   }
-])
+}
 
-const curProject = ref<Project | null>({
-  id: 1,
-  name: 'AI 마켓 솔루션 구매',
-  description: 'AI 마켓에서 솔루션을 검색하고 구매하는 전체 프로세스에 대한 매뉴얼',
-  status: '진행중',
-  serv_url: 'https://www.google.com',
-  delete_yn: 0,
-  created_at: '2026-04-01',
-  updated_at: '2026-04-10'
-})
+const loadProject = async (): Promise<void> => {
+  const rows = await getProjects({
+    id : route.params.id,
+    limit:1,
+    offset:0
+  })
+  curProject.value = rows[0] ?? null
 
+}
+
+const loadWorkspaces = async (): Promise<void> => {
+  const projectId = Number(route.params.id)
+  const rows = await getWorkspaces({ project_id: projectId, limit: 50, offset: 0 })
+  workspaces.value = rows.map(mapWorkspaceToCard)
+}
+
+// 프로젝트 수정 모달 
 const onEditProject = (): void => {
   if (!curProject.value) return
+
   modalEditProjectRef.value?.onOpenEdit({
     id: String(curProject.value.id),
     name: curProject.value.name,
     description: curProject.value.description,
+    url: curProject.value.serv_url,
     thumbnail: projectThumbnail.value
   })
 }
 
-const onSubmitEditProject = (payload: {
+// 프로젝트 수정
+const onSubmitEditProject = async (payload: {
   id?: string
   name: string
   description: string
+  url: string
   thumbnail: string | null
-}): void => {
-  if (!curProject.value) return
-  curProject.value.name = payload.name
-  curProject.value.description = payload.description
+}): Promise<void> => {
+  if (!curProject.value || !payload.id) return
+
+  await updateProject({
+    id: payload.id,
+    name: payload.name,
+    description: payload.description,
+    serv_url: payload.url
+  })
+
+  await loadProject()
   projectThumbnail.value = payload.thumbnail
 }
 
-const onClickNewWorkspace = (): void => {
+// 워크스페이스 생성 모달
+const onCreateWorkspace = (): void => {
   modalNewWorkspaceRef.value?.onOpen()
 }
 
+//워크스페이스 생성
 const onSubmitWorkspace = (payload: WorkspacePayload): void => {
-  if (payload.id != null) {
-    const ws = workspaces.value.find((w) => w.id === payload.id)
-    if (ws) {
-      ws.name = payload.name
-      ws.thumbnail = payload.thumbnail
-    }
-  } else {
-    const now = new Date()
-    const pad = (n: number): string => String(n).padStart(2, '0')
-    const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`
-    workspaces.value.push({
-      id: nextWsId++,
-      name: payload.name,
-      thumbnail: payload.thumbnail,
-      createdAt: dateStr,
-      imageCount: 0,
-      docCount: 0
+  if (payload.id != null) return
+
+  void (async () => {
+    const projectId = Number(route.params.id)
+    await createWorkspace({
+      project_id: projectId,
+      name: payload.name
     })
-  }
+    await loadWorkspaces()
+  })()
 }
 
-const onClickDeleteProject = (): void => {
+//프로젝트 삭제 모달
+const onDeleteProject = (): void => {
   confirmMsgHtml.value = `
   <div class="text-center">
-    <h3 class="text-lg font-bold mb-2">"${curProject.value?.name}"</h3>
+    <h3 class="text-lg font-bold mb-2">${curProject.value?.name}</h3>
     <p class="text-sm text-gray-500">프로젝트를 삭제하시겠습니까?</p>
   </div>
   `
   onConfirmCallback = (): void => {
-    console.log('프로젝트 삭제')
+    if (!curProject.value) return
+
+    void (async () => {
+      await deleteProject(String(curProject.value?.id))
+      await router.push('/')
+    })()
   }
   modalConfirmRef.value?.onOpen()
 }
+
+onMounted(() => {
+  void loadProject()
+  void loadWorkspaces()
+})
 </script>

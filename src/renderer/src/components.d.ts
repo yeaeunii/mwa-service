@@ -11,6 +11,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    CanvasEditor: typeof import('./views/editor/components/CanvasEditor.vue')['default']
     CaptureGroupPanel: typeof import('./views/captures/components/CaptureGroupPanel.vue')['default']
     ColumnTreeExplorer: typeof import('./components/ui/tree/FilesExplorer.vue')['default']
     DocsAnnotation: typeof import('./views/docs/components/DocsAnnotation.vue')['default']
@@ -18,7 +19,9 @@ declare module 'vue' {
     DocumentPreviewCard: typeof import('./views/document/components/DocumentPreviewCard.vue')['default']
     DrawerRightPanel: typeof import('./views/exploration/components/DrawerRightPanel.vue')['default']
     DrawerSideCaptureGroup: typeof import('./views/captures/components/DrawerSideCaptureGroup.vue')['default']
+    EditorTools: typeof import('./views/editor/components/EditorTools.vue')['default']
     FilesExplorer: typeof import('./components/ui/tree/FilesExplorer.vue')['default']
+    FunctionList: typeof import('./views/editor/components/FunctionList.vue')['default']
     GalleryItems: typeof import('./views/projects/components/GalleryItems.vue')['default']
     GalleryTabpannel: typeof import('./views/project/components/GalleryTabpannel.vue')['default']
     HomeView: typeof import('./views/home/components/HomeView.vue')['default']
@@ -130,5 +133,6 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     Versions: typeof import('./components/Versions.vue')['default']
     VueDraggable: typeof import('vue-draggable-plus')['VueDraggable']
+    ZoomControls: typeof import('./views/editor/components/ZoomControls.vue')['default']
   }
 }
