@@ -121,7 +121,7 @@
 
 <script setup lang="ts">
 import type { Project } from '@database/dto'
-import { getProjects } from '@/database'
+import { createProject, getProjects } from '@/database'
 import { formatDate } from '@/utils/datetime'
 
 type Filter = '전체' | '진행중' | '완료'
@@ -198,11 +198,12 @@ const CreateProject = async (payload: {
   description: string
   url: string
 }): Promise<void> => {
-  const projectId = (await window.api.invoke('dao:call', 'createProject', {
+  const projectId = await createProject({
     name: payload.name,
     description: payload.description,
     serv_url: payload.url
-  })) as number
+  })
+  if (projectId === null) return
 
 console.log('created projectId:', projectId)
   await loadProjects()

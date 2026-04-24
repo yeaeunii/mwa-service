@@ -224,6 +224,10 @@ import { useDragSource, useDropZone } from '@renderer/composables/useCrossDrag'
 
 const route = useRoute()
 const workspaceId = computed(() => route.params.id)
+
+
+
+
 const router = useRouter()
 
 // --- Screenshot Data ---
@@ -304,5 +308,13 @@ const { isOverDropZone, onDragOver, onDragLeave, onDrop } = useDropZone<number>(
     }
     selectedIds.value = new Set()
   }
+})
+
+
+
+
+
+onMounted(()=>{
+  console.log('workspaceId:', workspaceId.value)
 })
 </script>
