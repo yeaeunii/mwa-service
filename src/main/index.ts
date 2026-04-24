@@ -10,7 +10,7 @@ import {
   nativeTheme
 } from 'electron'
 import { join } from 'path'
-import { readFile, writeFile } from 'fs/promises'
+import { writeFile } from 'fs/promises'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
@@ -20,12 +20,11 @@ import path from 'path'
 import { pathToFileURL } from 'url'
 import { existsSync, mkdirSync } from 'fs'
 
-const IMG_SCHEME = 'image'
+const IMG_SCHEME = 'appimg'
 
 //Light 테마 고정
 nativeTheme.themeSource = 'light'
 
-// 1. (필수) 앱이 준비되기 전에 스키마 권한을 등록해야 합니다.
 protocol.registerSchemesAsPrivileged([
   {
     scheme: IMG_SCHEME,
@@ -37,11 +36,6 @@ protocol.registerSchemesAsPrivileged([
     }
   }
 ])
-
-const filePathToDataUrl = async (filePath: string, mimeType = 'image/png'): Promise<string> => {
-  const fileBuffer = await readFile(filePath)
-  return `data:${mimeType};base64,${fileBuffer.toString('base64')}`
-}
 
 function createWindow(): void {
   // Create the browser window.
@@ -94,6 +88,8 @@ function unregisterShortcut(keyset: string): void {
   globalShortcut.unregister(keyset)
 }
 
+  
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
@@ -103,24 +99,57 @@ app.whenReady().then(() => {
 
   initDatabase()
 
-  const imagesDir = path.join(app.getPath('userData'), 'images')
-  if (!existsSync(imagesDir)) {
-    mkdirSync(imagesDir, { recursive: true })
+    //파일 경로
+    const getFileStoragePaths = () => {
+      const userDataDir = app.getPath('userData')
+      const fileRootDir = path.join(userDataDir, 'FILE')
+    
+      return {
+        userDataDir,
+        fileRootDir,
+        capturesDir: path.join(fileRootDir, 'CAPTURES'),
+        docsDir: path.join(fileRootDir, 'DOCS'),
+        thumbnailsDir: path.join(fileRootDir, 'Thumbnails')
+      }
+    }
+
+    
+  //local 폴더 생성
+  const ensureFileStorageDirs = (): void => {
+    const { fileRootDir, capturesDir, docsDir, thumbnailsDir } = getFileStoragePaths()
+  
+    for (const dir of [fileRootDir, capturesDir, docsDir, thumbnailsDir]) {
+      if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true })
+      }
+    }
   }
+  
+  ensureFileStorageDirs()
+
 
   protocol.handle(IMG_SCHEME, (request) => {
     try {
       const url = new URL(request.url)
-      // Support both IMG_SCHEME://1.png and IMG_SCHEME:///1.png formats.
-      const rawPath = url.pathname && url.pathname !== '/' ? url.pathname : url.hostname
+      const { userDataDir } = getFileStoragePaths()
+      
+      const rawPath =
+        url.hostname && url.pathname && url.pathname !== '/'
+          ? `${url.hostname}${url.pathname}`
+          : url.pathname && url.pathname !== '/'
+            ? url.pathname
+            : url.hostname
       const relativePath = decodeURIComponent(rawPath).replace(/^\/+/, '').replace(/\\/g, '/')
+
       if (!relativePath) {
         return new Response('Bad Request', { status: 400 })
       }
 
-      const absPath = path.resolve(imagesDir, relativePath)
-      const normalizedBase = path.resolve(imagesDir) + path.sep
-      const isInsideBase = absPath === path.resolve(imagesDir) || absPath.startsWith(normalizedBase)
+      const absPath = path.resolve(userDataDir, relativePath)
+      const resolvedBase = path.resolve(userDataDir)
+      const normalizedBase = resolvedBase + path.sep
+      const isInsideBase = absPath === resolvedBase || absPath.startsWith(normalizedBase)
+
       if (!isInsideBase) {
         return new Response('Forbidden', { status: 403 })
       }
@@ -174,36 +203,8 @@ app.whenReady().then(() => {
     return (daoMethod as (...params: unknown[]) => unknown)(...args)
   })
 
-  ipcMain.handle(
-    'capture:overwriteImage',
-    async (
-      _,
-      payload: {
-        filePath: string
-        dataUrl: string
-      }
-    ) => {
-      const base64Data = payload.dataUrl.replace(/^data:image\/\w+;base64,/, '')
-      await writeFile(payload.filePath, Buffer.from(base64Data, 'base64'))
-      return { success: true }
-    }
-  )
 
-  ipcMain.handle('webview:saveCapture', async (_, dataUrl: string) => {
-    const { canceled, filePath } = await dialog.showSaveDialog({
-      title: 'Save Capture',
-      defaultPath: join(app.getPath('pictures'), `capture-${Date.now()}.png`),
-      filters: [
-        { name: 'PNG Image', extensions: ['png'] },
-        { name: 'JPEG Image', extensions: ['jpg', 'jpeg'] }
-      ]
-    })
-    if (canceled || !filePath) return { success: false }
 
-    const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '')
-    await writeFile(filePath, Buffer.from(base64Data, 'base64'))
-    return { success: true, filePath }
-  })
 
   ipcMain.handle('shortcut:register', (_, keyset: string, eventReceiver: string) => {
     registerGlobalShortcut(keyset, eventReceiver)

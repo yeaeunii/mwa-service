@@ -1,12 +1,15 @@
-import type { Project } from '@database/dto'
-import type { Workspace } from '@database/dto'
+import type { Capture, Project, Workspace } from '@database/dto'
 
+export interface WorkspaceDetail extends Workspace {
+  project_name: string
+}
 
-export const createProject = async (project: Record<string, unknown>): Promise<void> => {
+export const createProject = async (project: Record<string, unknown>): Promise<number | null> => {
   try {
-    await window.api.invoke('dao:call', 'createProject', project)
+    return (await window.api.invoke('dao:call', 'createProject', project)) as number
   } catch (error) {
     console.error(error)
+    return null
   }
 }
 
@@ -29,6 +32,7 @@ export const getWorkspaces = async (params: Record<string, unknown>): Promise<Wo
   }
 }
 
+
 export const createWorkspace = async (workspace: Record<string, unknown>): Promise<number | null> => {
   try {
     return (await window.api.invoke('dao:call', 'createWorkspace', workspace)) as number
@@ -49,6 +53,66 @@ export const updateProject = async (project: Record<string, unknown>): Promise<v
 export const deleteProject = async (id: string): Promise<void> => {
   try {
     await window.api.invoke('dao:call', 'deleteProject', id)
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+export const getWorkspaceDetail = async (id: string): Promise<WorkspaceDetail | null> => {
+  try {
+    return (await window.api.invoke('dao:call', 'getWorkspaceDetail', id)) as WorkspaceDetail | null
+  } catch (error) {
+    console.error(error)
+    return null
+  }
+
+}
+
+export const getCaptureList = async (params: {
+  workspaceId: number
+}): Promise<Capture[]> => {
+  try {
+    return (await window.api.invoke('dao:call', 'getCaptureList', params)) as Capture[]
+  } catch (error) {
+    console.error(error)
+    return []
+  }
+}
+
+export const createCaptureWithImage = async (capture: {
+  workspaceId: string
+  name: string
+  dataUrl: string
+  currentUrl: string
+}): Promise<{ id: number; imgPath: string } | null> => {
+  try {
+    return (await window.api.invoke('dao:call', 'createCaptureWithImage', capture)) as {
+      id: number
+      imgPath: string
+    }
+  } catch (error) {
+    console.error(error)
+    return null
+  }
+}
+
+export const updateCaptureName = async (capture: {
+  id: number
+  name: string
+}): Promise<void> => {
+  try {
+    await window.api.invoke('dao:call', 'updateCaptureName', capture)
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+export const deleteCapture = async (capture: {
+  id: number
+  imgPath?: string | null
+}): Promise<void> => {
+  try {
+    await window.api.invoke('dao:call', 'deleteCapture', capture)
   } catch (error) {
     console.error(error)
   }

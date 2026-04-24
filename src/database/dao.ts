@@ -1,5 +1,10 @@
-import { selectList, runQuery } from './conn'
+import { app } from 'electron'
+import { existsSync, mkdirSync } from 'fs'
+import { unlink, writeFile } from 'fs/promises'
+import path from 'path'
+import { selectList,selectOne,  runQuery } from './conn'
 import { Project, Workspace } from './dto'
+import dayjs from 'dayjs'
 
 // 프로젝트 조회
 export const getProjectList = (params?: Record<string, unknown>): Project[] => {
@@ -34,7 +39,7 @@ export const getProjectList = (params?: Record<string, unknown>): Project[] => {
 // 프로젝트 생성
 export const createProject = (project: Record<string, unknown>): number => {
 
-  const now = new Date().toISOString()
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
 
   const query = `
     INSERT INTO t_project (name, description, status, serv_url, delete_yn, created_at, updated_at)
@@ -120,7 +125,8 @@ export const getWorkspaceList = (params?: Record<string, unknown>): Workspace[] 
 
 // 워크스페이스 생성
 export const createWorkspace = (workspace: Record<string, unknown>): number => {
-  const now = new Date().toISOString()
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+
 
   const query = `
     INSERT INTO t_worksapce (project_id, name, latest_src_url, created_at, updated_at)
@@ -162,6 +168,151 @@ export const updateWorkspace = (project: Record<string, unknown>): void => {
 export const deleteWorkspace = (id: string | number): void => {
   const query = `
     DELETE FROM t_worksapce
+    WHERE id = @id
+  `
+
+  runQuery(query, { id })
+}
+
+
+//프로젝트명 워크스페이스명 조회
+export const getWorkspaceDetail = (id:string | number ) => {
+const query = `
+    SELECT
+      w.id,
+      w.name,
+      w.project_id,
+      w.latest_src_url,
+      p.name as project_name
+    FROM t_worksapce w
+    JOIN t_project p ON p.id = w.project_id
+    WHERE w.id = @id
+`
+
+return selectOne(query, { id })
+}
+
+
+//캡쳐 이미지 조회
+export const getCaptureList = (params: Record<string, unknown>) => {
+  const query = `
+    SELECT
+      id,
+      workspace_id,
+      name,
+      img_path,
+      created_at
+    FROM t_capture
+    WHERE workspace_id = @workspaceId
+    ORDER BY id DESC
+  `
+
+  return selectList(query, params)
+}
+
+
+
+//캡쳐이미지 local & DB 저장
+export const createCaptureWithImage = async (
+  capture: Record<string, unknown>
+): Promise<{ id: number; imgPath: string }> => {
+  const workspaceId = String(capture.workspaceId ?? '')
+  const name = String(capture.name ?? '')
+  const dataUrl = String(capture.dataUrl ?? '')
+  const currentUrl = String(capture.currentUrl ?? '')
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+
+  const insertQuery = `
+    INSERT INTO t_capture (workspace_id, name, img_path, created_at)
+    VALUES (@workspaceId, @name, @imgPath, @created_at)
+  `
+  const insertResult = runQuery(insertQuery, {
+    workspaceId,
+    name,
+    imgPath: null,
+    created_at: now
+  })
+  const captureId = Number(insertResult.lastInsertRowid)
+
+  const capturesDir = path.join(app.getPath('userData'), 'FILE', 'CAPTURES')
+  if (!existsSync(capturesDir)) {
+    mkdirSync(capturesDir, { recursive: true })
+  }
+
+  const imgName = `captures_${captureId}.png`
+  const imgLocalPath = path.join(capturesDir, imgName)
+  const imgPath = path.join('FILE', 'CAPTURES', imgName).replace(/\\/g, '/')
+  const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '')
+
+  await writeFile(imgLocalPath, Buffer.from(base64Data, 'base64'))
+  runQuery(
+    `
+      UPDATE t_capture
+      SET img_path = @imgPath
+      WHERE id = @id
+    `,
+    {
+      id: captureId,
+      imgPath
+    }
+  )
+  runQuery(
+    `
+      UPDATE t_worksapce
+      SET latest_src_url = @latest_src_url,
+          updated_at = @updated_at
+      WHERE id = @id
+    `,
+    {
+      id: workspaceId,
+      latest_src_url: currentUrl,
+      updated_at: now
+    }
+  )
+
+  return {
+    id: captureId,
+    imgPath
+  }
+}
+
+
+//캡쳐이름 수정
+export const updateCaptureName = (capture: Record<string, unknown>): void => {
+  const query = `
+    UPDATE t_capture
+    SET name = @name
+    WHERE id = @id
+  `
+
+  runQuery(query, capture)
+}
+
+
+//캡쳐 삭제
+export const deleteCapture = async (capture: Record<string, unknown>): Promise<void> => {
+  const id = capture.id as string | number
+  const imgPath = (capture.imgPath as string | null | undefined) ?? null
+
+  if (imgPath) {
+    const fileRootDir = path.join(app.getPath('userData'), 'FILE')
+    const relativePath = imgPath.replace(/\\/g, '/').replace(/^\/+/, '')
+    const absPath = path.resolve(app.getPath('userData'), relativePath)
+    const resolvedBase = path.resolve(fileRootDir)
+    const normalizedBase = resolvedBase + path.sep
+    const isInsideBase = absPath === resolvedBase || absPath.startsWith(normalizedBase)
+
+    if (!isInsideBase) {
+      throw new Error(`Forbidden file path: ${imgPath}`)
+    }
+
+    if (existsSync(absPath)) {
+      await unlink(absPath)
+    }
+  }
+
+  const query = `
+    DELETE FROM t_capture
     WHERE id = @id
   `
 

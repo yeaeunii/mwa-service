@@ -69,13 +69,13 @@
           <li>
             <a>
               <i-lucide-layout-dashboard />
-              Project명
+              {{ workspaceInfo?.project_name || 'Project명' }}
             </a>
           </li>
           <li>
             <a>
               <i-lucide-folder />
-              Workspace명
+              {{ workspaceInfo?.name || 'Workspace명'  }}
             </a>
           </li>
         </ul>
@@ -89,10 +89,10 @@
                 class="absolute bottom-0 left-0 w-full h-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center"
               >
                 <div class="flex gap-2">
-                  <button class="btn btn-sm btn-circle">
+                  <button type="button" class="btn btn-sm btn-circle" @click="onEditCapture(image)">
                     <i-lucide-pencil />
                   </button>
-                  <button class="btn btn-sm btn-circle">
+                  <button type="button" class="btn btn-sm btn-circle" @click="onDeleteCapture(image)">
                     <i-lucide-trash />
                   </button>
                 </div>
@@ -105,12 +105,30 @@
         </div>
       </div>
     </div>
-    <ModalCaptureName ref="modalCaptureNameRef" @onConfirm="onCaptureWebviewConfirm" />
+    <ModalCaptureName ref="modalCaptureNameRef" @onConfirm="onCaptureNameConfirm" />
+    <ModalConfirm ref="modalConfirmRef" @on-confirm="onConfirmDeleteCapture">
+      <template #message>
+        <div class="text-center">
+          <h3 class="text-lg font-bold mb-2">{{ deletingCapture?.name }}</h3>
+          <p class="text-sm text-gray-500">캡쳐 이미지를 삭제하시겠습니까?</p>
+        </div>
+      </template>
+    </ModalConfirm>
   </div>
 </template>
 
 <script setup lang="ts">
+import {
+  createCaptureWithImage,
+  deleteCapture,
+  getCaptureList,
+  getWorkspaceDetail,
+  updateCaptureName,
+  type WorkspaceDetail
+} from '@/database'
+
 const modalCaptureNameRef = ref<ComponentRef<'ModalCaptureName'> | null>(null)
+const modalConfirmRef = ref<ComponentRef<'ModalConfirm'> | null>(null)
 
 interface WebviewElement extends HTMLElement {
   src: string
@@ -130,6 +148,22 @@ const CAPTURE_SHORTCUT_KEY = 'CommandOrControl+Shift+S'
 
 const webviewRef = ref<WebviewElement | null>(null)
 const router = useRouter()
+const route = useRoute()
+const workspaceId = computed(() => String(route.query.workspaceId ?? ''))
+const workspaceInfo = ref<WorkspaceDetail | null>(null)
+
+const loadWorkspaceInfo = async (): Promise<void> => {
+  if (!workspaceId.value) return
+
+  workspaceInfo.value = await getWorkspaceDetail(workspaceId.value)
+  
+  if (workspaceInfo.value?.latest_src_url) {
+    urlInput.value = workspaceInfo.value.latest_src_url
+    currentUrl.value = workspaceInfo.value.latest_src_url
+  }
+}
+
+
 
 const urlInput = ref(START_PAGE_URL)
 const currentUrl = ref(START_PAGE_URL)
@@ -140,6 +174,9 @@ const isCaptureFlashVisible = ref(false)
 let captureFlashTimeout: ReturnType<typeof setTimeout> | null = null
 
 const captureImages = ref<CaptureImage[]>([])
+const editingCaptureId = ref<number | null>(null)
+const deletingCapture = ref<CaptureImage | null>(null)
+
 
 const navigate = (): void => {
   let url = urlInput.value.trim()
@@ -221,22 +258,104 @@ const initWebview = (): void => {
 const onCaptureWebview = async (): Promise<void> => {
   const webview = webviewRef.value
   if (!webview) return
+  editingCaptureId.value = null
   modalCaptureNameRef.value?.onOpen()
 }
 
-const onCaptureWebviewConfirm = async (name: string): Promise<void> => {
-  console.log('onCaptureWebviewConfirm')
+const toFileSrc = (imgPath: string): string => {
+  const normalizedPath = imgPath.replace(/\\/g, '/')
+  return `appimg:///${normalizedPath}`
+}
+
+//켑쳐 이미지 조회
+const loadCaptureList = async (): Promise<void> => {
+  if (!workspaceId.value) return
+
+  const list = await getCaptureList({
+    workspaceId: Number(workspaceId.value)
+  })
+
+  captureImages.value = list.map((item) => ({
+    id: item.id,
+    name: item.name,
+    src: item.img_path ? toFileSrc(item.img_path) : '',
+    imgPath: item.img_path ?? undefined
+  }))
+}
+
+
+const onEditCapture = (image: CaptureImage): void => {
+  editingCaptureId.value = image.id
+  modalCaptureNameRef.value?.onOpen({
+    initialName: image.name,
+    title: '캡쳐 이미지명을 변경하세요',
+    confirmText: '저장'
+  })
+}
+
+const onDeleteCapture = (image: CaptureImage): void => {
+  deletingCapture.value = image
+  modalConfirmRef.value?.onOpen()
+}
+
+const onConfirmDeleteCapture = async (): Promise<void> => {
+  const target = deletingCapture.value
+  if (!target) return
+
+  await deleteCapture({
+    id: target.id,
+    imgPath: target.imgPath ?? null
+  })
+
+  captureImages.value = captureImages.value.filter((item) => item.id !== target.id)
+  deletingCapture.value = null
+}
+
+// 캡쳐 이미지 저장/수정
+const onCaptureNameConfirm = async (name: string): Promise<void> => {
+  const nextName = name.trim()
+  if (!nextName) return
+
+  if (editingCaptureId.value !== null) {
+    const captureId = editingCaptureId.value
+    await updateCaptureName({
+      id: captureId,
+      name: nextName
+    })
+
+    captureImages.value = captureImages.value.map((item) =>
+      item.id === captureId ? { ...item, name: nextName } : item
+    )
+    editingCaptureId.value = null
+    return
+  }
+
   const imageDataURL = await getCaptureImageDataURL()
   if (!imageDataURL) return
-  captureImages.value.push({
-    id: captureImages.value.length + 1,
-    name,
-    src: imageDataURL
+
+  const saved = await createCaptureWithImage({
+    workspaceId: String(workspaceId.value),
+    name: nextName,
+    dataUrl: imageDataURL,
+    currentUrl: currentUrl.value
   })
+  if (!saved) return
+
+
+  captureImages.value.push({
+    id: saved.id,
+    name: nextName,
+    src: imageDataURL,
+    imgPath: saved.imgPath
+  })
+  
 }
 
 onMounted(async () => {
   initWebview()
+  // console.log('workspaceId:', workspaceId.value)
+  void loadWorkspaceInfo()
+  await loadCaptureList()
   window.api.invoke('shortcut:register', CAPTURE_SHORTCUT_KEY, 'shortcut:captureWebview')
   webviewCaptureListener = window.api.on('shortcut:captureWebview', onCaptureWebview)
 })
@@ -250,4 +369,8 @@ onUnmounted(() => {
   webviewCaptureListener = null
   window.api.invoke('shortcut:unregister', CAPTURE_SHORTCUT_KEY)
 })
+
+
+
+
 </script>

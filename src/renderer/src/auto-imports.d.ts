@@ -10,6 +10,8 @@ declare global {
   const acceptHMRUpdate: typeof import('pinia').acceptHMRUpdate
   const computed: typeof import('vue').computed
   const createApp: typeof import('vue').createApp
+  const createCapture: typeof import('./database/index').createCapture
+  const createCaptureWithImage: typeof import('./database/index').createCaptureWithImage
   const createPinia: typeof import('pinia').createPinia
   const createProject: typeof import('./database/index').createProject
   const createWorkspace: typeof import('./database/index').createWorkspace
@@ -17,14 +19,18 @@ declare global {
   const defineAsyncComponent: typeof import('vue').defineAsyncComponent
   const defineComponent: typeof import('vue').defineComponent
   const defineStore: typeof import('pinia').defineStore
+  const deleteCapture: typeof import('./database/index').deleteCapture
   const deleteProject: typeof import('./database/index').deleteProject
   const effectScope: typeof import('vue').effectScope
   const getActivePinia: typeof import('pinia').getActivePinia
+  const getCaptureList: typeof import('./database/index').getCaptureList
   const getCurrentInstance: typeof import('vue').getCurrentInstance
   const getCurrentScope: typeof import('vue').getCurrentScope
   const getCurrentWatcher: typeof import('vue').getCurrentWatcher
   const getProject: typeof import('./database/index').getProject
   const getProjects: typeof import('./database/index').getProjects
+  const getWorkspaceDetail: typeof import('./database/index').getWorkspaceDetail
+  const getWorkspaceList: typeof import('./database/index').getWorkspaceList
   const getWorkspaces: typeof import('./database/index').getWorkspaces
   const h: typeof import('vue').h
   const inject: typeof import('vue').inject
@@ -74,6 +80,8 @@ declare global {
   const toValue: typeof import('vue').toValue
   const triggerRef: typeof import('vue').triggerRef
   const unref: typeof import('vue').unref
+  const updateCaptureName: typeof import('./database/index').updateCaptureName
+  const updateCapturePath: typeof import('./database/index').updateCapturePath
   const updateProject: typeof import('./database/index').updateProject
   const useAttrs: typeof import('vue').useAttrs
   const useContextMenu: typeof import('./composables/useContextMenu').useContextMenu
@@ -111,6 +119,9 @@ declare global {
   // @ts-ignore
   export type { CaptureImage } from './types/index'
   import('./types/index')
+  // @ts-ignore
+  export type { WorkspaceDetail } from './database/index'
+  import('./database/index')
 }
 
 // for vue template auto import
@@ -122,6 +133,7 @@ declare module 'vue' {
     readonly acceptHMRUpdate: UnwrapRef<typeof import('pinia')['acceptHMRUpdate']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
     readonly createApp: UnwrapRef<typeof import('vue')['createApp']>
+    readonly createCaptureWithImage: UnwrapRef<typeof import('./database/index')['createCaptureWithImage']>
     readonly createPinia: UnwrapRef<typeof import('pinia')['createPinia']>
     readonly createProject: UnwrapRef<typeof import('./database/index')['createProject']>
     readonly createWorkspace: UnwrapRef<typeof import('./database/index')['createWorkspace']>
@@ -129,13 +141,16 @@ declare module 'vue' {
     readonly defineAsyncComponent: UnwrapRef<typeof import('vue')['defineAsyncComponent']>
     readonly defineComponent: UnwrapRef<typeof import('vue')['defineComponent']>
     readonly defineStore: UnwrapRef<typeof import('pinia')['defineStore']>
+    readonly deleteCapture: UnwrapRef<typeof import('./database/index')['deleteCapture']>
     readonly deleteProject: UnwrapRef<typeof import('./database/index')['deleteProject']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly getActivePinia: UnwrapRef<typeof import('pinia')['getActivePinia']>
+    readonly getCaptureList: UnwrapRef<typeof import('./database/index')['getCaptureList']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
     readonly getCurrentWatcher: UnwrapRef<typeof import('vue')['getCurrentWatcher']>
     readonly getProjects: UnwrapRef<typeof import('./database/index')['getProjects']>
+    readonly getWorkspaceDetail: UnwrapRef<typeof import('./database/index')['getWorkspaceDetail']>
     readonly getWorkspaces: UnwrapRef<typeof import('./database/index')['getWorkspaces']>
     readonly h: UnwrapRef<typeof import('vue')['h']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
@@ -185,6 +200,7 @@ declare module 'vue' {
     readonly toValue: UnwrapRef<typeof import('vue')['toValue']>
     readonly triggerRef: UnwrapRef<typeof import('vue')['triggerRef']>
     readonly unref: UnwrapRef<typeof import('vue')['unref']>
+    readonly updateCaptureName: UnwrapRef<typeof import('./database/index')['updateCaptureName']>
     readonly updateProject: UnwrapRef<typeof import('./database/index')['updateProject']>
     readonly useAttrs: UnwrapRef<typeof import('vue')['useAttrs']>
     readonly useContextMenu: UnwrapRef<typeof import('./composables/useContextMenu')['useContextMenu']>
