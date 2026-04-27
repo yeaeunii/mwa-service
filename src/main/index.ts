@@ -10,7 +10,6 @@ import {
   nativeTheme
 } from 'electron'
 import { join } from 'path'
-import { writeFile } from 'fs/promises'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
@@ -98,6 +97,18 @@ app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.electron')
 
   initDatabase()
+
+  app.on('web-contents-created', (_, contents) => {
+    if (contents.getType() !== 'webview') return
+
+    contents.setWindowOpenHandler((details) => {
+      if (details.url) {
+        contents.loadURL(details.url)
+      }
+
+      return { action: 'deny' }
+    })
+  })
 
     //파일 경로
     const getFileStoragePaths = () => {

@@ -21,7 +21,7 @@ const router = createRouter({
       component: ProjectIndex
     },
     {
-      path: '/capture',
+      path: '/capture/:workspaceId',
       name: 'capture-index',
       component: CaptureIndex
     },

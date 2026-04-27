@@ -54,6 +54,7 @@
         <webview
           ref="webviewRef"
           :src="currentUrl"
+          allowpopups
           class="absolute inset-0 h-full w-full bg-white"
         ></webview>
         <div
@@ -139,8 +140,14 @@ interface WebviewElement extends HTMLElement {
   canGoForward: () => boolean
   capturePage: () => Promise<{ toDataURL: () => string }>
   executeJavaScript: (code: string) => Promise<unknown>
-  addEventListener: (event: string, listener: (e: unknown) => void) => void
+  addEventListener: (event: string, listener: (e: WebviewNavigationEvent) => void) => void
+
   openDevTools: () => void
+}
+
+interface WebviewNavigationEvent {
+  url?: string
+  isMainFrame?: boolean
 }
 
 const START_PAGE_URL = 'https://www.google.com'
@@ -149,7 +156,7 @@ const CAPTURE_SHORTCUT_KEY = 'CommandOrControl+Shift+S'
 const webviewRef = ref<WebviewElement | null>(null)
 const router = useRouter()
 const route = useRoute()
-const workspaceId = computed(() => String(route.query.workspaceId ?? ''))
+const workspaceId = computed(() => String(route.params.workspaceId ?? ''))
 const workspaceInfo = ref<WorkspaceDetail | null>(null)
 
 const loadWorkspaceInfo = async (): Promise<void> => {
@@ -185,6 +192,11 @@ const navigate = (): void => {
     url = 'https://' + url
     urlInput.value = url
   }
+  currentUrl.value = url
+}
+
+const navigateWebviewTo = (url: string): void => {
+  urlInput.value = url
   currentUrl.value = url
 }
 
@@ -242,17 +254,17 @@ const initWebview = (): void => {
     canGoForward.value = webview.canGoForward()
   })
 
-  webview.addEventListener('did-navigate', (e: unknown) => {
-    urlInput.value = (e as { url: string }).url
-    canGoBack.value = webview.canGoBack()
-    canGoForward.value = webview.canGoForward()
-  })
+  const syncCurrentUrl = (e: WebviewNavigationEvent): void => {
+    if (e.isMainFrame === false || !e.url) return
 
-  webview.addEventListener('did-navigate-in-page', (e: unknown) => {
-    urlInput.value = (e as { url: string }).url
+    navigateWebviewTo(e.url)
     canGoBack.value = webview.canGoBack()
     canGoForward.value = webview.canGoForward()
-  })
+  }
+
+  webview.addEventListener('did-navigate', syncCurrentUrl)
+
+  webview.addEventListener('did-navigate-in-page', syncCurrentUrl)
 }
 
 const onCaptureWebview = async (): Promise<void> => {

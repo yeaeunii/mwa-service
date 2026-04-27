@@ -8,7 +8,6 @@ const INVOKE_CHANNELS = [
   'dialog:openFile',
   'shell:openExternal',
   'app:getVersion',
-  'db:getPath',
   'dao:call',
   'shortcut:register',
   'shortcut:unregister'

@@ -36,7 +36,7 @@
             <span class="badge badge-sm badge-ghost">{{ screenshots.length }}</span>
           </div>
           <router-link
-            :to="{ path: '/capture', query: { workspaceId: workspaceId } }"
+            :to="{ name: 'capture-index', params: { workspaceId } }"
             class="btn btn-primary btn-sm gap-1.5"
           >
             <i-lucide-camera class="h-4 w-4" />
