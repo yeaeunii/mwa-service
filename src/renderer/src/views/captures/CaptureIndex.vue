@@ -64,7 +64,7 @@
       </div>
       <!-- Webview -->
     </div>
-    <div class="w-100 bg-base-100 flex-shrink-0 p-3 flex flex-col">
+    <div class="w-100 h-[100vh] bg-base-100 flex-shrink-0 p-3 flex flex-col overflow-hidden">
       <div class="breadcrumbs mb-3">
         <ul>
           <li>
@@ -82,6 +82,7 @@
         </ul>
       </div>
       <div class="overflow-y-auto w-full p-3 bg-slate-50 rounded-md flex-1">
+            <!-- 캡쳐 이미지 목록 -->
         <div class="grid grid-cols-2 gap-4">
           <div v-for="image in captureImages" :key="image.id" class="group">
             <div class="overflow-hidden border border-gray-300 rounded-md shadow-sm h-30 relative">
