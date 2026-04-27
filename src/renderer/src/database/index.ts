@@ -1,4 +1,4 @@
-import type { Capture, Project, Workspace } from '@database/dto'
+import type { Capture, Doc, Project, Workspace } from '@database/dto'
 
 export interface WorkspaceDetail extends Workspace {
   project_name: string
@@ -113,6 +113,45 @@ export const deleteCapture = async (capture: {
 }): Promise<void> => {
   try {
     await window.api.invoke('dao:call', 'deleteCapture', capture)
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+export const createDoc = async (doc: {
+  workspaceId: number
+  title: string
+  description?: string
+  status?: string
+  docMetaJson?: string
+  contentJson?: string
+  annotationJson?: string
+  orgnImgPath?: string
+  drawImgPath?: string
+  sortOrder?: number
+}): Promise<number | null> => {
+  try {
+    return (await window.api.invoke('dao:call', 'createDoc', doc)) as number
+  } catch (error) {
+    console.error(error)
+    return null
+  }
+}
+
+export const getDocList = async (params: {
+  workspaceId: number
+}): Promise<Doc[]> => {
+  try {
+    return (await window.api.invoke('dao:call', 'getDocList', params)) as Doc[]
+  } catch (error) {
+    console.error(error)
+    return []
+  }
+}
+
+export const deleteDoc = async (id: number): Promise<void> => {
+  try {
+    await window.api.invoke('dao:call', 'deleteDoc', id)
   } catch (error) {
     console.error(error)
   }

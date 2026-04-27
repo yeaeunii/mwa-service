@@ -4,6 +4,7 @@ export interface Project {
   description: string
   serv_url: string
   status: string
+  thumbnail_path: string
   delete_yn: string
   created_at: string
   updated_at: string
@@ -14,6 +15,7 @@ export interface Workspace {
   project_id: number
   name: string
   latest_src_url: string
+  thumbnail_path: string
   created_at: string
   updated_at: string
 }
@@ -32,6 +34,7 @@ export interface Doc {
   section_id: number
   title: string
   description: string
+  status: string
   doc_meta_json: string
   content_json: string
   annotation_json: string

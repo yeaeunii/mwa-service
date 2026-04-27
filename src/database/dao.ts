@@ -24,6 +24,7 @@ export const getProjectList = (params?: Record<string, unknown>): Project[] => {
       description,
       status,
       serv_url,
+      thumbnail_path,
       delete_yn,
       created_at,
       updated_at
@@ -42,13 +43,32 @@ export const createProject = (project: Record<string, unknown>): number => {
   const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
 
   const query = `
-    INSERT INTO t_project (name, description, status, serv_url, delete_yn, created_at, updated_at)
-    VALUES (@name, @description, @status, @serv_url, @delete_yn, @created_at, @updated_at)
+    INSERT INTO t_project (
+      name,
+      description,
+      status,
+      serv_url,
+      thumbnail_path,
+      delete_yn,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      @name,
+      @description,
+      @status,
+      @serv_url,
+      @thumbnail_path,
+      @delete_yn,
+      @created_at,
+      @updated_at
+    )
   `
 
   const payload = {
     status: '진행중',
     serv_url: '',
+    thumbnail_path: '',
     delete_yn: '0',
     created_at: now,
     updated_at: now,
@@ -110,9 +130,10 @@ export const getWorkspaceList = (params?: Record<string, unknown>): Workspace[] 
       project_id,
       name,
       latest_src_url,
+      thumbnail_path,
       created_at,
       updated_at
-    FROM t_worksapce
+    FROM t_workspace
     WHERE project_id = @project_id
     ORDER BY updated_at DESC
     LIMIT @limit
@@ -126,15 +147,47 @@ export const getWorkspaceList = (params?: Record<string, unknown>): Workspace[] 
 // 워크스페이스 생성
 export const createWorkspace = (workspace: Record<string, unknown>): number => {
   const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  const project = selectOne<Project>(
+    `
+      SELECT
+        id,
+        name,
+        description,
+        status,
+        serv_url,
+        thumbnail_path,
+        delete_yn,
+        created_at,
+        updated_at
+      FROM t_project
+      WHERE id = @id
+    `,
+    { id: workspace.project_id }
+  )
 
 
   const query = `
-    INSERT INTO t_worksapce (project_id, name, latest_src_url, created_at, updated_at)
-    VALUES (@project_id, @name, @latest_src_url, @created_at, @updated_at)
+    INSERT INTO t_workspace (
+      project_id,
+      name,
+      latest_src_url,
+      thumbnail_path,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      @project_id,
+      @name,
+      @latest_src_url,
+      @thumbnail_path,
+      @created_at,
+      @updated_at
+    )
   `
 
   const payload = {
-    latest_src_url: '',
+    latest_src_url: project?.serv_url || '',
+    thumbnail_path: '',
     created_at: now,
     updated_at: now,
     ...workspace
@@ -149,7 +202,7 @@ export const createWorkspace = (workspace: Record<string, unknown>): number => {
 // 워크스페이스 수정
 export const updateWorkspace = (project: Record<string, unknown>): void => {
   const query = `
-    UPDATE t_worksapce
+    UPDATE t_workspace
     SET
       name = @name,
       updated_at = @updated_at
@@ -167,7 +220,7 @@ export const updateWorkspace = (project: Record<string, unknown>): void => {
 // 워크스페이스 삭제
 export const deleteWorkspace = (id: string | number): void => {
   const query = `
-    DELETE FROM t_worksapce
+    DELETE FROM t_workspace
     WHERE id = @id
   `
 
@@ -183,8 +236,9 @@ const query = `
       w.name,
       w.project_id,
       w.latest_src_url,
+      w.thumbnail_path,
       p.name as project_name
-    FROM t_worksapce w
+    FROM t_workspace w
     JOIN t_project p ON p.id = w.project_id
     WHERE w.id = @id
 `
@@ -258,7 +312,7 @@ export const createCaptureWithImage = async (
   )
   runQuery(
     `
-      UPDATE t_worksapce
+      UPDATE t_workspace
       SET latest_src_url = @latest_src_url,
           updated_at = @updated_at
       WHERE id = @id
@@ -313,6 +367,93 @@ export const deleteCapture = async (capture: Record<string, unknown>): Promise<v
 
   const query = `
     DELETE FROM t_capture
+    WHERE id = @id
+  `
+
+  runQuery(query, { id })
+}
+
+//문서 생성
+export const createDoc = (doc: Record<string, unknown>): number => {
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  const query = `
+    INSERT INTO t_doc (
+      workspace_id,
+      title,
+      description,
+      status,
+      doc_meta_json,
+      content_json,
+      annotation_json,
+      orgn_img_path,
+      draw_img_path,
+      sort_order,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      @workspaceId,
+      @title,
+      @description,
+      @status,
+      @docMetaJson,
+      @contentJson,
+      @annotationJson,
+      @orgnImgPath,
+      @drawImgPath,
+      @sortOrder,
+      @created_at,
+      @updated_at
+    )
+  `
+
+  const payload = {
+    description: '',
+    status: '작업대기',
+    docMetaJson: '{}',
+    contentJson: '[]',
+    annotationJson: '[]',
+    orgnImgPath: '',
+    drawImgPath: '',
+    sortOrder: 0,
+    created_at: now,
+    updated_at: now,
+    ...doc
+  }
+
+  const result = runQuery(query, payload)
+  return Number(result.lastInsertRowid)
+}
+
+//문서 조회
+export const getDocList = (params: Record<string, unknown>) => {
+  const query = `
+    SELECT
+      id,
+      workspace_id,
+      title,
+      description,
+      status,
+      doc_meta_json,
+      content_json,
+      annotation_json,
+      orgn_img_path,
+      draw_img_path,
+      sort_order,
+      created_at,
+      updated_at
+    FROM t_doc
+    WHERE workspace_id = @workspaceId
+    ORDER BY sort_order ASC, id ASC
+  `
+
+  return selectList(query, params)
+}
+
+//문서 삭제
+export const deleteDoc = (id: string | number): void => {
+  const query = `
+    DELETE FROM t_doc
     WHERE id = @id
   `
 

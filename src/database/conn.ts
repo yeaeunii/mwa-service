@@ -24,7 +24,7 @@ export const initDatabase = (): Database => {
   database = new Database(dbPath)
   database.pragma('foreign_keys = ON')
 
-  if (app.getVersion() === '0.1.0') {
+  if (app.getVersion() === '0.1.1') {
     database.exec(schemaSql)
   }
 

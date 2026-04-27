@@ -52,6 +52,7 @@
       <!-- Webview -->
       <div class="relative flex-1">
         <webview
+          v-if="currentUrl"
           ref="webviewRef"
           :src="currentUrl"
           allowpopups
@@ -164,17 +165,16 @@ const loadWorkspaceInfo = async (): Promise<void> => {
   if (!workspaceId.value) return
 
   workspaceInfo.value = await getWorkspaceDetail(workspaceId.value)
-  
-  if (workspaceInfo.value?.latest_src_url) {
-    urlInput.value = workspaceInfo.value.latest_src_url
-    currentUrl.value = workspaceInfo.value.latest_src_url
-  }
+
+  const initialUrl = workspaceInfo.value?.latest_src_url || START_PAGE_URL
+  urlInput.value = initialUrl
+  currentUrl.value = initialUrl
 }
 
 
 
-const urlInput = ref(START_PAGE_URL)
-const currentUrl = ref(START_PAGE_URL)
+const urlInput = ref('')
+const currentUrl = ref('')
 const isLoading = ref(false)
 const canGoBack = ref(false)
 const canGoForward = ref(false)
@@ -365,9 +365,10 @@ const onCaptureNameConfirm = async (name: string): Promise<void> => {
 }
 
 onMounted(async () => {
-  initWebview()
   // console.log('workspaceId:', workspaceId.value)
-  void loadWorkspaceInfo()
+  await loadWorkspaceInfo()
+  await nextTick()
+  initWebview()
   await loadCaptureList()
   window.api.invoke('shortcut:register', CAPTURE_SHORTCUT_KEY, 'shortcut:captureWebview')
   webviewCaptureListener = window.api.on('shortcut:captureWebview', onCaptureWebview)

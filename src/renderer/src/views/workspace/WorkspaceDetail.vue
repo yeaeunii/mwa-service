@@ -12,7 +12,7 @@
               <i-lucide-briefcase class="h-4 w-4 text-primary" />
             </div>
             <div>
-              <div class="text-base font-bold leading-tight">AI 마켓</div>
+              <div class="text-base font-bold leading-tight">{{ workspaceName || '워크스페이스' }}</div>
               <div class="text-xs text-base-content/50">워크스페이스</div>
             </div>
           </div>
@@ -71,6 +71,18 @@
               @dragend="onDragEnd"
             >
               <div class="relative overflow-hidden rounded-md">
+                <button
+                  type="button"
+                  class="btn btn-xs btn-circle absolute right-1.5 top-1.5 z-20 border-primary shadow-sm"
+                  :class="
+                    selectedIds.has(shot.id)
+                      ? 'btn-primary text-white'
+                      : 'bg-white/95 text-primary hover:bg-primary/10'
+                  "
+                  @click.stop="onToggleSelectCaptureImage(shot.id)"
+                >
+                  <i-lucide-check class="h-3.5 w-3.5" />
+                </button>
                 <img
                   :src="shot.src"
                   alt="screenshot"
@@ -85,14 +97,13 @@
                       : 'bg-black/0 group-hover:bg-black/30'
                   "
                 >
-                  <i-lucide-check
-                    v-if="selectedIds.has(shot.id)"
-                    class="h-5 w-5 text-primary drop-shadow"
-                  />
-                  <i-lucide-eye
-                    v-else
-                    class="h-5 w-5 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                  />
+                  <button
+                    type="button"
+                    class="btn btn-xs btn-circle border-none bg-white/90 text-base-content opacity-0 shadow-sm transition-opacity hover:bg-white group-hover:opacity-100"
+                    @click.stop="openCaptureImageModal(shot.id)"
+                  >
+                    <i-lucide-eye class="h-4 w-4" />
+                  </button>
                 </div>
               </div>
               <div
@@ -181,6 +192,13 @@
                   <i-lucide-layers class="h-3 w-3" />
                   {{ doc.screenshotCount }}
                 </div>
+                <button
+                  type="button"
+                  class="btn btn-xs btn-circle absolute right-2 top-2 z-20 border-none bg-white/90 text-error opacity-0 shadow-sm transition-opacity hover:bg-white group-hover:opacity-100"
+                  @click.prevent.stop="openDeleteDocConfirm(doc)"
+                >
+                  <i-lucide-trash class="h-3.5 w-3.5" />
+                </button>
               </div>
               <div class="px-3 pt-3">
                 <div class="mb-2 flex items-center justify-between">
@@ -207,6 +225,23 @@
       </main>
     </div>
 
+    <WorkspaceModalCaptureImages
+      ref="modalCaptureImagesRef"
+      :capture-image-items="screenshots"
+      :selected-image-ids="selectedImageIds"
+      title="캡쳐 이미지"
+      @on-toggle-select-image="onToggleSelectCaptureImage"
+      @on-remove-image="onRemoveCaptureImage"
+    />
+    <ModalConfirm ref="modalConfirmRef" ok-text="삭제" @on-confirm="onConfirmDeleteDoc">
+      <template #message>
+        <div class="text-center">
+          <h3 class="mb-2 text-lg font-bold">{{ deletingDoc?.title }}</h3>
+          <p class="text-sm text-gray-500">문서를 삭제하시겠습니까?</p>
+        </div>
+      </template>
+    </ModalConfirm>
+
     <!-- Custom Drag Ghost (hidden, used for setDragImage) -->
     <div
       ref="dragGhostRef"
@@ -221,9 +256,19 @@
 <script setup lang="ts">
 import { useDragSelect } from '@renderer/composables/useDragSelect'
 import { useDragSource, useDropZone } from '@renderer/composables/useCrossDrag'
+import {
+  createDoc,
+  deleteCapture,
+  deleteDoc,
+  getCaptureList,
+  getDocList,
+  getWorkspaceDetail
+} from '@/database'
+import WorkspaceModalCaptureImages from './components/ModalCaptureImages.vue'
 
 const route = useRoute()
 const workspaceId = computed(() => route.params.id)
+const workspaceName = ref('')
 
 
 
@@ -236,15 +281,64 @@ interface Screenshot {
   id: number
   name: string
   src: string
+  imgPath?: string
 }
 
-const screenshots = ref<Screenshot[]>(
-  Array.from({ length: 10 }, (_, i) => ({
-    id: i + 1,
-    name: `기능명 ${i + 1}`,
-    src: 'https://placehold.co/200x140/f1f5f9/94a3b8?text=SCREENSHOT'
+const screenshots = ref<Screenshot[]>([])
+const modalCaptureImagesRef = ref<InstanceType<typeof WorkspaceModalCaptureImages> | null>(null)
+
+const toFileSrc = (imgPath: string): string => {
+  const normalizedPath = imgPath.replace(/\\/g, '/')
+  return `appimg:///${normalizedPath}`
+}
+
+const loadCaptureList = async (): Promise<void> => {
+  const list = await getCaptureList({
+    workspaceId: Number(workspaceId.value)
+  })
+
+  screenshots.value = list.map((item) => ({
+    id: item.id,
+    name: item.name,
+    src: item.img_path ? toFileSrc(item.img_path) : '',
+    imgPath: item.img_path ?? undefined
   }))
-)
+}
+
+const loadWorkspaceDetail = async (): Promise<void> => {
+  const detail = await getWorkspaceDetail(String(workspaceId.value))
+  workspaceName.value = detail?.name ?? ''
+}
+
+const openCaptureImageModal = (imageId: number): void => {
+  modalCaptureImagesRef.value?.onOpen(imageId)
+}
+
+const onToggleSelectCaptureImage = (imageId: number): void => {
+  const nextSelectedIds = new Set(selectedIds.value)
+
+  if (nextSelectedIds.has(imageId)) {
+    nextSelectedIds.delete(imageId)
+  } else {
+    nextSelectedIds.add(imageId)
+  }
+
+  selectedIds.value = nextSelectedIds
+}
+
+const onRemoveCaptureImage = async (imageId: number): Promise<void> => {
+  const target = screenshots.value.find((item) => item.id === imageId)
+  if (!target) return
+
+  await deleteCapture({
+    id: target.id,
+    imgPath: target.imgPath ?? null
+  })
+
+  screenshots.value = screenshots.value.filter((item) => item.id !== imageId)
+  selectedIds.value.delete(imageId)
+  selectedIds.value = new Set(selectedIds.value)
+}
 
 // --- Drag Select ---
 
@@ -257,6 +351,8 @@ const { selectedIds, isDragging, selectionStyle, onMouseDown, onClickItem, cance
     dataAttr: 'shot-id',
     itemIds: screenshotIds
   })
+
+const selectedImageIds = computed(() => Array.from(selectedIds.value))
 
 // --- Document Data ---
 
@@ -273,6 +369,61 @@ interface Document {
 
 let nextDocId = 1
 const documents = ref<Document[]>([])
+const deletingDoc = ref<Document | null>(null)
+const modalConfirmRef = ref<ComponentRef<'ModalConfirm'> | null>(null)
+
+const formatDocCreatedAt = (dateText: string): string => {
+  const date = new Date(dateText)
+  if (Number.isNaN(date.getTime())) return dateText
+
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  return `${pad(date.getMonth() + 1)}.${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+const getDocCaptureId = (docMetaJson: string): number | null => {
+  try {
+    const meta = JSON.parse(docMetaJson || '{}') as { captureId?: unknown }
+    const captureId = Number(meta.captureId)
+    return Number.isFinite(captureId) ? captureId : null
+  } catch {
+    return null
+  }
+}
+
+const loadDocList = async (): Promise<void> => {
+  const list = await getDocList({
+    workspaceId: Number(workspaceId.value)
+  })
+
+  documents.value = list.map((doc) => {
+    const captureId = getDocCaptureId(doc.doc_meta_json)
+
+    return {
+      id: doc.id,
+      title: doc.title,
+      description: doc.description,
+      thumbnail: doc.orgn_img_path ? toFileSrc(doc.orgn_img_path) : '',
+      status: doc.status,
+      createdAt: formatDocCreatedAt(doc.created_at),
+      screenshotCount: captureId === null ? 0 : 1,
+      screenshotIds: captureId === null ? [] : [captureId]
+    }
+  })
+}
+
+const openDeleteDocConfirm = (doc: Document): void => {
+  deletingDoc.value = doc
+  modalConfirmRef.value?.onOpen()
+}
+
+const onConfirmDeleteDoc = async (): Promise<void> => {
+  const target = deletingDoc.value
+  if (!target) return
+
+  await deleteDoc(target.id)
+  documents.value = documents.value.filter((doc) => doc.id !== target.id)
+  deletingDoc.value = null
+}
 
 // --- Cross-Panel Drag & Drop ---
 
@@ -286,35 +437,62 @@ const { draggingCount, onDragStart, onDragEnd } = useDragSource({
 
 const { isOverDropZone, onDragOver, onDragLeave, onDrop } = useDropZone<number>({
   onDropItems: (droppedIds) => {
-    const droppedShots = droppedIds
-      .map((id) => screenshots.value.find((s) => s.id === id))
-      .filter(Boolean) as Screenshot[]
-
-    const pad = (n: number): string => String(n).padStart(2, '0')
-    const now = new Date()
-    const dateStr = `${pad(now.getMonth() + 1)}.${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`
-
-    for (const shot of droppedShots) {
-      documents.value.push({
-        id: nextDocId++,
-        title: shot.name,
-        description: `${shot.name}에 대한 매뉴얼 문서입니다.`,
-        thumbnail: shot.src,
-        status: '작업대기',
-        createdAt: dateStr,
-        screenshotCount: 1,
-        screenshotIds: [shot.id]
-      })
-    }
-    selectedIds.value = new Set()
+    void createDocsFromDroppedShots(droppedIds)
   }
 })
 
+const createDocsFromDroppedShots = async (droppedIds: number[]): Promise<void> => {
+  const droppedShots = droppedIds
+    .map((id) => screenshots.value.find((s) => s.id === id))
+    .filter(Boolean) as Screenshot[]
+
+  const pad = (n: number): string => String(n).padStart(2, '0')
+  const now = new Date()
+  const dateStr = `${pad(now.getMonth() + 1)}.${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`
+
+  for (const [index, shot] of droppedShots.entries()) {
+    const description = `${shot.name}에 대한 매뉴얼 문서입니다.`
+    const docId = await createDoc({
+      workspaceId: Number(workspaceId.value),
+      title: shot.name,
+      description,
+      status: '작업대기',
+      orgnImgPath: shot.imgPath ?? '',
+      drawImgPath: '',
+      sortOrder: documents.value.length + index + 1,
+      docMetaJson: JSON.stringify({
+        captureId: shot.id,
+        captureName: shot.name
+      }),
+      contentJson: '[]',
+      annotationJson: '[]'
+    })
+
+    if (docId === null) continue
+
+    documents.value.push({
+      id: docId,
+      title: shot.name,
+      description,
+      thumbnail: shot.src,
+      status: '작업대기',
+      createdAt: dateStr,
+      screenshotCount: 1,
+      screenshotIds: [shot.id]
+    })
+  }
+
+  selectedIds.value = new Set()
+}
 
 
 
 
-onMounted(()=>{
+
+onMounted(() => {
   console.log('workspaceId:', workspaceId.value)
+  void loadWorkspaceDetail()
+  void loadCaptureList()
+  void loadDocList()
 })
 </script>
