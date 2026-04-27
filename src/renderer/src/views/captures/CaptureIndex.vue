@@ -355,7 +355,7 @@ const onCaptureNameConfirm = async (name: string): Promise<void> => {
   if (!saved) return
 
 
-  captureImages.value.push({
+  captureImages.value.unshift({
     id: saved.id,
     name: nextName,
     src: imageDataURL,
