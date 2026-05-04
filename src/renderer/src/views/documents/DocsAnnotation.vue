@@ -13,7 +13,9 @@
               <i-lucide-pencil-ruler class="h-4 w-4 text-primary" />
             </div>
             <div>
-              <div class="text-sm font-bold leading-tight">{{ currentDocTitle || '문서 편집' }}</div>
+              <div class="text-sm font-bold leading-tight">
+                {{ currentDocTitle || '문서 편집' }}
+              </div>
               <div
                 v-if="isSaving || showSavedStatus"
                 class="flex items-center gap-1.5 text-xs text-base-content/50"
@@ -57,11 +59,21 @@
             class="flex items-center justify-between border-b border-base-content/5 bg-base-100 px-4 py-2"
           >
             <div class="join">
-              <button type="button" class="btn btn-ghost btn-xs join-item gap-1 text-base-content/45">
+              <button
+                type="button"
+                class="btn btn-ghost btn-xs join-item gap-1 text-base-content/45"
+                :disabled="!canUndo"
+                @click="undoAnnotation"
+              >
                 <i-lucide-undo-2 class="h-3.5 w-3.5" />
                 Undo
               </button>
-              <button type="button" class="btn btn-ghost btn-xs join-item gap-1 text-base-content/45">
+              <button
+                type="button"
+                class="btn btn-ghost btn-xs join-item gap-1 text-base-content/45"
+                :disabled="!canRedo"
+                @click="redoAnnotation"
+              >
                 <i-lucide-redo-2 class="h-3.5 w-3.5" />
                 Redo
               </button>
@@ -73,7 +85,7 @@
               <div class="flex items-center gap-1">
                 <button
                   type="button"
-                  class="tooltip tooltip-bottom btn btn-ghost btn-xs gap-1"
+                  class="tooltip tooltip-neutral tooltip-bottom btn btn-ghost btn-xs gap-1"
                   data-tip="왼쪽으로 90° 회전"
                   @click="onRotate"
                 >
@@ -82,8 +94,9 @@
                 </button>
                 <button
                   type="button"
-                  class="btn btn-ghost btn-xs gap-1 text-error"
-                  @click="onResetViewport"
+                  class="tooltip tooltip-neutral tooltip-bottom btn btn-ghost btn-xs gap-1 text-error"
+                  data-tip="전체 초기화"
+                  @click="onClickResetAnnotations"
                 >
                   <i-lucide-eraser class="h-3.5 w-3.5" />
                   초기화
@@ -113,7 +126,6 @@
               @add-annotation="addAnnotation"
               @update-annotation="updateAnnotation"
               @remove-annotation="removeAnnotation"
-              @close-context-menu="closeContextMenu"
               @zoom-wheel="onZoomWheel"
             />
             <div
@@ -171,11 +183,7 @@
             @click="onClickDocItem(doc.id)"
           >
             <div class="relative">
-              <img
-                :src="doc.thumbnail"
-                alt="thumbnail"
-                class="h-28 w-full object-cover"
-              />
+              <img :src="doc.thumbnail" alt="thumbnail" class="h-28 w-full object-cover" />
               <div v-if="curDocId === doc.id" class="absolute right-2 top-2">
                 <div
                   class="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-white"
@@ -192,7 +200,10 @@
             </div>
           </a>
         </div>
-        <div v-else class="flex flex-1 items-center justify-center p-6 text-center text-sm text-base-content/40">
+        <div
+          v-else
+          class="flex flex-1 items-center justify-center p-6 text-center text-sm text-base-content/40"
+        >
           {{ documentSearchKeyword ? '검색 결과가 없습니다' : '문서가 없습니다' }}
         </div>
       </div>
@@ -208,6 +219,14 @@
         <span>{{ saveToast.message }}</span>
       </div>
     </div>
+
+    <ModalConfirm ref="resetConfirmRef" ok-text="초기화" @on-confirm="onConfirmResetAnnotations">
+      <template #message>
+        <div class="text-center">
+          <p class="text-sm text-base-content/50">모든 어노테이션을 삭제하시겠습니까?</p>
+        </div>
+      </template>
+    </ModalConfirm>
   </div>
 </template>
 
@@ -220,42 +239,23 @@ import ZoomControls from '@/views/editor/components/ZoomControls.vue'
 import type { CanvasAnnotation, ToolMode } from '@/types'
 import type { Doc } from '@database/dto'
 
-const openDrawer = ref(false)
-const zoomPct = ref(100)
-const isSaving = ref(false)
-const saveToast = ref<{ type: 'success' | 'error'; message: string } | null>(null)
-let saveToastTimeout: ReturnType<typeof setTimeout> | null = null
-const route = useRoute()
-const router = useRouter()
-const curDocId = ref(Number(route.params.docId || 0))
-const currentWorkspaceId = ref(0)
-const currentDocTitle = ref('')
-const isLoading = ref(false)
-const imageSrc = ref('')
-const annotations = ref<CanvasAnnotation[]>([])
-const activeTool = ref<ToolMode>('number')
-const activeColor = ref('red')
-const MIN_ZOOM_PCT = 50
-const MAX_ZOOM_PCT = 200
-let wheelZoomPoint: { x: number; y: number } | null = null
-const canvasEditorRef = ref<{
+interface CanvasEditorRef {
   setZoom: (pct: number) => void
   setZoomAtPoint: (pct: number, point: { x: number; y: number }) => void
   resetViewport: () => void
   rotateSelectedAnnotationCCW90: () => void
-  rotateBaseImageCCW90: () => void
   exportImageDataURL: () => string | null
-} | null>(null)
-
-const funcItems = ref<FunctionalityItem[]>([])
-const documentSearchKeyword = ref('')
-const documentItems = ref<DocumentItem[]>([])
-const showSavedStatus = ref(false)
+}
 
 interface FunctionalityItem {
   id: string
   orderNo: number
   content: string
+}
+
+interface HistorySnapshot {
+  annotations: CanvasAnnotation[]
+  funcItems: FunctionalityItem[]
 }
 
 interface DocumentItem {
@@ -271,6 +271,47 @@ interface ContentJsonItem {
   text: string
 }
 
+// 라우팅
+const route = useRoute()
+const router = useRouter()
+
+// 화면 상태
+const openDrawer = ref(false)
+const isLoading = ref(false)
+const isSaving = ref(false)
+const showSavedStatus = ref(false)
+const saveToast = ref<{ type: 'success' | 'error'; message: string } | null>(null)
+let saveToastTimeout: ReturnType<typeof setTimeout> | null = null
+const resetConfirmRef = ref<ComponentRef<'ModalConfirm'> | null>(null)
+
+// 문서 상태
+const curDocId = ref(Number(route.params.docId || 0))
+const currentWorkspaceId = ref(0)
+const currentDocTitle = ref('')
+const imageSrc = ref('')
+const documentSearchKeyword = ref('')
+const documentItems = ref<DocumentItem[]>([])
+
+// 에디터 상태
+const annotations = ref<CanvasAnnotation[]>([])
+const funcItems = ref<FunctionalityItem[]>([])
+const activeTool = ref<ToolMode>('number')
+const activeColor = ref('#fc5c65')
+const canvasEditorRef = ref<CanvasEditorRef | null>(null)
+
+// 줌 상태
+const zoomPct = ref(100)
+const MIN_ZOOM_PCT = 50
+const MAX_ZOOM_PCT = 200
+let wheelZoomPoint: { x: number; y: number } | null = null
+
+// 히스토리 상태
+const undoStack = ref<HistorySnapshot[]>([])
+const redoStack = ref<HistorySnapshot[]>([])
+let isApplyingHistory = false
+const MAX_HISTORY_COUNT = 80
+
+// content_json 파싱
 const parseContentItems = (value: string | null | undefined): ContentJsonItem[] => {
   try {
     const parsed = JSON.parse(value || '[]')
@@ -289,6 +330,75 @@ const parseContentItems = (value: string | null | undefined): ContentJsonItem[] 
   }
 }
 
+// 히스토리 복제
+const cloneAnnotations = (items: CanvasAnnotation[]): CanvasAnnotation[] =>
+  items.map((item) => ({ ...item }))
+
+const cloneFunctionItems = (items: FunctionalityItem[]): FunctionalityItem[] =>
+  items.map((item) => ({ ...item }))
+
+// 히스토리 스냅샷
+const createHistorySnapshot = (): HistorySnapshot => ({
+  annotations: cloneAnnotations(annotations.value),
+  funcItems: cloneFunctionItems(funcItems.value)
+})
+
+const getHistoryKey = (snapshot: HistorySnapshot): string => JSON.stringify(snapshot)
+
+const canUndo = computed(() => undoStack.value.length > 1)
+const canRedo = computed(() => redoStack.value.length > 0)
+
+// 히스토리 초기화
+const resetHistory = (): void => {
+  undoStack.value = [createHistorySnapshot()]
+  redoStack.value = []
+}
+
+// 히스토리 추가
+const pushHistory = (): void => {
+  const snapshot = createHistorySnapshot()
+  const prevSnapshot = undoStack.value[undoStack.value.length - 1]
+  if (prevSnapshot && getHistoryKey(prevSnapshot) === getHistoryKey(snapshot)) return
+
+  undoStack.value = [...undoStack.value.slice(-(MAX_HISTORY_COUNT - 1)), snapshot]
+  redoStack.value = []
+}
+
+// 히스토리 적용
+const applyHistorySnapshot = (snapshot: HistorySnapshot): void => {
+  isApplyingHistory = true
+  annotations.value = cloneAnnotations(snapshot.annotations)
+  funcItems.value = cloneFunctionItems(snapshot.funcItems)
+  void nextTick(() => {
+    isApplyingHistory = false
+  })
+}
+
+// 되돌리기
+const undoAnnotation = (): void => {
+  if (!canUndo.value) return
+
+  const nextUndoStack = [...undoStack.value]
+  const currentSnapshot = nextUndoStack.pop()
+  const prevSnapshot = nextUndoStack[nextUndoStack.length - 1]
+  if (!currentSnapshot || !prevSnapshot) return
+
+  undoStack.value = nextUndoStack
+  redoStack.value = [currentSnapshot, ...redoStack.value]
+  applyHistorySnapshot(prevSnapshot)
+}
+
+// 다시 실행
+const redoAnnotation = (): void => {
+  const nextSnapshot = redoStack.value[0]
+  if (!nextSnapshot) return
+
+  redoStack.value = redoStack.value.slice(1)
+  undoStack.value = [...undoStack.value, nextSnapshot]
+  applyHistorySnapshot(nextSnapshot)
+}
+
+// 기능 목록 동기화
 const syncFunctionItemsFromAnnotations = (): void => {
   const prevContentById = new Map(funcItems.value.map((item) => [item.id, item.content]))
   const numberAnnotations = annotations.value
@@ -306,6 +416,7 @@ const syncFunctionItemsFromAnnotations = (): void => {
   }))
 }
 
+// 기능 목록 복원
 const hydrateFunctionItems = (contentItems: ContentJsonItem[]): void => {
   const contentByAnnotationId = new Map(contentItems.map((item) => [item.annotationId, item.text]))
   const numberAnnotations = annotations.value
@@ -326,6 +437,7 @@ const hydrateFunctionItems = (contentItems: ContentJsonItem[]): void => {
 const getAnnotationOrder = (annotation: CanvasAnnotation): number =>
   annotation.order ?? annotation.number ?? annotation.zIndex ?? 0
 
+// 기능 목록 재정렬
 const onReorderFunctionList = (payload: {
   visibleIds: string[]
   fromIndex: number
@@ -336,7 +448,7 @@ const onReorderFunctionList = (payload: {
 
   const visibleIdSet = new Set(payload.visibleIds)
 
-  // 현재 정렬 상태(1..N에 해당) 기준으로 전체 목록을 다시 가져옵니다.
+  // 전체 정렬
   const sortedFull = [...funcItems.value].sort((a, b) => a.orderNo - b.orderNo)
 
   const visibleItems = sortedFull.filter((item) => visibleIdSet.has(item.id))
@@ -346,11 +458,11 @@ const onReorderFunctionList = (payload: {
   const to = Math.max(0, Math.min(payload.toIndex, visibleItems.length - 1))
   if (from === to) return
 
-  // "move" 동작: from을 뽑아서 to 위치에 삽입
+  // 이동 처리
   const moved = visibleItems.splice(from, 1)[0]
   visibleItems.splice(to, 0, moved)
 
-  // 전체 목록에서 visible 구간만 방금 재배열된 순서로 치환
+  // 표시 목록 치환
   let visiblePtr = 0
   const newSortedFull = sortedFull.map((item) => {
     if (!visibleIdSet.has(item.id)) return item
@@ -358,7 +470,7 @@ const onReorderFunctionList = (payload: {
     return next ?? item
   })
 
-  // 번호는 전체 기준으로 1..N 연속으로 다시 매깁니다.
+  // 번호 재부여
   const nextOrderById = new Map<string, number>()
 
   newSortedFull.forEach((item, index) => {
@@ -382,6 +494,7 @@ const onReorderFunctionList = (payload: {
   funcItems.value = newSortedFull
 }
 
+// 문서 이동
 const onClickDocItem = (id: number): void => {
   openDrawer.value = false
   if (id === curDocId.value) return
@@ -389,6 +502,7 @@ const onClickDocItem = (id: number): void => {
   void router.push(`/documents/${id}/annotation`)
 }
 
+// 뒤로가기
 const goToDocsIndex = (): void => {
   if (!currentWorkspaceId.value || !curDocId.value) {
     router.back()
@@ -398,15 +512,18 @@ const goToDocsIndex = (): void => {
   void router.push(`/workspace/${currentWorkspaceId.value}/documents/${curDocId.value}`)
 }
 
+// 로컬 이미지 URL
 const toFileSrc = (imgPath: string, version?: string): string => {
   const normalizedPath = imgPath.replace(/\\/g, '/')
   const cacheKey = version ? `?v=${encodeURIComponent(version)}` : ''
   return `appimg:///${normalizedPath}${cacheKey}`
 }
 
+// 문서 카드 데이터
 const toDocumentItem = (doc: Doc): DocumentItem => {
   const thumbnailPath = doc.draw_img_path || doc.orgn_img_path
-  const thumbnailVersion = doc.draw_img_path ? `${doc.updated_at}-${Date.now()}` : doc.updated_at
+  const thumbnailVersion = doc.updated_at
+
 
   return {
     id: doc.id,
@@ -418,6 +535,7 @@ const toDocumentItem = (doc: Doc): DocumentItem => {
   }
 }
 
+// 문서 검색
 const filteredDocumentItems = computed(() => {
   const keyword = documentSearchKeyword.value.trim().toLowerCase()
   if (!keyword) return documentItems.value
@@ -425,6 +543,7 @@ const filteredDocumentItems = computed(() => {
   return documentItems.value.filter((doc) => doc.title.toLowerCase().includes(keyword))
 })
 
+// annotation_json 파싱
 const parseAnnotations = (value: string | null | undefined): CanvasAnnotation[] => {
   try {
     const parsed = JSON.parse(value || '[]')
@@ -446,6 +565,7 @@ const parseAnnotations = (value: string | null | undefined): CanvasAnnotation[] 
   return []
 }
 
+// 문서 목록 조회
 const loadDocumentItems = async (workspaceId: number): Promise<void> => {
   const list = await getDocList({
     workspaceId
@@ -454,6 +574,7 @@ const loadDocumentItems = async (workspaceId: number): Promise<void> => {
   documentItems.value = list.map(toDocumentItem)
 }
 
+// 현재 문서 조회
 const loadDoc = async (): Promise<void> => {
   if (!curDocId.value) return
 
@@ -468,6 +589,7 @@ const loadDoc = async (): Promise<void> => {
     imageSrc.value = doc?.orgn_img_path ? toFileSrc(doc.orgn_img_path) : ''
     annotations.value = parseAnnotations(doc?.annotation_json)
     hydrateFunctionItems(parseContentItems(doc?.content_json))
+    resetHistory()
 
     if (doc?.workspace_id) {
       await loadDocumentItems(doc.workspace_id)
@@ -477,23 +599,27 @@ const loadDoc = async (): Promise<void> => {
   }
 }
 
+// 어노테이션 추가
 const addAnnotation = (annotation: CanvasAnnotation): void => {
   annotations.value = [...annotations.value, annotation]
   syncFunctionItemsFromAnnotations()
 }
 
+// 어노테이션 수정
 const updateAnnotation = (annotation: CanvasAnnotation): void => {
-  annotations.value = annotations.value.map((item) => (item.id === annotation.id ? annotation : item))
+  annotations.value = annotations.value.map((item) =>
+    item.id === annotation.id ? annotation : item
+  )
   syncFunctionItemsFromAnnotations()
 }
 
+// 어노테이션 삭제
 const removeAnnotation = (annotationId: string): void => {
   annotations.value = annotations.value.filter((item) => item.id !== annotationId)
   syncFunctionItemsFromAnnotations()
 }
 
-const closeContextMenu = (): void => {}
-
+// 휠 줌
 const onZoomWheel = (payload: {
   deltaPct: number
   point: {
@@ -512,14 +638,24 @@ const onZoomWheel = (payload: {
   zoomPct.value = nextZoomPct
 }
 
-const onResetViewport = (): void => {
+// 초기화 확인
+const onClickResetAnnotations = (): void => {
+  resetConfirmRef.value?.onOpen()
+}
+
+// 초기화 실행
+const onConfirmResetAnnotations = (): void => {
+  annotations.value = []
+  funcItems.value = []
   canvasEditorRef.value?.resetViewport()
 }
 
+// 선택 어노테이션 회전
 const onRotate = (): void => {
   canvasEditorRef.value?.rotateSelectedAnnotationCCW90()
 }
 
+// 저장 content_json
 const toContentJson = (): ContentJsonItem[] =>
   funcItems.value
     .slice()
@@ -530,6 +666,7 @@ const toContentJson = (): ContentJsonItem[] =>
       text: item.content
     }))
 
+// 저장 annotation_json
 const toAnnotationJson = (): CanvasAnnotation[] =>
   annotations.value
     .slice()
@@ -548,6 +685,7 @@ const toAnnotationJson = (): CanvasAnnotation[] =>
       height: annotation.height
     }))
 
+// 저장 토스트
 const showSaveToast = (type: 'success' | 'error', message: string): void => {
   if (saveToastTimeout) {
     clearTimeout(saveToastTimeout)
@@ -560,6 +698,7 @@ const showSaveToast = (type: 'success' | 'error', message: string): void => {
   }, 1800)
 }
 
+// 문서 저장
 const saveAnnotationDoc = async (): Promise<void> => {
   if (!curDocId.value || isSaving.value) return
 
@@ -584,22 +723,12 @@ const saveAnnotationDoc = async (): Promise<void> => {
   }
 }
 
+// 초기 조회
 onMounted(() => {
   void loadDoc()
-  // funcItems.value = [
-  //   { id: '123123', orderNo: 1, content: '기능 1' },
-  //   { id: '12313', orderNo: 2, content: '기능 2' },
-  //   { id: '12314', orderNo: 3, content: '기능 3' },
-  //   { id: '1', orderNo: 4, content: '기능 4' },
-  //   { id: '2', orderNo: 5, content: '기능 5' },
-  //   { id: '3', orderNo: 6, content: '기능 6' },
-  //   { id: '4', orderNo: 7, content: '기능 7' },
-  //   { id: '5', orderNo: 8, content: '기능 8' },
-  //   { id: '6', orderNo: 9, content: '기능 9' },
-  //   { id: '7', orderNo: 10, content: '기능 10' }
-  // ]
 })
 
+// 줌 반영
 watch(zoomPct, (changeZoomPct) => {
   if (wheelZoomPoint) {
     canvasEditorRef.value?.setZoomAtPoint(changeZoomPct, wheelZoomPoint)
@@ -610,6 +739,7 @@ watch(zoomPct, (changeZoomPct) => {
   canvasEditorRef.value?.setZoom(changeZoomPct)
 })
 
+// 라우트 문서 변경
 watch(
   () => route.params.docId,
   (docId) => {
@@ -621,15 +751,18 @@ watch(
   }
 )
 
+// 변경 감지
 watch(
   [annotations, funcItems],
   () => {
-    if (isLoading.value || isSaving.value) return
+    if (isLoading.value || isSaving.value || isApplyingHistory) return
+    pushHistory()
     showSavedStatus.value = false
   },
   { deep: true }
 )
 
+// 정리
 onUnmounted(() => {
   if (saveToastTimeout) {
     clearTimeout(saveToastTimeout)

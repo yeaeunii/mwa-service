@@ -66,7 +66,7 @@ const toolItems: Array<{
   { value: 'number', label: '번호' },
   { value: 'strokebox', label: '테두리 박스' },
   { value: 'filled-box', label: '박스' },
-  { value: 'mosaic', label: '모자이크' }
+  // { value: 'mosaic', label: '모자이크' }
 ]
 
 const props = defineProps<{

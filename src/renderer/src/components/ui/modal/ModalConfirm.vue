@@ -2,7 +2,6 @@
 import { ref } from 'vue'
 const emits = defineEmits(['onConfirm'])
 
-const msgHtml = ref<string>('')
 const modalRef = ref<ComponentRef<'ModalBase'> | null>(null)
 const onOpen = (): void => {
   modalRef.value?.onOpen()
