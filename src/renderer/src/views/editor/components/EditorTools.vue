@@ -1,60 +1,50 @@
 <template>
-  <div class="pointer-events-auto absolute inset-x-0 top-4 z-10 flex justify-center px-6">
-    <div class="flex items-center gap-3 rounded-2xl border border-white/10 bg-neutral/95 px-3 py-2 text-neutral-content/70 shadow-lg">
-      <div class="flex items-center gap-1.5 rounded-xl bg-black/20 px-2 py-1">
-        <button
-          v-for="color in palette"
-          :key="color"
-          type="button"
-          class="h-6 w-6 rounded-full border-2 transition-transform hover:scale-110"
-          :class="
-            colorValue === color
-              ? 'border-white shadow-[0_0_0_2px_rgba(255,255,255,0.2)]'
-              : 'border-transparent'
-          "
-          :style="{ backgroundColor: color }"
-          @click="emit('update:colorValue', color)"
-        />
-      </div>
+  <div class="flex items-center gap-3">
+    <div class="flex items-center gap-1.5">
+      <button
+        v-for="color in palette"
+        :key="color"
+        type="button"
+        class="h-5 w-5 rounded-full border transition-transform hover:scale-110"
+        :class="
+          colorValue === color ? 'border-primary ring-2 ring-primary/20' : 'border-base-content/10'
+        "
+        :style="{ backgroundColor: color }"
+        :aria-label="`색상 ${color}`"
+        @click="emit('update:colorValue', color)"
+      />
+    </div>
 
-      <div class="tabs tabs-box bg-transparent p-0">
-      <button
-        type="button"
-        class="tab [--tab-bg:green]"
-        :class="{ 'tab-active': modelValue === 'number' }"
-        @click="emit('update:modelValue', modelValue === 'number' ? null : 'number')">
-        NUMBER
-      </button>
-      <button
-        type="button"
-        class="tab [--tab-bg:green]"
-        :class="{ 'tab-active': modelValue === 'strokebox' }"
-        @click="emit('update:modelValue', modelValue === 'strokebox' ? null : 'strokebox')">
-        STROKEBOX
-      </button>
+    <div class="h-4 w-px bg-base-content/10"></div>
 
+    <div class="flex items-center gap-1">
       <button
+        v-for="tool in toolItems"
+        :key="tool.value"
         type="button"
-        class="tab [--tab-bg:green]"
-        :class="{ 'tab-active': modelValue === 'filled-box' }"
-        @click="emit('update:modelValue', modelValue === 'filled-box' ? null : 'filled-box')">
-        FILLED BOX
+        class="btn btn-xs gap-1 border-none shadow-none"
+        :class="
+          modelValue === tool.value
+            ? 'btn-primary text-primary-content'
+            : 'btn-ghost text-base-content/60 hover:bg-primary/10 hover:text-primary'
+        "
+        :title="tool.label"
+        @click="toggleTool(tool.value)"
+      >
+        <i-lucide-circle-plus v-if="tool.value === 'number'" class="h-3.5 w-3.5" />
+        <i-lucide-square v-else-if="tool.value === 'strokebox'" class="h-3.5 w-3.5" />
+        <span v-else-if="tool.value === 'filled-box'" class="h-3.5 w-3.5 rounded-[2px] bg-current"></span>
+        <i-lucide-square-dashed v-else class="h-3.5 w-3.5" />
+        <span>{{ tool.label }}</span>
       </button>
-
-      <button
-        type="button"
-        class="tab [--tab-bg:green]"
-        :class="{ 'tab-active': modelValue === 'mosaic' }"
-        @click="emit('update:modelValue', modelValue === 'mosaic' ? null : 'mosaic')">
-        MOSAIC
-      </button>
-      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import type { ToolMode } from '@/types'
+
+type ActiveToolMode = Exclude<ToolMode, null>
 
 const palette = [
   '#fc5c65',
@@ -69,7 +59,17 @@ const palette = [
   '#4b6584'
 ] as const
 
-defineProps<{
+const toolItems: Array<{
+  value: ActiveToolMode
+  label: string
+}> = [
+  { value: 'number', label: '번호' },
+  { value: 'strokebox', label: '테두리 박스' },
+  { value: 'filled-box', label: '박스' },
+  { value: 'mosaic', label: '모자이크' }
+]
+
+const props = defineProps<{
   modelValue: ToolMode
   colorValue: string
 }>()
@@ -79,5 +79,7 @@ const emit = defineEmits<{
   'update:colorValue': [value: string]
 }>()
 
-
+const toggleTool = (tool: ActiveToolMode): void => {
+  emit('update:modelValue', props.modelValue === tool ? null : tool)
+}
 </script>

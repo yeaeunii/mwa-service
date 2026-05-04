@@ -129,8 +129,9 @@ import {
   updateCaptureName,
   type WorkspaceDetail
 } from '@/database'
+import ModalCaptureName from './components/ModalCaptureName.vue'
 
-const modalCaptureNameRef = ref<ComponentRef<'ModalCaptureName'> | null>(null)
+const modalCaptureNameRef = ref<InstanceType<typeof ModalCaptureName> | null>(null)
 const modalConfirmRef = ref<ComponentRef<'ModalConfirm'> | null>(null)
 
 interface WebviewElement extends HTMLElement {

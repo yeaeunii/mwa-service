@@ -46,7 +46,7 @@
         <div class="px-3 py-2">
           <label class="input input-sm w-full">
             <i-lucide-search class="h-3.5 w-3.5 opacity-40" />
-            <input type="search" placeholder="검색..." />
+            <input v-model="screenshotSearchKeyword" type="search" placeholder="검색..." />
           </label>
         </div>
         <div
@@ -56,7 +56,7 @@
         >
           <div class="grid grid-cols-2 gap-1.5">
             <div
-              v-for="shot in screenshots"
+              v-for="shot in filteredScreenshots"
               :key="shot.id"
               :data-shot-id="shot.id"
               class="group cursor-pointer rounded-lg p-1.5 transition-colors"
@@ -126,12 +126,26 @@
 
       <!-- Manual Document Section -->
       <main
-        class="flex flex-1 flex-col overflow-hidden transition-colors duration-150"
+        class="relative flex flex-1 flex-col overflow-hidden transition-colors duration-150"
         :class="isOverDropZone ? 'bg-primary/5' : ''"
         @dragover.prevent="onDragOver"
         @dragleave="onDragLeave"
         @drop.prevent="onDrop"
       >
+        <!-- Drop Zone Overlay -->
+        <div
+          v-if="isOverDropZone"
+          class="pointer-events-none absolute inset-x-6 bottom-6 top-20 z-30 flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-primary/50 bg-primary/5"
+        >
+          <div class="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+            <i-lucide-file-plus class="h-7 w-7 text-primary" />
+          </div>
+          <span class="text-sm font-bold text-primary"> 여기에 놓아서 문서를 생성하세요 </span>
+          <span v-if="draggingCount > 0" class="text-xs text-primary/60">
+            {{ draggingCount }}개의 스크린샷
+          </span>
+        </div>
+
         <div
           class="flex items-center justify-between border-b border-base-content/5 bg-base-100 px-6 py-3"
         >
@@ -142,41 +156,34 @@
           </div>
           <label class="input input-sm w-64">
             <i-lucide-search class="h-3.5 w-3.5 opacity-40" />
-            <input type="search" placeholder="문서 검색..." />
+            <input v-model="documentSearchKeyword" type="search" placeholder="문서 검색..." />
           </label>
         </div>
 
         <div class="relative flex-1 overflow-y-auto p-6">
-          <!-- Drop Zone Overlay -->
           <div
-            v-if="isOverDropZone"
-            class="pointer-events-none absolute inset-6 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-primary/50 bg-primary/5"
-          >
-            <div class="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-              <i-lucide-file-plus class="h-7 w-7 text-primary" />
-            </div>
-            <span class="text-sm font-bold text-primary"> 여기에 놓아서 문서를 생성하세요 </span>
-            <span v-if="draggingCount > 0" class="text-xs text-primary/60">
-              {{ draggingCount }}개의 스크린샷
-            </span>
-          </div>
-
-          <div
-            v-if="documents.length === 0"
+            v-if="filteredDocuments.length === 0"
             class="flex h-full flex-col items-center justify-center gap-3 text-base-content/30"
           >
             <i-lucide-file-x class="h-12 w-12" />
-            <span class="text-sm font-medium">스크린샷을 드래그하여 문서를 생성하세요</span>
+            <span class="text-sm font-medium">
+              {{ documentSearchKeyword ? '검색 결과가 없습니다' : '스크린샷을 드래그하여 문서를 생성하세요' }}
+            </span>
           </div>
 
           <div v-else class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             <router-link
-              v-for="doc in documents"
+              v-for="(doc, index) in filteredDocuments"
               :key="doc.id"
-              :to="`/workspace/${workspaceId}/documents`"
+              :to="`/workspace/${workspaceId}/documents/${doc.id}`"
               class="group block overflow-hidden rounded-xl border border-base-content/10 bg-base-100 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
             >
               <div class="relative overflow-hidden">
+                <div
+                  class="absolute left-3 top-3 z-20 flex h-7 min-w-10 items-center justify-center rounded-md border border-primary bg-base-100/95 px-2 text-primary shadow-sm backdrop-blur"
+                >
+                  <span class="text-xs font-black tabular-nums">{{ index + 1 }}</span>
+                </div>
                 <img
                   :src="doc.thumbnail"
                   alt="thumbnail"
@@ -185,13 +192,6 @@
                 <div
                   class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
                 />
-                <div
-                  v-if="doc.screenshotCount > 1"
-                  class="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-black/50 px-2 py-0.5 text-xs text-white backdrop-blur-sm"
-                >
-                  <i-lucide-layers class="h-3 w-3" />
-                  {{ doc.screenshotCount }}
-                </div>
                 <button
                   type="button"
                   class="btn btn-xs btn-circle absolute right-2 top-2 z-20 border-none bg-white/90 text-error opacity-0 shadow-sm transition-opacity hover:bg-white group-hover:opacity-100"
@@ -213,10 +213,6 @@
                 <div class="flex items-center gap-1 text-xs text-base-content/40">
                   <i-lucide-clock class="h-3 w-3" />
                   {{ doc.createdAt }}
-                </div>
-                <div class="flex items-center gap-1 text-xs text-base-content/40">
-                  <i-lucide-list-checks class="h-3 w-3" />
-                  {{ doc.screenshotCount }} steps
                 </div>
               </div>
             </router-link>
@@ -262,18 +258,21 @@ import {
   deleteDoc,
   getCaptureList,
   getDocList,
-  getWorkspaceDetail
+  getWorkspaceDetail,
+  updateDocSortOrders
 } from '@/database'
 import WorkspaceModalCaptureImages from './components/ModalCaptureImages.vue'
 
 const route = useRoute()
+const router = useRouter()
+
 const workspaceId = computed(() => route.params.id)
 const workspaceName = ref('')
+const screenshotSearchKeyword = ref('')
+const documentSearchKeyword = ref('')
 
 
 
-
-const router = useRouter()
 
 // --- Screenshot Data ---
 
@@ -287,9 +286,10 @@ interface Screenshot {
 const screenshots = ref<Screenshot[]>([])
 const modalCaptureImagesRef = ref<InstanceType<typeof WorkspaceModalCaptureImages> | null>(null)
 
-const toFileSrc = (imgPath: string): string => {
+const toFileSrc = (imgPath: string, version?: string): string => {
   const normalizedPath = imgPath.replace(/\\/g, '/')
-  return `appimg:///${normalizedPath}`
+  const cacheKey = version ? `?v=${encodeURIComponent(version)}` : ''
+  return `appimg:///${normalizedPath}${cacheKey}`
 }
 
 const loadCaptureList = async (): Promise<void> => {
@@ -343,7 +343,7 @@ const onRemoveCaptureImage = async (imageId: number): Promise<void> => {
 // --- Drag Select ---
 
 const gridContainerRef = ref<HTMLElement | null>(null)
-const screenshotIds = computed(() => screenshots.value.map((s) => s.id))
+const screenshotIds = computed(() => filteredScreenshots.value.map((s) => s.id))
 
 const { selectedIds, isDragging, selectionStyle, onMouseDown, onClickItem, cancelDrag } =
   useDragSelect({
@@ -363,11 +363,10 @@ interface Document {
   thumbnail: string
   status: string
   createdAt: string
-  screenshotCount: number
-  screenshotIds: number[]
+  sortOrder: number
 }
 
-let nextDocId = 1
+
 const documents = ref<Document[]>([])
 const deletingDoc = ref<Document | null>(null)
 const modalConfirmRef = ref<ComponentRef<'ModalConfirm'> | null>(null)
@@ -380,33 +379,23 @@ const formatDocCreatedAt = (dateText: string): string => {
   return `${pad(date.getMonth() + 1)}.${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-const getDocCaptureId = (docMetaJson: string): number | null => {
-  try {
-    const meta = JSON.parse(docMetaJson || '{}') as { captureId?: unknown }
-    const captureId = Number(meta.captureId)
-    return Number.isFinite(captureId) ? captureId : null
-  } catch {
-    return null
-  }
-}
-
 const loadDocList = async (): Promise<void> => {
   const list = await getDocList({
     workspaceId: Number(workspaceId.value)
   })
 
   documents.value = list.map((doc) => {
-    const captureId = getDocCaptureId(doc.doc_meta_json)
+    const thumbnailPath = doc.draw_img_path || doc.orgn_img_path
+    const thumbnailVersion = doc.draw_img_path ? `${doc.updated_at}-${Date.now()}` : doc.updated_at
 
     return {
       id: doc.id,
       title: doc.title,
       description: doc.description,
-      thumbnail: doc.orgn_img_path ? toFileSrc(doc.orgn_img_path) : '',
+      thumbnail: thumbnailPath ? toFileSrc(thumbnailPath, thumbnailVersion) : '',
       status: doc.status,
       createdAt: formatDocCreatedAt(doc.created_at),
-      screenshotCount: captureId === null ? 0 : 1,
-      screenshotIds: captureId === null ? [] : [captureId]
+      sortOrder: doc.sort_order
     }
   })
 }
@@ -421,7 +410,19 @@ const onConfirmDeleteDoc = async (): Promise<void> => {
   if (!target) return
 
   await deleteDoc(target.id)
-  documents.value = documents.value.filter((doc) => doc.id !== target.id)
+  documents.value = documents.value
+    .filter((doc) => doc.id !== target.id)
+    .map((doc, index) => ({
+      ...doc,
+      sortOrder: index + 1
+    }))
+
+  await updateDocSortOrders(
+    documents.value.map((doc) => ({
+      id: doc.id,
+      sortOrder: doc.sortOrder
+    }))
+  )
   deletingDoc.value = null
 }
 
@@ -452,42 +453,69 @@ const createDocsFromDroppedShots = async (droppedIds: number[]): Promise<void> =
 
   for (const [index, shot] of droppedShots.entries()) {
     const description = `${shot.name}에 대한 매뉴얼 문서입니다.`
-    const docId = await createDoc({
+    const sortOrder = documents.value.length + index + 1
+    const createdDoc = await createDoc({
       workspaceId: Number(workspaceId.value),
       title: shot.name,
       description,
       status: '작업대기',
       orgnImgPath: shot.imgPath ?? '',
       drawImgPath: '',
-      sortOrder: documents.value.length + index + 1,
+      sortOrder,
       docMetaJson: JSON.stringify({
-        captureId: shot.id,
-        captureName: shot.name
+        writer: '담당자',
+        entry_path: ''
       }),
       contentJson: '[]',
       annotationJson: '[]'
     })
 
-    if (docId === null) continue
+    if (createdDoc === null) continue
 
     documents.value.push({
-      id: docId,
+      id: createdDoc.id,
       title: shot.name,
       description,
-      thumbnail: shot.src,
+      thumbnail: createdDoc.orgnImgPath ? toFileSrc(createdDoc.orgnImgPath) : shot.src,
       status: '작업대기',
       createdAt: dateStr,
-      screenshotCount: 1,
-      screenshotIds: [shot.id]
+      sortOrder
     })
   }
 
   selectedIds.value = new Set()
 }
 
+// --- serch ---
+
+const filteredScreenshots = computed(() => {
+  const keyword = screenshotSearchKeyword.value.trim().toLowerCase()
+  if (!keyword) return screenshots.value
+
+  return screenshots.value.filter((item) =>
+    String(item.name ?? '').toLowerCase().includes(keyword)
+  )
+})
+
+const filteredDocuments = computed(() => {
+  const keyword = documentSearchKeyword.value.trim().toLowerCase()
+  if (!keyword) return documents.value
+
+  return documents.value.filter((doc) =>
+    [doc.title, doc.description, doc.status]
+      .some((text) => String(text ?? '').toLowerCase().includes(keyword))
+  )
+})
 
 
 
+
+
+
+
+watch(screenshotSearchKeyword, () => {
+  selectedIds.value = new Set()
+})
 
 onMounted(() => {
   console.log('workspaceId:', workspaceId.value)

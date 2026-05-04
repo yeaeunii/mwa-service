@@ -41,7 +41,7 @@
                     v-if="folder.thumbnail"
                     :src="folder.thumbnail"
                     alt=""
-                    class="h-full w-full object-cover"
+                    class="h-full w-full object-contain"
                   />
                   <div
                     v-else
@@ -79,7 +79,7 @@
                       v-if="folder.thumbnail"
                       :src="folder.thumbnail"
                       alt=""
-                      class="h-20 w-full object-cover"
+                      class="h-20 w-full object-contain"
                     />
                     <div
                       v-else
@@ -209,7 +209,7 @@
                     v-if="folder.thumbnail"
                     :src="folder.thumbnail"
                     alt=""
-                    class="h-20 w-full object-cover"
+                    class="h-20 w-full object-contain"
                   /> -->
                   <div
                     v-else

@@ -1,106 +1,188 @@
 <template>
-  <aside
-    class="flex w-[22rem] shrink-0 flex-col border-l border-white/10 bg-slate-900 transition-all duration-200"
-    :class="isOpen ? 'translate-x-0' : 'translate-x-full'"
+  <section
+    class="flex w-80 shrink-0 flex-col overflow-hidden border-l border-base-content/5 bg-base-100 xl:w-96"
   >
-    <div class="border-b border-white/10 px-4 py-3">
-      <div class="flex items-center gap-2 text-base font-bold text-white">
-        <i-lucide-notebook-tabs class="text-sm text-blue-400" />
-        기능 설명 리스트
+    <div class="flex items-center justify-between border-b border-base-content/5 bg-base-100 px-4 py-3">
+      <div class="flex items-center gap-2.5">
+        <div class="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+          <i-lucide-list-ordered class="h-4 w-4" />
+        </div>
+        <div>
+          <p class="text-sm font-semibold leading-tight">기능 목록</p>
+          <p class="text-xs text-base-content/50">문서 기능 설명을 정리하세요</p>
+        </div>
+      </div>
+      <span class="badge badge-primary badge-soft badge-sm"
+        >{{ filteredItems.length }}개</span
+      >
+    </div>
+
+    <div class="border-b border-base-content/5 bg-base-100 px-3 py-2.5">
+      <div class="flex items-center gap-2">
+        <label class="input input-sm flex-1">
+          <i-lucide-search class="h-3.5 w-3.5 opacity-45" />
+          <input v-model="searchQuery" type="search" placeholder="기능 설명 검색..." />
+        </label>
       </div>
     </div>
 
-    <div class="flex-1 space-y-3 overflow-y-auto px-3 py-3">
+    <div ref="funcListRef" class="flex-1 space-y-3 overflow-y-auto bg-base-200/40 p-3.5">
       <div
-        v-for="card in cards"
-        :key="card.annotationId"
-        class="rounded-xl border bg-slate-800/80 p-3 transition-colors"
-        :class="[
-          card.text.trim() ? 'border-white/10' : 'border-red-300/50',
-          dragCardId === card.annotationId && 'cursor-grabbing opacity-40 scale-[0.98]',
-          overCardId === card.annotationId && 'border-blue-400 bg-slate-700/80'
-        ]"
-        draggable="true"
-        @dragstart="emit('update:dragCardId', card.annotationId)"
-        @dragenter.prevent="emit('update:overCardId', card.annotationId)"
-        @dragover.prevent
-        @dragleave="emit('update:overCardId', null)"
-        @drop.prevent="emit('moveCard', card.annotationId)"
-        @dragend="handleDragEnd"
+        v-for="item in filteredItems"
+        :key="item.id"
+        class="group relative overflow-hidden rounded-xl border border-base-content/10 bg-base-100 p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-md focus-within:border-primary/35 focus-within:shadow-md focus-within:ring-2 focus-within:ring-primary/10"
       >
-        <div class="mb-2.5 flex items-center gap-2">
-          <div
-            class="flex h-6 min-w-6 items-center justify-center rounded-full bg-rose-500 px-1 text-[11px] font-bold text-white"
-          >
-            {{ card.number }}
+        <div class="mb-2 flex items-start justify-between gap-3">
+          <div class="badge badge-primary badge-soft gap-1 px-2.5 py-2 text-[11px] font-bold text-primary">
+            <i-lucide-hash class="h-3 w-3" />
+            {{ item.orderNo }}
           </div>
-          <div class="text-xs font-semibold text-white">STEP {{ card.number }}</div>
-          <button
-            type="button"
-            class="btn btn-xs btn-ghost ml-auto text-rose-300 shadow-none hover:bg-transparent"
-            @click="emit('removeAnno', card.annotationId)"
-          >
-            <i-lucide-trash-2 class="text-xs" />
-          </button>
+          <div class="flex items-center gap-1">
+            <button
+              type="button"
+              class="btn btn-ghost btn-xs btn-square text-base-content/45 hover:bg-base-200 hover:text-base-content/75"
+              @click="toggleExpanded(item.id)"
+            >
+              <i-lucide-chevron-down v-if="!isExpanded(item.id)" class="h-4 w-4" />
+              <i-lucide-chevron-up v-else class="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              class="drag-handle btn btn-ghost btn-xs btn-square cursor-grab text-base-content/35 transition-colors hover:bg-base-200 hover:text-base-content/70 active:cursor-grabbing active:bg-base-300"
+            >
+              <i-lucide-grip-vertical class="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
-        <input
-          :value="card.text"
-          type="text"
-          class="input input-sm w-full border bg-slate-900/80 text-white shadow-none"
-          :class="card.text.trim() ? 'border-white/10' : 'border-red-300/50'"
-          placeholder="기능 설명을 입력하세요"
-          @input="emit('setText', card.annotationId, ($event.target as HTMLInputElement).value)"
-        />
+        <button
+          v-if="compactMode && !isExpanded(item.id)"
+          type="button"
+          class="line-clamp-2 min-h-10 w-full rounded-lg border border-base-content/8 bg-base-200/40 px-2.5 py-2 text-left text-xs leading-relaxed text-base-content/65 transition-colors hover:border-primary/20 hover:bg-base-200/60"
+          @click="openItemEditor(item.id)"
+        >
+          {{ item.content || '아직 입력된 설명이 없습니다.' }}
+        </button>
+        <div v-else>
+          <textarea
+            v-model="item.content"
+            rows="4"
+            placeholder="기능 설명을 입력하세요"
+            :data-editor-id="item.id"
+            class="textarea textarea-sm min-h-24 w-full resize-none border-base-content/10 bg-base-100 text-sm leading-relaxed text-base-content/80 placeholder:text-base-content/35 focus:border-primary/30 focus:outline-none"
+          />
+        </div>
+      </div>
+
+      <div
+        v-if="!localItems.length"
+        class="flex min-h-52 flex-col items-center justify-center rounded-xl border-2 border-dashed border-base-content/15 bg-base-100/70 p-6 text-center"
+      >
+        <div class="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-base-200 text-base-content/50">
+          <i-lucide-list-plus class="h-5 w-5" />
+        </div>
+        <p class="text-sm font-semibold text-base-content/80">아직 등록된 기능이 없습니다</p>
+        <p class="mt-1 text-xs text-base-content/50">기능 설명을 추가해 문서 단계를 정리해보세요.</p>
+      </div>
+      <div
+        v-else-if="!filteredItems.length"
+        class="flex min-h-44 flex-col items-center justify-center rounded-xl border border-base-content/10 bg-base-100/80 p-5 text-center"
+      >
+        <div class="mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-base-200 text-base-content/40">
+          <i-lucide-search-x class="h-4 w-4" />
+        </div>
+        <p class="text-sm font-medium text-base-content/70">검색 결과가 없습니다</p>
+        <p class="mt-1 text-xs text-base-content/50">다른 키워드로 검색해보세요.</p>
       </div>
     </div>
-
-    <div class="border-t border-white/10 p-4">
-      <button
-        type="button"
-        class="btn w-full border-0 bg-blue-900 text-white shadow-none hover:bg-blue-900"
-        @click="emit('saveData')"
-      >
-        <i-lucide-save class="text-sm" />
-        설명 저장하기
-      </button>
-    </div>
-  </aside>
-
-  <button
-    type="button"
-    class="absolute right-0 top-1/2 z-20 flex h-14 w-8 -translate-y-1/2 items-center justify-center rounded-l-2xl bg-slate-900 text-slate-200 shadow-lg hover:bg-slate-800"
-    :class="isOpen ? '-translate-x-[22rem]' : 'translate-x-0'"
-    @click="emit('update:isOpen', !isOpen)"
-  >
-    <i-lucide-chevron-right v-if="isOpen" class="text-sm" />
-    <i-lucide-chevron-left v-else class="text-sm" />
-  </button>
+</section>
 </template>
 
 <script setup lang="ts">
-import type { Card } from '@/types'
+interface FunctionalityItem {
+  id: string
+  orderNo: number
+  content: string
+}
 
-
-defineProps<{
-  isOpen: boolean
-  cards: Card[]
-  dragCardId: string | null
-  overCardId: string | null
+const props = defineProps<{
+  items: FunctionalityItem[]
 }>()
 
 const emit = defineEmits<{
-  'update:isOpen': [value: boolean]
-  'update:dragCardId': [value: string | null]
-  'update:overCardId': [value: string | null]
-  moveCard: [targetId: string]
-  removeAnno: [annotationId: string]
-  setText: [annotationId: string, text: string]
-  saveData: []
+  reorder: [
+    payload: {
+      visibleIds: string[]
+      fromIndex: number
+      toIndex: number
+    }
+  ]
 }>()
 
-const handleDragEnd = (): void => {
-  emit('update:dragCardId', null)
-  emit('update:overCardId', null)
+const localItems = computed(() => props.items)
+const searchQuery = ref('')
+const compactMode = ref(true)
+const expandedItemIds = ref<string[]>([])
+const funcListRef = ref<HTMLDivElement | null>(null)
+
+const filteredItems = computed(() => {
+  const query = searchQuery.value.trim().toLowerCase()
+  if (!query) return localItems.value
+
+  return localItems.value.filter((item) => item.content.toLowerCase().includes(query))
+})
+
+const isExpanded = (id: string): boolean => expandedItemIds.value.includes(id)
+
+const toggleExpanded = (id: string): void => {
+  if (isExpanded(id)) {
+    expandedItemIds.value = expandedItemIds.value.filter((itemId) => itemId !== id)
+    return
+  }
+
+  expandedItemIds.value = [...expandedItemIds.value, id]
 }
+
+const focusEditor = (id: string): void => {
+  const target = funcListRef.value?.querySelector(
+    `textarea[data-editor-id="${id}"]`
+  ) as HTMLTextAreaElement | null
+  target?.focus()
+}
+
+const openItemEditor = (id: string): void => {
+  if (!isExpanded(id)) {
+    expandedItemIds.value = [...expandedItemIds.value, id]
+    void nextTick(() => {
+      focusEditor(id)
+    })
+    return
+  }
+
+  focusEditor(id)
+}
+
+useDraggable(funcListRef, localItems, {
+  handle: '.drag-handle',
+  animation: 150,
+  onEnd: (event) => {
+    const { oldIndex, newIndex } = event
+    if (
+      oldIndex === undefined ||
+      newIndex === undefined ||
+      oldIndex === newIndex ||
+      oldIndex < 0 ||
+      newIndex < 0
+    ) {
+      return
+    }
+
+    const visibleIds = filteredItems.value.map((item) => item.id)
+    const fromId = visibleIds[oldIndex]
+    const toId = visibleIds[newIndex]
+    if (!fromId || !toId || fromId === toId) return
+
+    emit('reorder', { visibleIds, fromIndex: oldIndex, toIndex: newIndex })
+  }
+})
 </script>

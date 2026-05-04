@@ -29,6 +29,7 @@ declare global {
   const getCurrentInstance: typeof import('vue').getCurrentInstance
   const getCurrentScope: typeof import('vue').getCurrentScope
   const getCurrentWatcher: typeof import('vue').getCurrentWatcher
+  const getDocDetail: typeof import('./database/index').getDocDetail
   const getDocList: typeof import('./database/index').getDocList
   const getProject: typeof import('./database/index').getProject
   const getProjects: typeof import('./database/index').getProjects
@@ -85,6 +86,9 @@ declare global {
   const unref: typeof import('vue').unref
   const updateCaptureName: typeof import('./database/index').updateCaptureName
   const updateCapturePath: typeof import('./database/index').updateCapturePath
+  const updateDoc: typeof import('./database/index').updateDoc
+  const updateDocAnnotation: typeof import('./database/index').updateDocAnnotation
+  const updateDocSortOrders: typeof import('./database/index').updateDocSortOrders
   const updateProject: typeof import('./database/index').updateProject
   const useAttrs: typeof import('vue').useAttrs
   const useContextMenu: typeof import('./composables/useContextMenu').useContextMenu
@@ -120,7 +124,7 @@ declare global {
   export type { UseDragSelectOptions, UseDragSelectReturn } from './composables/useDragSelect'
   import('./composables/useDragSelect')
   // @ts-ignore
-  export type { CaptureImage } from './types/index'
+  export type { CaptureImage, ToolMode, CanvasAnnotation, AnnotationItem, ContentItem, Card, EditorDocGroup, EditorDoc } from './types/index'
   import('./types/index')
   // @ts-ignore
   export type { WorkspaceDetail } from './database/index'
@@ -207,6 +211,9 @@ declare module 'vue' {
     readonly triggerRef: UnwrapRef<typeof import('vue')['triggerRef']>
     readonly unref: UnwrapRef<typeof import('vue')['unref']>
     readonly updateCaptureName: UnwrapRef<typeof import('./database/index')['updateCaptureName']>
+    readonly updateDoc: UnwrapRef<typeof import('./database/index')['updateDoc']>
+    readonly updateDocAnnotation: UnwrapRef<typeof import('./database/index')['updateDocAnnotation']>
+    readonly updateDocSortOrders: UnwrapRef<typeof import('./database/index')['updateDocSortOrders']>
     readonly updateProject: UnwrapRef<typeof import('./database/index')['updateProject']>
     readonly useAttrs: UnwrapRef<typeof import('vue')['useAttrs']>
     readonly useContextMenu: UnwrapRef<typeof import('./composables/useContextMenu')['useContextMenu']>

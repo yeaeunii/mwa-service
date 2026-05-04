@@ -36,7 +36,7 @@ const router = createRouter({
       component: WorkspaceDetail
     },
     {
-      path: '/workspace/:id/documents',
+      path: '/workspace/:id/documents/:docId?',
       name: 'docs-index',
       component: DocsIndex
     },

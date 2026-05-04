@@ -1,5 +1,5 @@
 import { app } from 'electron'
-import { existsSync, mkdirSync } from 'fs'
+import { copyFileSync, existsSync, mkdirSync } from 'fs'
 import { unlink, writeFile } from 'fs/promises'
 import path from 'path'
 import { selectList,selectOne,  runQuery } from './conn'
@@ -374,7 +374,7 @@ export const deleteCapture = async (capture: Record<string, unknown>): Promise<v
 }
 
 //문서 생성
-export const createDoc = (doc: Record<string, unknown>): number => {
+export const createDoc = (doc: Record<string, unknown>): { id: number; orgnImgPath: string } => {
   const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
   const query = `
     INSERT INTO t_doc (
@@ -410,7 +410,10 @@ export const createDoc = (doc: Record<string, unknown>): number => {
   const payload = {
     description: '',
     status: '작업대기',
-    docMetaJson: '{}',
+    docMetaJson: JSON.stringify({
+      writer: '담당자',
+      entry_path: ''
+    }),
     contentJson: '[]',
     annotationJson: '[]',
     orgnImgPath: '',
@@ -422,11 +425,64 @@ export const createDoc = (doc: Record<string, unknown>): number => {
   }
 
   const result = runQuery(query, payload)
-  return Number(result.lastInsertRowid)
+  const docId = Number(result.lastInsertRowid)
+  const sourceImgPath = String(payload.orgnImgPath ?? '')
+  let orgnImgPath = sourceImgPath
+
+  if (sourceImgPath) {
+    const fileRootDir = path.join(app.getPath('userData'), 'FILE')
+    const docsDir = path.join(fileRootDir, 'DOCS')
+    const relativePath = sourceImgPath.replace(/\\/g, '/').replace(/^\/+/, '')
+    const sourceAbsPath = path.resolve(app.getPath('userData'), relativePath)
+    const resolvedBase = path.resolve(fileRootDir)
+    const normalizedBase = resolvedBase + path.sep
+    const isInsideBase = sourceAbsPath === resolvedBase || sourceAbsPath.startsWith(normalizedBase)
+
+    if (!isInsideBase) {
+      throw new Error(`Forbidden file path: ${sourceImgPath}`)
+    }
+
+    if (existsSync(sourceAbsPath)) {
+      if (!existsSync(docsDir)) {
+        mkdirSync(docsDir, { recursive: true })
+      }
+
+      const docImgName = `orgnImg_${docId}.png`
+      const docImgAbsPath = path.join(docsDir, docImgName)
+      const docImgPath = path.join('FILE', 'DOCS', docImgName).replace(/\\/g, '/')
+
+      copyFileSync(sourceAbsPath, docImgAbsPath)
+      orgnImgPath = docImgPath
+      runQuery(
+        `
+          UPDATE t_doc
+          SET orgn_img_path = @orgnImgPath,
+              updated_at = @updated_at
+          WHERE id = @id
+        `,
+        {
+          id: docId,
+          orgnImgPath: docImgPath,
+          updated_at: now
+        }
+      )
+    }
+  }
+
+  return {
+    id: docId,
+    orgnImgPath
+  }
 }
 
 //문서 조회
 export const getDocList = (params: Record<string, unknown>) => {
+  const queryParams = {
+    id: null,
+    workspaceId: null,
+    ...params
+  }
+
   const query = `
     SELECT
       id,
@@ -443,11 +499,69 @@ export const getDocList = (params: Record<string, unknown>) => {
       created_at,
       updated_at
     FROM t_doc
-    WHERE workspace_id = @workspaceId
+    WHERE (@workspaceId IS NULL OR workspace_id = @workspaceId)
+      AND (@id IS NULL OR id = @id)
     ORDER BY sort_order ASC, id ASC
   `
 
-  return selectList(query, params)
+  return selectList(query, queryParams)
+}
+
+//문서 내용 수정
+export const updateDoc = (doc: Record<string, unknown>): void => {
+  const query = `
+    UPDATE t_doc
+    SET title = @title,
+        description = @description,
+        doc_meta_json = @docMetaJson,
+        updated_at = @updated_at
+    WHERE id = @id
+  `
+
+  runQuery(query, {
+    id: doc.id,
+    title: doc.title,
+    description: doc.description,
+    docMetaJson: doc.docMetaJson,
+    updated_at: dayjs().format('YYYY-MM-DD HH:mm:ss')
+  })
+}
+
+const saveDrawImage = async (docId: number, drawDataUrl: string): Promise<string | null> => {
+  const base64Data = drawDataUrl.replace(/^data:image\/\w+;base64,/, '')
+  if (!base64Data) return null
+
+  const docsDir = path.join(app.getPath('userData'), 'FILE', 'DOCS')
+  mkdirSync(docsDir, { recursive: true })
+
+  const drawImgName = `drawImg_${docId}.png`
+  const drawImgAbsPath = path.join(docsDir, drawImgName)
+  await writeFile(drawImgAbsPath, Buffer.from(base64Data, 'base64'))
+
+  return path.join('FILE', 'DOCS', drawImgName).replace(/\\/g, '/')
+}
+
+//문서 어노테이션/기능 내용 수정
+export const updateDocAnnotation = async (doc: Record<string, unknown>): Promise<void> => {
+  const docId = Number(doc.id)
+  const drawDataUrl = typeof doc.drawDataUrl === 'string' ? doc.drawDataUrl : ''
+  const drawImgPath = drawDataUrl ? await saveDrawImage(docId, drawDataUrl) : null
+  const query = `
+    UPDATE t_doc
+    SET content_json = @contentJson,
+        annotation_json = @annotationJson,
+        draw_img_path = COALESCE(@drawImgPath, draw_img_path),
+        updated_at = @updated_at
+    WHERE id = @id
+  `
+
+  runQuery(query, {
+    id: docId,
+    contentJson: doc.contentJson,
+    annotationJson: doc.annotationJson,
+    drawImgPath,
+    updated_at: dayjs().format('YYYY-MM-DD HH:mm:ss')
+  })
 }
 
 //문서 삭제
@@ -458,4 +572,23 @@ export const deleteDoc = (id: string | number): void => {
   `
 
   runQuery(query, { id })
+}
+
+//문서 정렬 순서 수정
+export const updateDocSortOrders = (docs: Array<{ id: number; sortOrder: number }>): void => {
+  const query = `
+    UPDATE t_doc
+    SET sort_order = @sortOrder,
+        updated_at = @updated_at
+    WHERE id = @id
+  `
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+
+  for (const doc of docs) {
+    runQuery(query, {
+      id: doc.id,
+      sortOrder: doc.sortOrder,
+      updated_at: now
+    })
+  }
 }

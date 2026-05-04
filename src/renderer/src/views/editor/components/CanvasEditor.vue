@@ -1,46 +1,85 @@
 <template>
-  <div class="relative min-h-0 flex-1 overflow-hidden bg-slate-950">
-    <div class="absolute inset-0 overflow-hidden bg-slate-950" @contextmenu.prevent>
-      <div class="flex h-full w-full items-center justify-center p-10">
+  <div ref="editorFrame" class="relative min-h-0 flex-1 overflow-hidden bg-white" @wheel="onWheel">
+    <div class="absolute inset-0 overflow-hidden bg-white" @contextmenu.prevent>
+      <div class="flex h-full w-full items-center justify-center p-4">
         <div class="relative inline-block">
           <canvas ref="canvasEl" class="border border-white/10"></canvas>
 
           <div
-            v-show="delBtnPos"
-            class="pointer-events-auto absolute z-50"
-            :style="
-              delBtnPos
-                ? {
-                    left: `${delBtnPos.left}px`,
-                    top: `${delBtnPos.top}px`
-                  }
-                : {}
-            "
+            v-if="contextMenu"
+            class="absolute z-50 w-36 overflow-hidden rounded-lg border border-base-content/10 bg-base-100 py-1 text-xs shadow-xl"
+            :style="{
+              left: `${contextMenu.left}px`,
+              top: `${contextMenu.top}px`
+            }"
+            @mousedown.stop
+            @contextmenu.prevent.stop
           >
             <button
               type="button"
-              class="flex h-10 w-10 items-center justify-center rounded-lg bg-transparent shadow-lg"
-              @click="removeSelected"
+              class="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-base-200"
+              @click="onClickLayerAction('front')"
             >
-              <i-lucide-trash-2 class="text-sm text-red-500" />
+              <i-lucide-bring-to-front class="h-3.5 w-3.5 text-primary" />
+              맨 앞으로
+            </button>
+            <button
+              type="button"
+              class="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-base-200"
+              @click="onClickLayerAction('forward')"
+            >
+              <i-lucide-arrow-up class="h-3.5 w-3.5 text-primary" />
+              앞으로
+            </button>
+            <button
+              type="button"
+              class="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-base-200"
+              @click="onClickLayerAction('backward')"
+            >
+              <i-lucide-arrow-down class="h-3.5 w-3.5 text-primary" />
+              뒤로
+            </button>
+            <button
+              type="button"
+              class="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-base-200"
+              @click="onClickLayerAction('back')"
+            >
+              <i-lucide-send-to-back class="h-3.5 w-3.5 text-primary" />
+              맨 뒤로
             </button>
           </div>
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
 <script setup lang="ts">
-import { Canvas, Circle, FabricImage, FabricText, Group, Rect, filters } from 'fabric'
-import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { Canvas,Circle,Control,FabricImage,FabricText,Group,Point,Rect,controlsUtils,filters } from 'fabric'
+import { nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import type { CanvasAnnotation, ToolMode } from '@/types'
 
 type CanvasObj = (Rect | FabricImage | Group) & {
   annotationId?: string
   annotationToolType?: CanvasAnnotation['toolType']
 }
+
+type CloneDragState = {
+  annotation: CanvasAnnotation
+  target: CanvasObj
+  preview: CanvasObj | null
+  originalLeft: number
+  originalTop: number
+  currentLeft: number
+  currentTop: number
+}
+
+type RotationState = {
+  target: CanvasObj
+  center: Point
+}
+
+// ─── Props / Emits ───
 
 const props = defineProps<{
   imageSrc: string
@@ -49,6 +88,7 @@ const props = defineProps<{
   activeColor: string
 }>()
 
+// 부모 이벤트
 const emit = defineEmits<{
   'add-annotation': [annotation: CanvasAnnotation]
   'update-annotation': [annotation: CanvasAnnotation]
@@ -61,27 +101,58 @@ const emit = defineEmits<{
     }
   ]
   'close-context-menu': []
+  'zoom-wheel': [
+    payload: {
+      deltaPct: number
+      point: {
+        x: number
+        y: number
+      }
+    }
+  ]
 }>()
 
-const CANVAS_WIDTH = 1200
-const CANVAS_HEIGHT = 700
+const MIN_CANVAS_WIDTH = 640
+const MIN_CANVAS_HEIGHT = 420
+const CANVAS_PADDING = 32
 
+// ─── Template Refs / UI State ───
+
+// DOM 참조
+const editorFrame = ref<HTMLDivElement | null>(null)
 const canvasEl = ref<HTMLCanvasElement | null>(null)
-const delBtnPos = ref<{ left: number; top: number } | null>(null)
+const contextMenu = ref<{ annotationId: string; left: number; top: number } | null>(null)
 const selectedObj = shallowRef<CanvasObj | null>(null)
 
+// ─── Fabric Runtime State ───
+
+// Fabric 인스턴스
 let canvas: Canvas | null = null
 let baseImg: FabricImage | null = null
+let resizeObserver: ResizeObserver | null = null
+
+// ─── Drawing / Clipboard State ───
+
+// 드래그 생성 상태
 let drawBox: Rect | null = null
 let drawing = false
 let startX = 0
 let startY = 0
 
+// 복제 상태
+let copiedAnnotation: CanvasAnnotation | null = null
+let cloneDragState: CloneDragState | null = null
+let rotationState: RotationState | null = null
+
+// ─── Selection State ───
+
+// 선택 해제
 const clearSel = (): void => {
   selectedObj.value = null
-  delBtnPos.value = null
+  contextMenu.value = null
 }
 
+// 선택 동기화
 const syncSel = (): void => {
   if (!canvas) return
 
@@ -92,14 +163,28 @@ const syncSel = (): void => {
   }
 
   selectedObj.value = activeObj as CanvasObj
-  const bounds = activeObj.getBoundingRect()
-
-  delBtnPos.value = {
-    left: bounds.left + bounds.width - 34,
-    top: Math.max(0, bounds.top - 40)
-  }
 }
 
+// ─── Viewport / Image Export ───
+
+// Ctrl 휠 확대
+const onWheel = (event: WheelEvent): void => {
+  if (!event.ctrlKey || !canvas) return
+
+  event.preventDefault()
+
+  const rect = canvas.upperCanvasEl.getBoundingClientRect()
+
+  emit('zoom-wheel', {
+    deltaPct: event.deltaY < 0 ? 5 : -5,
+    point: {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top
+    }
+  })
+}
+
+// 전체 확대
 const applyZoom = (nextPct: number): void => {
   if (!canvas) return
 
@@ -107,6 +192,15 @@ const applyZoom = (nextPct: number): void => {
   canvas.requestRenderAll()
 }
 
+// 지점 확대
+const applyZoomAtPoint = (nextPct: number, point: { x: number; y: number }): void => {
+  if (!canvas) return
+
+  canvas.zoomToPoint(new Point(point.x, point.y), nextPct / 100)
+  canvas.requestRenderAll()
+}
+
+// 뷰포트 초기화
 const resetViewport = (): void => {
   if (!canvas) return
 
@@ -114,6 +208,39 @@ const resetViewport = (): void => {
   canvas.requestRenderAll()
 }
 
+// 원본 회전
+const rotateBaseImageCCW90 = (): void => {
+  if (!canvas || !baseImg) return
+
+  const nextAngle = (baseImg.angle ?? 0) - 90
+  baseImg.set({
+    angle: nextAngle
+  })
+
+  baseImg.setCoords()
+  canvas.requestRenderAll()
+}
+
+// 선택 회전
+const rotateSelectedAnnotationCCW90 = (): void => {
+  if (!canvas || !selectedObj.value?.annotationId) return
+
+  const centerPoint = selectedObj.value.getCenterPoint()
+  const nextAngle = ((selectedObj.value.angle ?? 0) - 90) % 360
+  selectedObj.value.set({
+    angle: nextAngle
+  })
+  selectedObj.value.setPositionByOrigin(centerPoint, 'center', 'center')
+  selectedObj.value.setCoords()
+  canvas.setActiveObject(selectedObj.value)
+  syncSel()
+  canvas.requestRenderAll()
+  emitObjectUpdate(selectedObj.value, {
+    angle: nextAngle
+  })
+}
+
+// 원본 영역
 const getImgBounds = (): { left: number; top: number; width: number; height: number } | null => {
   if (!baseImg) return null
 
@@ -128,6 +255,30 @@ const getImgBounds = (): { left: number; top: number; width: number; height: num
   }
 }
 
+// PNG export
+const exportImageDataURL = (): string | null => {
+  if (!canvas) return null
+
+  const bounds = getImgBounds()
+  if (!bounds) {
+    return canvas.toDataURL({
+      format: 'png',
+      multiplier: 1
+    })
+  }
+
+  return canvas.toDataURL({
+    format: 'png',
+    left: bounds.left,
+    top: bounds.top,
+    width: bounds.width,
+    height: bounds.height,
+    multiplier: 1
+  })
+}
+
+// ─── Annotation Lookup / Metadata ───
+
 const findAnnotation = (annotationId?: string): CanvasAnnotation | null =>
   props.annotations.find((annotation) => annotation.id === annotationId) ?? null
 
@@ -141,18 +292,93 @@ const setAnnotationMeta = (
   return obj
 }
 
+const rotateControlIcon = new Image()
+rotateControlIcon.src =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 12a9 9 0 1 1-2.64-6.36" stroke="#262626" stroke-width="5"/>
+      <path d="M21 3v6h-6" stroke="#262626" stroke-width="5"/>
+      <path d="M21 12a9 9 0 1 1-2.64-6.36" stroke="#ffffff" stroke-width="2.4"/>
+      <path d="M21 3v6h-6" stroke="#ffffff" stroke-width="2.4"/>
+    </svg>
+  `)
+
+// 회전 아이콘
+const renderRotateControl = (
+  ctx: CanvasRenderingContext2D,
+  left: number,
+  top: number
+): void => {
+  ctx.save()
+
+//회전아이콘과 객체 잇는 선
+  // ctx.strokeStyle = '#a3a3a3'
+  // ctx.lineWidth = 1.5
+  // ctx.beginPath()
+  // ctx.moveTo(left, top + 12)
+  // ctx.lineTo(left, top + 31)
+  // ctx.stroke()
+
+  ctx.drawImage(rotateControlIcon, left - 12, top - 12, 24, 24)
+  ctx.restore()
+}
+
+const enableRotationControl = (obj: CanvasObj): CanvasObj => {
+  obj.set({
+    lockRotation: false,
+    centeredRotation: true
+  })
+  obj.controls.mtr = new Control({
+    x: 0,
+    y: -0.5,
+    offsetY: -34,
+    cursorStyle: 'grab',
+    actionHandler: controlsUtils.rotationWithSnapping,
+    render: renderRotateControl
+  })
+
+  return obj
+}
+
 const findCanvasObject = (annotationId: string): CanvasObj | null => {
   if (!canvas) return null
 
   return (
-    canvas.getObjects().find((obj) => (obj as CanvasObj).annotationId === annotationId) as
+    (canvas.getObjects().find((obj) => (obj as CanvasObj).annotationId === annotationId) as
       | CanvasObj
       | undefined
-      | null
-  ) ?? null
+      | null) ?? null
+  )
 }
 
+// ─── Layer Z-Index Sync ───
 
+// zIndex 동기화
+const syncAnnotationZIndexFromCanvas = (): void => {
+  if (!canvas) return
+
+  const annotationObjects = canvas
+    .getObjects()
+    .filter((obj) => (obj as CanvasObj).annotationId) as CanvasObj[]
+
+  annotationObjects.forEach((obj, index) => {
+    const annotation = findAnnotation(obj.annotationId)
+    if (!annotation) return
+
+    const nextZIndex = index + 1
+    if (annotation.zIndex === nextZIndex) return
+
+    emit('update-annotation', {
+      ...annotation,
+      zIndex: nextZIndex
+    })
+  })
+}
+
+// ─── Layer Ordering ───
+
+// 레이어 이동
 const bringToFront = (annotationId: string): void => {
   if (!canvas) return
 
@@ -168,6 +394,7 @@ const bringToFront = (annotationId: string): void => {
   canvas.setActiveObject(obj)
   syncSel()
   canvas.requestRenderAll()
+  syncAnnotationZIndexFromCanvas()
 }
 
 const sendToBack = (annotationId: string): void => {
@@ -185,6 +412,7 @@ const sendToBack = (annotationId: string): void => {
   canvas.setActiveObject(obj)
   syncSel()
   canvas.requestRenderAll()
+  syncAnnotationZIndexFromCanvas()
 }
 
 const bringForward = (annotationId: string): void => {
@@ -197,6 +425,7 @@ const bringForward = (annotationId: string): void => {
   canvas.setActiveObject(obj)
   syncSel()
   canvas.requestRenderAll()
+  syncAnnotationZIndexFromCanvas()
 }
 
 const sendBackwards = (annotationId: string): void => {
@@ -214,10 +443,25 @@ const sendBackwards = (annotationId: string): void => {
   canvas.setActiveObject(obj)
   syncSel()
   canvas.requestRenderAll()
+  syncAnnotationZIndexFromCanvas()
 }
 
+const onClickLayerAction = (action: 'front' | 'forward' | 'backward' | 'back'): void => {
+  const annotationId = contextMenu.value?.annotationId
+  if (!annotationId) return
 
+  if (action === 'front') bringToFront(annotationId)
+  if (action === 'forward') bringForward(annotationId)
+  if (action === 'backward') sendBackwards(annotationId)
+  if (action === 'back') sendToBack(annotationId)
 
+  contextMenu.value = null
+  emit('close-context-menu')
+}
+
+// ─── Fabric Object Builders ───
+
+// 객체 생성
 const makeNumberMarker = (annotation: CanvasAnnotation): CanvasObj => {
   const circle = new Circle({
     radius: 14,
@@ -250,26 +494,26 @@ const makeNumberMarker = (annotation: CanvasAnnotation): CanvasObj => {
   )
 }
 
-const makeBox = (annotation: CanvasAnnotation): CanvasObj =>
-  setAnnotationMeta(
-    new Rect({
-      left: annotation.x,
-      top: annotation.y,
-      originX: 'left',
-      originY: 'top',
-      width: annotation.width ?? 0,
-      height: annotation.height ?? 0,
-      fill: annotation.toolType === 'filled-box' ? annotation.color : 'transparent',
-      stroke: annotation.color,
-      strokeWidth: 2,
-      selectable: true,
-      evented: true,
-      hasControls: true,
-      hasBorders: true
-    }) as CanvasObj,
-    annotation.id,
-    annotation.toolType
-  )
+const makeBox = (annotation: CanvasAnnotation): CanvasObj => {
+  const rect = new Rect({
+    left: annotation.x,
+    top: annotation.y,
+    originX: 'left',
+    originY: 'top',
+    angle: annotation.angle ?? 0,
+    width: annotation.width ?? 0,
+    height: annotation.height ?? 0,
+    fill: annotation.toolType === 'filled-box' ? annotation.color : 'transparent',
+    stroke: annotation.color,
+    strokeWidth: 2,
+    selectable: true,
+    evented: true,
+    hasControls: true,
+    hasBorders: true
+  }) as CanvasObj
+
+  return enableRotationControl(setAnnotationMeta(rect, annotation.id, annotation.toolType))
+}
 
 const makeMosaic = (annotation: CanvasAnnotation): CanvasObj | null => {
   if (!baseImg) return null
@@ -302,6 +546,7 @@ const makeMosaic = (annotation: CanvasAnnotation): CanvasObj | null => {
     height: sourceHeight,
     originX: 'left',
     originY: 'top',
+    angle: annotation.angle ?? 0,
     scaleX: clippedWidth / sourceWidth,
     scaleY: clippedHeight / sourceHeight,
     selectable: true,
@@ -314,7 +559,9 @@ const makeMosaic = (annotation: CanvasAnnotation): CanvasObj | null => {
   mosaicPiece.filters = [new filters.Pixelate({ blocksize })]
   mosaicPiece.applyFilters()
 
-  return setAnnotationMeta(mosaicPiece as CanvasObj, annotation.id, annotation.toolType)
+  return enableRotationControl(
+    setAnnotationMeta(mosaicPiece as CanvasObj, annotation.id, annotation.toolType)
+  )
 }
 
 const buildObject = (annotation: CanvasAnnotation): CanvasObj | null => {
@@ -323,6 +570,9 @@ const buildObject = (annotation: CanvasAnnotation): CanvasObj | null => {
   return makeBox(annotation)
 }
 
+// ─── Canvas Rendering / Resizing ───
+
+// 캔버스 동기화
 const syncCanvasObjects = (): void => {
   if (!canvas) return
 
@@ -367,6 +617,7 @@ const syncCanvasObjects = (): void => {
   canvas.requestRenderAll()
 }
 
+// 원본 이미지 로드
 const drawImage = async (): Promise<void> => {
   if (!canvas) return
 
@@ -385,13 +636,15 @@ const drawImage = async (): Promise<void> => {
   const image = await FabricImage.fromURL(props.imageSrc)
   const imageWidth = image.width ?? 1
   const imageHeight = image.height ?? 1
-  const scale = Math.min(CANVAS_WIDTH / imageWidth, CANVAS_HEIGHT / imageHeight)
+  const canvasWidth = canvas.getWidth()
+  const canvasHeight = canvas.getHeight()
+  const scale = Math.min(canvasWidth / imageWidth, canvasHeight / imageHeight)
 
   image.set({
     originX: 'center',
     originY: 'center',
-    left: CANVAS_WIDTH / 2,
-    top: CANVAS_HEIGHT / 2,
+    left: canvasWidth / 2,
+    top: canvasHeight / 2,
     scaleX: scale,
     scaleY: scale,
     selectable: false,
@@ -406,6 +659,24 @@ const drawImage = async (): Promise<void> => {
   syncCanvasObjects()
 }
 
+// 캔버스 리사이즈
+const resizeCanvasToFrame = (): void => {
+  if (!canvas || !editorFrame.value) return
+
+  const nextWidth = Math.max(MIN_CANVAS_WIDTH, editorFrame.value.clientWidth - CANVAS_PADDING)
+  const nextHeight = Math.max(MIN_CANVAS_HEIGHT, editorFrame.value.clientHeight - CANVAS_PADDING)
+
+  if (canvas.getWidth() === nextWidth && canvas.getHeight() === nextHeight) return
+
+  canvas.setDimensions({
+    width: nextWidth,
+    height: nextHeight
+  })
+
+  void drawImage()
+}
+
+// 다음 번호
 const getNextNumber = (): number => {
   const numbers = props.annotations
     .filter((annotation) => annotation.toolType === 'number')
@@ -414,6 +685,207 @@ const getNextNumber = (): number => {
   return (numbers.length ? Math.max(...numbers) : 0) + 1
 }
 
+// ─── Copy / Clone / Keyboard Movement ───
+
+// 복사 붙여넣기
+const copySelectedAnnotation = (): void => {
+  const annotation = findAnnotation(selectedObj.value?.annotationId)
+  if (!annotation || annotation.toolType === 'number') return
+
+  copiedAnnotation = {
+    ...annotation,
+    number: undefined,
+    order: undefined
+  }
+}
+
+const pasteCopiedAnnotation = (): void => {
+  if (!copiedAnnotation) return
+
+  const nextAnnotation: CanvasAnnotation = {
+    ...copiedAnnotation,
+    id: `ann-${Date.now()}`,
+    x: copiedAnnotation.x + 16,
+    y: copiedAnnotation.y + 16,
+    zIndex: props.annotations.length + 1
+  }
+
+  copiedAnnotation = nextAnnotation
+  emit('add-annotation', nextAnnotation)
+}
+
+// 방향키 이동
+const moveSelectedByKeyboard = (deltaX: number, deltaY: number): void => {
+  if (!canvas || !selectedObj.value?.annotationId) return
+
+  selectedObj.value.set({
+    left: (selectedObj.value.left ?? 0) + deltaX,
+    top: (selectedObj.value.top ?? 0) + deltaY
+  })
+  selectedObj.value.setCoords()
+  syncSel()
+  canvas.requestRenderAll()
+  emitObjectUpdate(selectedObj.value)
+}
+
+// Ctrl 드래그 시작
+const startCloneDrag = (target: CanvasObj): void => {
+  if (!canvas) return
+
+  const annotation = findAnnotation(target.annotationId)
+  if (!annotation || annotation.toolType === 'number') return
+
+  const preview = buildObject({
+    ...annotation,
+    id: `preview-${annotation.id}`
+  })
+
+  if (preview) {
+    preview.annotationId = undefined
+    preview.selectable = false
+    preview.evented = false
+    preview.opacity = 0.85
+    canvas.add(preview)
+    canvas.bringObjectToFront(preview)
+  }
+
+  cloneDragState = {
+    annotation,
+    target,
+    preview,
+    originalLeft: target.left ?? annotation.x,
+    originalTop: target.top ?? annotation.y,
+    currentLeft: target.left ?? annotation.x,
+    currentTop: target.top ?? annotation.y
+  }
+}
+
+// Ctrl 드래그 완료
+const finishCloneDrag = (target: CanvasObj): boolean => {
+  if (!cloneDragState || cloneDragState.target !== target) return false
+
+  const cloneState = cloneDragState
+  const droppedLeft = cloneDragState.currentLeft
+  const droppedTop = cloneDragState.currentTop
+
+  target.set({
+    left: cloneDragState.originalLeft,
+    top: cloneDragState.originalTop
+  })
+  target.setCoords()
+
+  if (cloneState.preview && canvas) {
+    canvas.remove(cloneState.preview)
+  }
+
+  const nextAnnotation: CanvasAnnotation = {
+    ...cloneState.annotation,
+    id: `ann-${Date.now()}`,
+    x: droppedLeft,
+    y: droppedTop,
+    zIndex: props.annotations.length + 1
+  }
+
+  cloneDragState = null
+  canvas?.setActiveObject(target)
+  syncSel()
+  canvas?.requestRenderAll()
+  emit('add-annotation', nextAnnotation)
+  return true
+}
+
+// 이동 중 처리
+const onObjectMoving = (target?: CanvasObj): void => {
+  if (cloneDragState && target && cloneDragState.target === target) {
+    cloneDragState.currentLeft = target.left ?? cloneDragState.currentLeft
+    cloneDragState.currentTop = target.top ?? cloneDragState.currentTop
+
+    cloneDragState.preview?.set({
+      left: cloneDragState.currentLeft,
+      top: cloneDragState.currentTop
+    })
+    cloneDragState.preview?.setCoords()
+
+    target.set({
+      left: cloneDragState.originalLeft,
+      top: cloneDragState.originalTop
+    })
+    target.setCoords()
+    canvas?.requestRenderAll()
+  }
+
+  syncSel()
+}
+
+// 회전 중 처리
+const onObjectRotating = (target?: CanvasObj): void => {
+  if (!target?.annotationId) return
+
+  if (!rotationState || rotationState.target !== target) {
+    rotationState = {
+      target,
+      center: target.getCenterPoint()
+    }
+  }
+
+  target.setPositionByOrigin(rotationState.center, 'center', 'center')
+  target.setCoords()
+  syncSel()
+}
+
+// 단축키
+const onKeyDown = (event: KeyboardEvent): void => {
+  const target = event.target as HTMLElement | null
+  const isEditableTarget =
+    target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable
+
+  if (isEditableTarget) return
+
+  const key = event.key.toLowerCase()
+  if (key === 'delete' ) {
+    event.preventDefault()
+    removeSelected()
+    return
+  }
+
+  const moveStep = event.shiftKey ? 10 : 1
+  if (key === 'arrowleft') {
+    event.preventDefault()
+    moveSelectedByKeyboard(-moveStep, 0)
+    return
+  }
+  if (key === 'arrowright') {
+    event.preventDefault()
+    moveSelectedByKeyboard(moveStep, 0)
+    return
+  }
+  if (key === 'arrowup') {
+    event.preventDefault()
+    moveSelectedByKeyboard(0, -moveStep)
+    return
+  }
+  if (key === 'arrowdown') {
+    event.preventDefault()
+    moveSelectedByKeyboard(0, moveStep)
+    return
+  }
+
+  if (!event.ctrlKey) return
+
+  if (key === 'c') {
+    copySelectedAnnotation()
+    return
+  }
+
+  if (key === 'v') {
+    event.preventDefault()
+    pasteCopiedAnnotation()
+  }
+}
+
+// ─── Annotation Data Sync ───
+
+// 객체 변경 반영
 const emitObjectUpdate = (obj: CanvasObj, overrides?: Partial<CanvasAnnotation>): void => {
   const current = findAnnotation(obj.annotationId)
   if (!current) return
@@ -423,6 +895,7 @@ const emitObjectUpdate = (obj: CanvasObj, overrides?: Partial<CanvasAnnotation>)
       ...current,
       x: obj.left ?? current.x,
       y: obj.top ?? current.y,
+      angle: obj.angle ?? current.angle ?? 0,
       ...overrides
     })
     return
@@ -432,12 +905,14 @@ const emitObjectUpdate = (obj: CanvasObj, overrides?: Partial<CanvasAnnotation>)
     ...current,
     x: obj.left ?? current.x,
     y: obj.top ?? current.y,
+    angle: obj.angle ?? current.angle ?? 0,
     width: (obj.width ?? current.width ?? 0) * (obj.scaleX ?? 1),
     height: (obj.height ?? current.height ?? 0) * (obj.scaleY ?? 1),
     ...overrides
   })
 }
 
+// 임시 박스
 const startBox = (left: number, top: number): void => {
   if (!canvas) return
 
@@ -464,83 +939,123 @@ const startBox = (left: number, top: number): void => {
   canvas.add(drawBox)
 }
 
+// ─── Delete / Fabric Event Wiring ───
+
+// 선택 삭제
 const removeSelected = (): void => {
-  if (!canvas || !selectedObj.value?.annotationId) return
-  emit('remove-annotation', selectedObj.value.annotationId)
+  if (!canvas) return
+
+  const activeObj = canvas.getActiveObject()
+  const activeObjects =
+    activeObj && 'getObjects' in activeObj
+      ? ((activeObj as unknown as { getObjects: () => CanvasObj[] }).getObjects() ?? [])
+      : selectedObj.value
+        ? [selectedObj.value]
+        : []
+
+  const annotationIds = activeObjects
+    .map((obj) => obj.annotationId)
+    .filter((annotationId): annotationId is string => Boolean(annotationId))
+
+  if (annotationIds.length === 0) return
+
+  canvas.discardActiveObject()
+  clearSel()
+  annotationIds.forEach((annotationId) => emit('remove-annotation', annotationId))
 }
 
+// Fabric 이벤트
 const setupCanvas = (): void => {
   if (!canvasEl.value) return
 
   canvas = new Canvas(canvasEl.value, {
-    width: CANVAS_WIDTH,
-    height: CANVAS_HEIGHT,
+    width: MIN_CANVAS_WIDTH,
+    height: MIN_CANVAS_HEIGHT,
     selection: true
   })
 
   canvas.on('selection:created', syncSel)
   canvas.on('selection:updated', syncSel)
   canvas.on('selection:cleared', clearSel)
-  canvas.on('object:moving', syncSel)
+  canvas.on('object:moving', (event) => {
+    onObjectMoving(event.target as CanvasObj | undefined)
+  })
   canvas.on('object:scaling', syncSel)
+  canvas.on('object:rotating', (event) => {
+    onObjectRotating(event.target as CanvasObj | undefined)
+  })
   canvas.on('object:modified', (event) => {
     syncSel()
     const target = event.target as CanvasObj | undefined
     if (!target?.annotationId) return
+    if (finishCloneDrag(target)) return
     emitObjectUpdate(target)
+    rotationState = null
   })
 
-canvas.on('mouse:down', (event) => {
-  if (!canvas) return
+  canvas.on('mouse:down', (event) => {
+    if (!canvas) return
 
-  const mouseEvent = event.e as MouseEvent
+    const mouseEvent = event.e as MouseEvent
+    const target = event.target as CanvasObj | undefined
 
-  if (mouseEvent.button === 2) {
-    if (event.target) {
-      const target = event.target as CanvasObj
-      const annotationId = target.annotationId
+    if (mouseEvent.button === 2) {
+      if (target) {
+        const annotationId = target.annotationId
 
-      if (annotationId) {
-        canvas.setActiveObject(target)
-        syncSel()
+        if (annotationId) {
+          canvas.setActiveObject(target)
+          syncSel()
+          contextMenu.value = {
+            annotationId,
+            left: mouseEvent.offsetX,
+            top: mouseEvent.offsetY
+          }
 
-        emit('open-context-menu', {
-          annotationId,
-          left: mouseEvent.offsetX,
-          top: mouseEvent.offsetY
-        })
-        return
+          emit('open-context-menu', {
+            annotationId,
+            left: mouseEvent.offsetX,
+            top: mouseEvent.offsetY
+          })
+          return
+        }
       }
+
+      contextMenu.value = null
+      emit('close-context-menu')
+      return
     }
 
+    contextMenu.value = null
     emit('close-context-menu')
-    return
-  }
 
-  emit('close-context-menu')
+    if (target) {
+      if (mouseEvent.ctrlKey && target.annotationId) {
+        startCloneDrag(target)
+      }
+      return
+    }
 
-  if (event.target) return
+    const pointer = canvas.getScenePoint(event.e)
 
-  const pointer = canvas.getScenePoint(event.e)
+    if (props.activeTool === 'number') {
+      const nextNumber = getNextNumber()
+      emit('add-annotation', {
+        id: `ann-${Date.now()}`,
+        toolType: 'number',
+        color: props.activeColor,
+        number: nextNumber,
+        order: nextNumber,
+        x: pointer.x,
+        y: pointer.y,
+        zIndex: props.annotations.length + 1
+      })
+      return
+    }
 
-  if (props.activeTool === 'number') {
-    const nextNumber = getNextNumber()
-    emit('add-annotation', {
-      id: `ann-${Date.now()}`,
-      toolType: 'number',
-      color: props.activeColor,
-      number: nextNumber,
-      order: nextNumber,
-      x: pointer.x,
-      y: pointer.y,
-      zIndex: props.annotations.length + 1
-    })
-    return
-  }
-
-  if (!['strokebox', 'filled-box', 'mosaic'].includes(props.activeTool ?? '')) return
-  startBox(pointer.x, pointer.y)
-})
+    if (!['strokebox', 'filled-box', 'mosaic'].includes(props.activeTool ?? '')) return
+    startBox(pointer.x, pointer.y)
+  })
 
   canvas.on('mouse:move', (event) => {
     if (!canvas || !drawing || !drawBox) return
@@ -588,6 +1103,8 @@ canvas.on('mouse:down', (event) => {
   })
 }
 
+// ─── Watchers / Lifecycle ───
+
 watch(
   () => props.imageSrc,
   () => {
@@ -596,6 +1113,7 @@ watch(
   { immediate: true }
 )
 
+// annotation watch
 watch(
   () => props.annotations,
   () => {
@@ -604,11 +1122,10 @@ watch(
   { deep: true }
 )
 
+// 색상 watch
 watch(
   () => props.activeColor,
   (nextColor) => {
-    console.log(selectedObj.value)
-
     if (!selectedObj.value) return
 
     const selectedAnnotation = findAnnotation(selectedObj.value.annotationId)
@@ -639,23 +1156,42 @@ watch(
   }
 )
 
-
+// mount
 onMounted(() => {
+  window.addEventListener('keydown', onKeyDown)
   setupCanvas()
-  void drawImage()
+  void nextTick(() => {
+    resizeCanvasToFrame()
+
+    if (editorFrame.value) {
+      resizeObserver = new ResizeObserver(() => {
+        resizeCanvasToFrame()
+      })
+      resizeObserver.observe(editorFrame.value)
+    }
+  })
 })
 
+// unmount
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeyDown)
+  resizeObserver?.disconnect()
+  resizeObserver = null
   canvas?.dispose()
   canvas = null
 })
 
+// 외부 API
 defineExpose({
   setZoom: applyZoom,
+  setZoomAtPoint: applyZoomAtPoint,
   resetViewport,
   bringToFront,
   sendToBack,
   bringForward,
-  sendBackwards
+  sendBackwards,
+  rotateSelectedAnnotationCCW90,
+  rotateBaseImageCCW90,
+  exportImageDataURL
 })
 </script>

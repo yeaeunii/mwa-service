@@ -1,41 +1,53 @@
 <template>
-  <div class="pointer-events-none absolute inset-x-0 bottom-5 z-10 flex justify-center px-6">
-    <div
-      class="pointer-events-auto flex items-center gap-1 rounded-2xl border border-white/10 bg-slate-900/90 p-1.5 shadow-lg"
-    >
-      <button
-        type="button"
-        class="btn btn-sm h-9 w-9 border-0 bg-slate-800 px-0 text-slate-200 shadow-none hover:bg-slate-700"
-        @click="emit('zoomOut')"
-      >
-        <i-lucide-minus class="text-sm" />
-      </button>
-      <button
-        type="button"
-        class="btn btn-sm h-9 border-0 bg-slate-800 px-3 text-sm text-slate-100 shadow-none hover:bg-slate-700"
-        @click="emit('resetZoom')"
-      >
-        {{ zoomPct }}%
-      </button>
-      <button
-        type="button"
-        class="btn btn-sm h-9 w-9 border-0 bg-slate-800 px-0 text-slate-200 shadow-none hover:bg-slate-700"
-        @click="emit('zoomIn')"
-      >
-        <i-lucide-plus class="text-sm" />
-      </button>
+  <div class="flex items-center gap-3">
+    <div class="flex items-center gap-2">
+      <span class="text-xs text-base-content/40">확대</span>
+      <input
+        :value="zoomPct"
+        class="range range-xs range-primary w-32"
+        type="range"
+        :min="minPct"
+        :max="maxPct"
+        :step="stepPct"
+        aria-label="확대"
+        @input="onInput"
+      />
+      <span class="w-10 text-right text-xs tabular-nums text-base-content/60">
+        {{ zoomLabel }}
+      </span>
     </div>
+    <div class="h-4 w-px bg-base-content/10"></div>
   </div>
 </template>
 
 <script setup lang="ts">
-defineProps<{
-  zoomPct: number
-}>()
+const props = withDefaults(
+  defineProps<{
+    zoomPct: number
+    minPct?: number
+    maxPct?: number
+    stepPct?: number
+  }>(),
+  {
+    minPct: 50,
+    maxPct: 200,
+    stepPct: 5
+  }
+)
 
 const emit = defineEmits<{
+  'update:zoomPct': [value: number]
+  zoomChange: [value: number]
   zoomIn: []
   zoomOut: []
   resetZoom: []
 }>()
+
+const zoomLabel = computed(() => `${(props.zoomPct / 100).toFixed(2)}x`)
+
+const onInput = (event: Event): void => {
+  const value = Number((event.target as HTMLInputElement).value)
+  emit('update:zoomPct', value)
+  emit('zoomChange', value)
+}
 </script>

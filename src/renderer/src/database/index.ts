@@ -129,9 +129,12 @@ export const createDoc = async (doc: {
   orgnImgPath?: string
   drawImgPath?: string
   sortOrder?: number
-}): Promise<number | null> => {
+}): Promise<{ id: number; orgnImgPath: string } | null> => {
   try {
-    return (await window.api.invoke('dao:call', 'createDoc', doc)) as number
+    return (await window.api.invoke('dao:call', 'createDoc', doc)) as {
+      id: number
+      orgnImgPath: string
+    }
   } catch (error) {
     console.error(error)
     return null
@@ -139,7 +142,8 @@ export const createDoc = async (doc: {
 }
 
 export const getDocList = async (params: {
-  workspaceId: number
+  workspaceId?: number | null
+  id?: number | null
 }): Promise<Doc[]> => {
   try {
     return (await window.api.invoke('dao:call', 'getDocList', params)) as Doc[]
@@ -149,9 +153,50 @@ export const getDocList = async (params: {
   }
 }
 
+export const updateDoc = async (doc: {
+  id: number
+  title: string
+  description: string
+  docMetaJson: string
+}): Promise<boolean> => {
+  try {
+    await window.api.invoke('dao:call', 'updateDoc', doc)
+    return true
+  } catch (error) {
+    console.error(error)
+    return false
+  }
+}
+
+export const updateDocAnnotation = async (doc: {
+  id: number
+  contentJson: string
+  annotationJson: string
+  drawDataUrl?: string | null
+}): Promise<boolean> => {
+  try {
+    await window.api.invoke('dao:call', 'updateDocAnnotation', doc)
+    return true
+  } catch (error) {
+    console.error(error)
+    return false
+  }
+}
+
 export const deleteDoc = async (id: number): Promise<void> => {
   try {
     await window.api.invoke('dao:call', 'deleteDoc', id)
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+export const updateDocSortOrders = async (docs: Array<{
+  id: number
+  sortOrder: number
+}>): Promise<void> => {
+  try {
+    await window.api.invoke('dao:call', 'updateDocSortOrders', docs)
   } catch (error) {
     console.error(error)
   }
