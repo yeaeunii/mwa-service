@@ -58,87 +58,14 @@
           >
             <i-lucide-chevron-right />
           </button>
-
-          <div
-            v-if="!props.readonly"
-            class="absolute top-0 left-0 h-full w-full flex items-center justify-center group-hover:opacity-100 opacity-0 transition-opacity duration-300"
-          >
-            <button
-              class="btn btn-sm btn-circle tooltip tooltip-bottom"
-              data-tip="닫기"
-              @click="selectedZoomImageId = null"
-            >
-              <i-lucide-x />
-            </button>
-          </div>
           <img
             :src="currentZoomItem.src"
             alt="Capture Image"
             class="mx-auto max-h-full max-w-full rounded-md object-contain"
           />
         </div>
-        <div v-else class="h-full">
-          <div
-            v-if="props.captureImageItems.length === 0"
-            class="h-full flex items-center justify-center text-center text-gray-500"
-          >
-            캡처된 이미지가 없습니다.
-          </div>
-          <div v-else class="grid grid-cols-2 gap-2">
-            <div
-              v-for="item of props.captureImageItems"
-              :key="item.id"
-              class="border border-gray-300 rounded-md overflow-hidden h-70 relative"
-              @mouseenter="
-                () => {
-                  selectedZoomImageId = null
-                  selecteImageId = item.id
-                }
-              "
-              @mouseleave="selecteImageId = null"
-            >
-              <button
-                type="button"
-                class="btn btn-xs btn-circle absolute right-2 top-2 z-20 border-primary shadow-md"
-                :class="
-                  isSelected(item.id)
-                    ? 'btn-primary text-white'
-                    : 'bg-white text-primary hover:bg-primary/10'
-                "
-                @click.stop="toggleSelectImage(item.id)"
-              >
-                <i-lucide-check class="h-3.5 w-3.5" />
-              </button>
-              <img :src="item.src" alt="Capture Image" class="w-full h-full object-cover" />
-              <div
-                class="absolute top-0 left-0 w-full h-full flex items-center justify-center bg-black/50 opacity-0 transition-opacity duration-300"
-                :class="{
-                  'opacity-100': selecteImageId === item.id && removeImageId === null
-                }"
-              >
-                <div class="flex gap-2">
-                  <button
-                    v-if="!props.readonly"
-                    class="btn btn-sm btn-circle tooltip tooltip-bottom"
-                    data-tip="삭제"
-                    @click="openRemoveConfirm(item.id)"
-                  >
-                    <i-lucide-trash />
-                  </button>
-                  <button
-                    class="btn btn-sm btn-circle tooltip tooltip-bottom"
-                    data-tip="확대"
-                    @click="selectedZoomImageId = item.id"
-                  >
-                    <i-lucide-expand />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
-    </div>
     <ModalConfirm ref="modalConfirmRef" ok-text="삭제" @on-confirm="confirmRemoveImage">
       <template #message>
         <div class="text-center">

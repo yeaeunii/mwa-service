@@ -55,7 +55,19 @@
 </template>
 
 <script setup lang="ts">
-import { Canvas,Circle,Control,FabricImage,FabricText,Group,Point,Rect,controlsUtils,filters } from 'fabric'
+import {
+  Canvas,
+  Circle,
+  Control,
+  FabricImage,
+  FabricText,
+  Group,
+  Point,
+  Rect,
+  controlsUtils,
+  Shadow,
+  filters
+} from 'fabric'
 import { nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import type { CanvasAnnotation, ToolMode } from '@/types'
 
@@ -123,6 +135,7 @@ const editorFrame = ref<HTMLDivElement | null>(null)
 const canvasEl = ref<HTMLCanvasElement | null>(null)
 const contextMenu = ref<{ annotationId: string; left: number; top: number } | null>(null)
 const selectedObj = shallowRef<CanvasObj | null>(null)
+const listSelectId = ref<string | null>(null)
 
 // ─── Fabric Runtime State ───
 
@@ -140,29 +153,106 @@ let startX = 0
 let startY = 0
 
 // 복제 상태
-let copiedAnnotation: CanvasAnnotation | null = null
-let cloneDragState: CloneDragState | null = null
-let rotationState: RotationState | null = null
+let copiedAnnotation: CanvasAnnotation | null = null // 복사해둔 어노테이션
+let cloneDragState: CloneDragState | null = null // Ctrl 드래그 복제 중 상태
+let rotationState: RotationState | null = null // 회전 중 상태
 
 // ─── Selection State ───
 
+const NUMBER_STROKE_COLOR = '#ffffff'
+
+const getColor = (): string =>
+  getComputedStyle(document.documentElement).getPropertyValue('--color-primary').trim() || '#4f46e5'
+
+const setNumberRing = (obj: CanvasObj | null, selected: boolean): void => {
+  if (!(obj instanceof Group) || obj.annotationToolType !== 'number') return
+
+  const fromFunctionList = selected && obj.annotationId === listSelectId.value
+  const circle = obj.getObjects().find((child) => child instanceof Circle)
+  circle?.set({
+    stroke: fromFunctionList ? getColor() : NUMBER_STROKE_COLOR,
+    strokeWidth: fromFunctionList ? 5 : 3
+  })
+  obj.set({
+    hasBorders: !fromFunctionList
+  })
+  obj.setCoords()
+}
+
 // 선택 해제
 const clearSel = (): void => {
+  setNumberRing(selectedObj.value, false)
   selectedObj.value = null
   contextMenu.value = null
+  listSelectId.value = null
+  canvas?.requestRenderAll()
 }
 
 // 선택 동기화
 const syncSel = (): void => {
   if (!canvas) return
 
-  const activeObj = canvas.getActiveObject()
+  const activeObj = canvas.getActiveObject() as CanvasObj | null
   if (!activeObj || activeObj === baseImg) {
     clearSel()
     return
   }
 
+  if (selectedObj.value !== activeObj) {
+    setNumberRing(selectedObj.value, false)
+  }
   selectedObj.value = activeObj as CanvasObj
+  setNumberRing(selectedObj.value, true)
+}
+
+// 기능입력시 번호 태깅 선택
+const selectAnnotation = (annotationId: string): void => {
+  if (!canvas) return
+
+  const target = canvas
+    .getObjects()
+    .find((obj) => (obj as CanvasObj).annotationId === annotationId) as CanvasObj | undefined
+
+  if (!target) return
+
+  listSelectId.value = annotationId
+  if (selectedObj.value !== target) {
+    setNumberRing(selectedObj.value, false)
+  }
+  canvas.setActiveObject(target)
+  selectedObj.value = target
+  setNumberRing(target, true)
+  canvas.requestRenderAll()
+}
+
+const applyColor = (nextColor: string): void => {
+  if (!selectedObj.value) return
+
+  const selectedAnnotation = findAnnotation(selectedObj.value.annotationId)
+  if (!selectedAnnotation || selectedAnnotation.toolType === 'mosaic') return
+
+  if (selectedObj.value instanceof Group) {
+    const circle = selectedObj.value.getObjects().find((child) => child instanceof Circle)
+    circle?.set('fill', nextColor)
+  } else if (selectedObj.value instanceof Rect) {
+    if (selectedAnnotation.toolType === 'filled-box') {
+      selectedObj.value.set({
+        fill: nextColor,
+        stroke: nextColor
+      })
+    } else {
+      selectedObj.value.set({
+        stroke: nextColor
+      })
+    }
+  }
+
+  selectedObj.value.setCoords()
+  canvas?.requestRenderAll()
+  emit('update-annotation', {
+    ...selectedAnnotation,
+    color: nextColor
+  })
 }
 
 // ─── Viewport / Image Export ───
@@ -305,20 +395,8 @@ rotateControlIcon.src =
   `)
 
 // 회전 아이콘
-const renderRotateControl = (
-  ctx: CanvasRenderingContext2D,
-  left: number,
-  top: number
-): void => {
+const renderRotateControl = (ctx: CanvasRenderingContext2D, left: number, top: number): void => {
   ctx.save()
-
-//회전아이콘과 객체 잇는 선
-  // ctx.strokeStyle = '#a3a3a3'
-  // ctx.lineWidth = 1.5
-  // ctx.beginPath()
-  // ctx.moveTo(left, top + 12)
-  // ctx.lineTo(left, top + 31)
-  // ctx.stroke()
 
   ctx.drawImage(rotateControlIcon, left - 12, top - 12, 24, 24)
   ctx.restore()
@@ -464,14 +542,22 @@ const onClickLayerAction = (action: 'front' | 'forward' | 'backward' | 'back'): 
 // 객체 생성
 const makeNumberMarker = (annotation: CanvasAnnotation): CanvasObj => {
   const circle = new Circle({
-    radius: 14,
+    radius: 16,
     fill: annotation.color,
+    stroke: '#ffffff',
+    strokeWidth: 3,
+    shadow: new Shadow({
+      color: 'rgba(0, 0, 0, 0.35)',
+      blur: 18,
+      offsetX: 0,
+      offsetY: 5
+    }),
     originX: 'center',
     originY: 'center'
   })
 
   const text = new FabricText(String(annotation.number ?? 0), {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
     fill: 'white',
     originX: 'center',
@@ -487,7 +573,7 @@ const makeNumberMarker = (annotation: CanvasAnnotation): CanvasObj => {
       selectable: true,
       evented: true,
       hasControls: false,
-      hasBorders: false
+      hasBorders: true
     }) as CanvasObj,
     annotation.id,
     annotation.toolType
@@ -609,6 +695,7 @@ const syncCanvasObjects = (): void => {
     if (active) {
       canvas.setActiveObject(active)
       selectedObj.value = active
+      setNumberRing(active, true)
     } else {
       clearSel()
     }
@@ -842,7 +929,7 @@ const onKeyDown = (event: KeyboardEvent): void => {
   if (isEditableTarget) return
 
   const key = event.key.toLowerCase()
-  if (key === 'delete' ) {
+  if (key === 'delete') {
     event.preventDefault()
     removeSelected()
     return
@@ -945,9 +1032,10 @@ const startBox = (left: number, top: number): void => {
 const removeSelected = (): void => {
   if (!canvas) return
 
-  const activeObj = canvas.getActiveObject()
-  const activeObjects =
-    activeObj && 'getObjects' in activeObj
+  const activeObj = canvas.getActiveObject() as CanvasObj | null
+  const activeObjects = activeObj?.annotationId
+    ? [activeObj as CanvasObj]
+    : activeObj && 'getObjects' in activeObj
       ? ((activeObj as unknown as { getObjects: () => CanvasObj[] }).getObjects() ?? [])
       : selectedObj.value
         ? [selectedObj.value]
@@ -998,6 +1086,8 @@ const setupCanvas = (): void => {
 
     const mouseEvent = event.e as MouseEvent
     const target = event.target as CanvasObj | undefined
+
+    listSelectId.value = null
 
     if (mouseEvent.button === 2) {
       if (target) {
@@ -1126,33 +1216,7 @@ watch(
 watch(
   () => props.activeColor,
   (nextColor) => {
-    if (!selectedObj.value) return
-
-    const selectedAnnotation = findAnnotation(selectedObj.value.annotationId)
-    if (!selectedAnnotation || selectedAnnotation.toolType === 'mosaic') return
-
-    if (selectedObj.value instanceof Group) {
-      const circle = selectedObj.value.getObjects().find((child) => child instanceof Circle)
-      circle?.set('fill', nextColor)
-    } else if (selectedObj.value instanceof Rect) {
-      if (selectedAnnotation.toolType === 'filled-box') {
-        selectedObj.value.set({
-          fill: nextColor,
-          stroke: nextColor
-        })
-      } else {
-        selectedObj.value.set({
-          stroke: nextColor
-        })
-      }
-    }
-
-    selectedObj.value.setCoords()
-    canvas?.requestRenderAll()
-    emit('update-annotation', {
-      ...selectedAnnotation,
-      color: nextColor
-    })
+    applyColor(nextColor)
   }
 )
 
@@ -1190,6 +1254,8 @@ defineExpose({
   sendToBack,
   bringForward,
   sendBackwards,
+  selectAnnotation,
+  applyColor,
   rotateSelectedAnnotationCCW90,
   rotateBaseImageCCW90,
   exportImageDataURL

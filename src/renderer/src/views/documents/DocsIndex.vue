@@ -61,7 +61,10 @@
                 <div class="rounded-xl border border-base-content/10 bg-base-100 shadow-sm">
                   <!-- Form Header -->
                   <div class="border-b border-base-content/5 p-5">
-                    <div class="mb-4">
+                    <div
+                      class="tooltip tooltip-neutral tooltip-top mb-4 w-full before:left-2 before:translate-x-0 after:left-5 after:translate-x-0"
+                      data-tip="문서 제목"
+                    >
                       <input
                         v-model="doc.title"
                         type="text"
@@ -69,7 +72,10 @@
                         placeholder="문서 제목을 입력하세요"
                       />
                     </div>
-                    <div class="mb-4">
+                    <div
+                      class="tooltip tooltip-neutral tooltip-top mb-4 w-full before:left-2 before:translate-x-0 after:left-5 after:translate-x-0"
+                      data-tip="문서 설명"
+                    >
                       <textarea
                         v-model.trim="doc.description"
                         rows="2"
@@ -77,7 +83,10 @@
                         placeholder="문서에 대한 설명을 입력하세요"
                       ></textarea>
                     </div>
-                    <div>
+                    <div
+                      class="tooltip tooltip-neutral tooltip-top w-full before:left-2 before:translate-x-0 after:left-5 after:translate-x-0"
+                      data-tip="진입경로"
+                    >
                       <div class="flex items-center gap-2 bg-slate-50 px-2 rounded-lg">
                         <i-lucide-route class="h-4 w-4 shrink-0 text-base-content/30" />
                         <input

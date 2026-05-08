@@ -9,6 +9,8 @@ export interface UseDragSelectOptions<T extends string | number = number> {
   itemIds: Ref<T[]>
   /** 드래그 시작 판정 임계값 (px, 기본 4) */
   threshold?: number
+  /** 일반 클릭도 Ctrl 클릭처럼 토글 선택할지 여부 */
+  toggleOnClick?: boolean
 }
 
 export interface UseDragSelectReturn<T extends string | number = number> {
@@ -26,7 +28,7 @@ export interface UseDragSelectReturn<T extends string | number = number> {
 export function useDragSelect<T extends string | number = number>(
   options: UseDragSelectOptions<T>
 ): UseDragSelectReturn<T> {
-  const { containerRef, dataAttr, itemIds, threshold = 4 } = options
+  const { containerRef, dataAttr, itemIds, threshold = 4, toggleOnClick = false } = options
 
   const selectedIds = ref<Set<T>>(new Set()) as Ref<Set<T>>
   const isDragging = ref(false)
@@ -181,15 +183,7 @@ export function useDragSelect<T extends string | number = number>(
   function onClickItem(id: T, e: MouseEvent): void {
     if (isDragging.value) return
 
-    if (e.metaKey || e.ctrlKey) {
-      const next = new Set(selectedIds.value)
-      if (next.has(id)) {
-        next.delete(id)
-      } else {
-        next.add(id)
-      }
-      selectedIds.value = next
-    } else if (e.shiftKey && selectedIds.value.size > 0) {
+    if (e.shiftKey && selectedIds.value.size > 0) {
       const ids = itemIds.value
       const lastSelected = [...selectedIds.value].pop()!
       const fromIdx = ids.indexOf(lastSelected)
@@ -198,6 +192,14 @@ export function useDragSelect<T extends string | number = number>(
       const next = new Set(selectedIds.value)
       for (let i = start; i <= end; i++) {
         next.add(ids[i])
+      }
+      selectedIds.value = next
+    } else if (toggleOnClick || e.metaKey || e.ctrlKey) {
+      const next = new Set(selectedIds.value)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
       }
       selectedIds.value = next
     } else {

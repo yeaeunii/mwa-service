@@ -4,7 +4,7 @@
     <nav class="navbar shrink-0 border-b border-base-content/10 bg-base-100 px-4">
       <div class="mx-auto flex w-full max-w-[1920px] items-center justify-between">
         <div class="flex items-center gap-3">
-          <button class="btn btn-ghost btn-sm" @click="router.push('/projects/1')">
+          <button class="btn btn-ghost btn-sm" @click="goBackToProject">
             <i-lucide-arrow-left class="h-4 w-4" />
           </button>
           <div class="flex items-center gap-2">
@@ -12,15 +12,23 @@
               <i-lucide-briefcase class="h-4 w-4 text-primary" />
             </div>
             <div>
-              <div class="text-base font-bold leading-tight">{{ workspaceName || '워크스페이스' }}</div>
+              <div class="text-base font-bold leading-tight">
+                {{ workspaceName || '워크스페이스' }}
+              </div>
               <div class="text-xs text-base-content/50">워크스페이스</div>
             </div>
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <span v-if="selectedIds.size > 0" class="text-xs font-medium text-primary">
-            {{ selectedIds.size }}개 선택됨
-          </span>
+          <button
+            type="button"
+            class="btn btn-sm gap-1.5"
+            :class="isEditMode ? 'btn-primary' : 'btn-active'"
+            @click="toggleEditMode"
+          >
+            <i-lucide-pencil class="h-4 w-4" />
+            {{ isEditMode ? '완료' : '편집모드' }}
+          </button>
         </div>
       </div>
     </nav>
@@ -29,26 +37,50 @@
     <div class="mx-auto flex w-full max-w-[1920px] flex-1 overflow-hidden">
       <!-- Screenshot Panel -->
       <aside class="flex w-72 shrink-0 flex-col border-r border-base-content/10 bg-base-100">
-        <div class="flex items-center justify-between border-b border-base-content/5 px-4 py-3">
-          <div class="flex items-center gap-2">
-            <i-lucide-image class="h-4 w-4 text-primary" />
+        <div class="border-b border-base-content/5 px-3 py-3">
+          <div class="mb-3 flex items-center gap-2 px-1">
+            <div class="flex h-7 w-7 items-center justify-center rounded-md bg-primary/10">
+              <i-lucide-image class="h-4 w-4 text-primary" />
+            </div>
             <span class="text-sm font-semibold">스크린샷</span>
             <span class="badge badge-sm badge-ghost">{{ screenshots.length }}</span>
           </div>
-          <router-link
-            :to="{ name: 'capture-index', params: { workspaceId } }"
-            class="btn btn-primary btn-sm gap-1.5"
-          >
-            <i-lucide-camera class="h-4 w-4" />
-            캡쳐
-          </router-link>
+
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              class="tooltip tooltip-neutral tooltip-bottom btn btn-sm gap-1.5"
+              data-tip="이미지 불러오기"
+              @click="openLocalImagePicker"
+            >
+              <i-lucide-upload class="h-4 w-4" />
+            </button>
+            <input
+              ref="fileInputRef"
+              type="file"
+              class="hidden"
+              accept="image/png,image/jpeg,image/gif,image/webp"
+              multiple
+              @change="onChangeLocalImages"
+            />
+
+            <router-link
+              :to="{ name: 'capture-index', params: { workspaceId } }"
+              class="tooltip tooltip-neutral tooltip-bottom btn btn-sm gap-1.5 border-primary/20 bg-primary/30 text-active hover:bg-primary/50"
+              data-tip="웹 화면 캡쳐"
+            >
+              <i-lucide-camera class="h-4 w-4" />
+            </router-link>
+          </div>
         </div>
-        <div class="px-3 py-2">
+
+        <div class="border-b border-base-content/5 px-3 py-2">
           <label class="input input-sm w-full">
             <i-lucide-search class="h-3.5 w-3.5 opacity-40" />
             <input v-model="screenshotSearchKeyword" type="search" placeholder="검색..." />
           </label>
         </div>
+
         <div
           ref="gridContainerRef"
           class="relative flex-1 overflow-y-auto px-2 pb-2 select-none"
@@ -154,10 +186,78 @@
             <span class="text-sm font-semibold">메뉴얼 문서</span>
             <span class="badge badge-sm badge-ghost">{{ documents.length }}</span>
           </div>
-          <label class="input input-sm w-64">
-            <i-lucide-search class="h-3.5 w-3.5 opacity-40" />
-            <input v-model="documentSearchKeyword" type="search" placeholder="문서 검색..." />
-          </label>
+          <div v-if="!isEditMode" class="flex items-center gap-2">
+            <label class="input input-sm w-64">
+              <i-lucide-search class="h-3.5 w-3.5 opacity-40" />
+              <input v-model="documentSearchKeyword" type="search" placeholder="문서 검색..." />
+            </label>
+            <select v-model="documentSortMode" class="select select-sm w-36">
+              <option value="custom">사용자 지정순</option>
+              <option value="latest">최신순</option>
+              <option value="functionCount">기능개수순</option>
+            </select>
+          </div>
+        </div>
+
+        <div
+          v-if="isEditMode"
+          class="flex items-center justify-between border-b border-base-content/5 bg-base-100 px-6 py-2"
+        >
+          <div class="flex items-center gap-2 text-sm">
+            <span class="badge badge-primary badge-outline"
+              >{{ selectedDocumentIds.size }}개 선택</span
+            >
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              class="btn btn-sm border-primary/20"
+              @click="toggleSelectAllDocuments"
+            >
+              {{ isAllDocumentsSelected ? '전체 해제' : '전체 선택' }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm"
+              :class="
+                selectedDocumentIds.size > 0
+                  ? 'border-primary/20 bg-primary/10 text-primary hover:bg-primary/20'
+                  : ''
+              "
+              :disabled="selectedDocumentIds.size === 0"
+              @click="openDocAction('copy')"
+            >
+              <i-lucide-copy class="h-3.5 w-3.5" />
+              복사
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm"
+              :class="
+                selectedDocumentIds.size > 0
+                  ? 'border-primary/20 bg-primary/10 text-primary hover:bg-primary/20'
+                  : ''
+              "
+              :disabled="selectedDocumentIds.size === 0"
+              @click="openDocAction('move')"
+            >
+              <i-lucide-folder-input class="h-3.5 w-3.5" />
+              이동
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm"
+              :class="
+                selectedDocumentIds.size > 0
+                  ? 'border-error/20 bg-error/30 text-error hover:bg-error/50'
+                  : ''
+              "
+              :disabled="selectedDocumentIds.size === 0"
+              @click="openDeleteSelectedConfirm"
+            >
+              선택 삭제
+            </button>
+          </div>
         </div>
 
         <div class="relative flex-1 overflow-y-auto p-6">
@@ -167,20 +267,44 @@
           >
             <i-lucide-file-x class="h-12 w-12" />
             <span class="text-sm font-medium">
-              {{ documentSearchKeyword ? '검색 결과가 없습니다' : '스크린샷을 드래그하여 문서를 생성하세요' }}
+              {{
+                documentSearchKeyword
+                  ? '검색 결과가 없습니다'
+                  : '스크린샷을 드래그하여 문서를 생성하세요'
+              }}
             </span>
           </div>
 
-          <div v-else class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            <router-link
+          <div
+            v-else
+            class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            @dragover.prevent="onDocumentGridDragOver"
+            @drop.prevent="onDocumentGridDrop"
+          >
+            <component
+              :is="isEditMode ? 'div' : 'router-link'"
               v-for="(doc, index) in filteredDocuments"
               :key="doc.id"
-              :to="`/workspace/${workspaceId}/documents/${doc.id}`"
+              :to="!isEditMode ? `/workspace/${workspaceId}/documents/${doc.id}` : undefined"
               class="group block overflow-hidden rounded-xl border border-base-content/10 bg-base-100 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+              :class="[
+                isEditMode ? 'cursor-move' : 'cursor-pointer',
+                selectedDocumentIds.has(doc.id)
+                  ? 'border-2 border-primary shadow-lg shadow-primary/20'
+                  : '',
+                dragOverDocumentId === doc.id ? 'border-primary' : ''
+              ]"
+              :draggable="isEditMode"
+              @click="onClickDocumentCard(doc.id, $event)"
+              @dragstart="onDocumentDragStart(doc.id, $event)"
+              @dragover.prevent="onDocumentDragOver(doc.id)"
+              @drop.prevent="onDocumentDrop(doc.id)"
+              @dragend="onDocumentDragEnd"
             >
               <div class="relative overflow-hidden">
                 <div
-                  class="absolute left-3 top-3 z-20 flex h-7 min-w-10 items-center justify-center rounded-md border border-primary bg-base-100/95 px-2 text-primary shadow-sm backdrop-blur"
+                  class="absolute left-3 top-3 z-20 flex h-8 min-w-8 items-center justify-center rounded-full px-2 shadow-md ring-2 ring-white/90 backdrop-blur"
+                  :class="selectedDocumentIds.has(doc.id) ? 'bg-primary/20' : 'bg-primary/20'"
                 >
                   <span class="text-xs font-black tabular-nums">{{ index + 1 }}</span>
                 </div>
@@ -190,14 +314,25 @@
                   class="h-36 w-full object-cover transition-transform duration-300 group-hover:scale-105"
                 />
                 <div
-                  class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
+                  class="absolute inset-0 transition-colors duration-150"
+                  :class="
+                    selectedDocumentIds.has(doc.id)
+                      ? 'bg-black/35'
+                      : 'bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100'
+                  "
                 />
                 <button
+                  v-if="isEditMode"
                   type="button"
-                  class="btn btn-xs btn-circle absolute right-2 top-2 z-20 border-none bg-white/90 text-error opacity-0 shadow-sm transition-opacity hover:bg-white group-hover:opacity-100"
-                  @click.prevent.stop="openDeleteDocConfirm(doc)"
+                  class="btn btn-xs btn-circle absolute right-5 top-2 z-20 border-primary shadow-sm"
+                  :class="
+                    selectedDocumentIds.has(doc.id)
+                      ? 'btn-primary text-white'
+                      : 'bg-white/95 text-primary hover:bg-primary/10'
+                  "
+                  @click.stop="toggleDocumentSelection(doc.id)"
                 >
-                  <i-lucide-trash class="h-3.5 w-3.5" />
+                  <i-lucide-check class="h-3.5 w-3.5" />
                 </button>
               </div>
               <div class="px-3 pt-3">
@@ -212,10 +347,11 @@
               <div class="flex items-center justify-between border-t border-base-content/5 p-3">
                 <div class="flex items-center gap-1 text-xs text-base-content/40">
                   <i-lucide-clock class="h-3 w-3" />
-                  {{ doc.createdAt }}
+                  {{ doc.updatedAt }}
                 </div>
+                <div class="badge badge-ghost badge-sm">기능 {{ doc.functionCount }}개</div>
               </div>
-            </router-link>
+            </component>
           </div>
         </div>
       </main>
@@ -232,11 +368,105 @@
     <ModalConfirm ref="modalConfirmRef" ok-text="삭제" @on-confirm="onConfirmDeleteDoc">
       <template #message>
         <div class="text-center">
-          <h3 class="mb-2 text-lg font-bold">{{ deletingDoc?.title }}</h3>
-          <p class="text-sm text-gray-500">문서를 삭제하시겠습니까?</p>
+          <h3 class="mb-2 text-lg font-bold">
+            선택한 문서 {{ pendingDeleteDocumentIds.length }}개를
+          </h3>
+          <p class="text-sm text-gray-500">정말 삭제하시겠습니까?</p>
         </div>
       </template>
     </ModalConfirm>
+
+    <ModalBase
+      ref="modalDocActionRef"
+      :title="docAction === 'copy' ? '문서 복사' : '문서 이동'"
+      width="w-[28rem]"
+      :close-on-backdrop="false"
+    >
+      <div class="space-y-4">
+        <p class="text-sm text-base-content/60">
+          선택한 문서 {{ selectedDocumentIds.size }}개를
+          {{ docAction === 'copy' ? '복사할' : '이동할' }} 워크스페이스를 선택하세요.
+        </p>
+
+        <div class="form-control w-full">
+          <div class="label">
+            <span class="label-text">대상 워크스페이스</span>
+          </div>
+          <button
+            ref="targetWorkspaceButtonRef"
+            type="button"
+            class="select select-bordered flex w-full items-center justify-between text-left"
+            :disabled="targetWorkspaces.length === 0"
+            @click="toggleWorkspaceMenu"
+          >
+            <span :class="targetWorkspaceId == null ? 'text-base-content/40' : ''">
+              {{ targetWorkspaceName || '워크스페이스 선택' }}
+            </span>
+            <i-lucide-chevron-down class="h-4 w-4 opacity-60" />
+          </button>
+        </div>
+
+        <div
+          v-if="targetWorkspaces.length === 0"
+          class="rounded-lg bg-base-200 px-3 py-2 text-sm text-base-content/60"
+        >
+          이동하거나 복사할 다른 워크스페이스가 없습니다.
+        </div>
+      </div>
+
+      <template #footer="{ close }">
+        <div class="flex w-full justify-end gap-2">
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            :disabled="isDocActioning"
+            @click="close"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            :disabled="
+              targetWorkspaceId == null || selectedDocumentIds.size === 0 || isDocActioning
+            "
+            @click="onConfirmDocAction(close)"
+          >
+            {{ docAction === 'copy' ? '복사' : '이동' }}
+          </button>
+        </div>
+      </template>
+    </ModalBase>
+
+    <div
+      v-if="isWorkspaceMenuOpen"
+      class="fixed z-[1000] max-h-48 overflow-y-auto rounded-lg border border-base-content/10 bg-base-100 p-1 shadow-xl"
+      :style="workspaceMenuStyle"
+    >
+      <button
+        v-for="workspace in targetWorkspaces"
+        :key="workspace.id"
+        type="button"
+        class="flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-base-200"
+        :class="targetWorkspaceId === workspace.id ? 'bg-primary/10 text-primary' : ''"
+        @click="selectTargetWorkspace(workspace.id)"
+      >
+        {{ workspace.name }}
+      </button>
+    </div>
+
+    <div v-if="docActionMessage" class="toast toast-end toast-bottom z-[1000]">
+      <div class="alert border border-primary/20 bg-base-100 shadow-xl">
+        <i-lucide-check-circle class="h-5 w-5 text-primary" />
+        <span class="text-sm">{{ docActionMessage }}</span>
+        <button type="button" class="btn btn-primary btn-xs" @click="goToActionWorkspace">
+          보기
+        </button>
+        <button type="button" class="btn btn-ghost btn-xs" @click="clearDocActionMessage">
+          닫기
+        </button>
+      </div>
+    </div>
 
     <!-- Custom Drag Ghost (hidden, used for setDragImage) -->
     <div
@@ -252,13 +482,18 @@
 <script setup lang="ts">
 import { useDragSelect } from '@renderer/composables/useDragSelect'
 import { useDragSource, useDropZone } from '@renderer/composables/useCrossDrag'
+import type { Workspace } from '@database/dto'
 import {
+  copyDocs,
   createDoc,
+  createCaptureWithImage,
   deleteCapture,
   deleteDoc,
   getCaptureList,
   getDocList,
+  getWorkspaces,
   getWorkspaceDetail,
+  moveDocs,
   updateDocSortOrders
 } from '@/database'
 import WorkspaceModalCaptureImages from './components/ModalCaptureImages.vue'
@@ -268,11 +503,12 @@ const router = useRouter()
 
 const workspaceId = computed(() => route.params.id)
 const workspaceName = ref('')
+const projectId = ref<number | null>(null)
 const screenshotSearchKeyword = ref('')
 const documentSearchKeyword = ref('')
+const documentSortMode = ref<'custom' | 'latest' | 'functionCount'>('custom')
 
-
-
+const fileInputRef = ref<HTMLInputElement | null>(null)
 
 // --- Screenshot Data ---
 
@@ -285,6 +521,14 @@ interface Screenshot {
 
 const screenshots = ref<Screenshot[]>([])
 const modalCaptureImagesRef = ref<InstanceType<typeof WorkspaceModalCaptureImages> | null>(null)
+
+const readFileAsDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result ?? ''))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
 
 const toFileSrc = (imgPath: string, version?: string): string => {
   const normalizedPath = imgPath.replace(/\\/g, '/')
@@ -308,10 +552,52 @@ const loadCaptureList = async (): Promise<void> => {
 const loadWorkspaceDetail = async (): Promise<void> => {
   const detail = await getWorkspaceDetail(String(workspaceId.value))
   workspaceName.value = detail?.name ?? ''
+  projectId.value = detail?.project_id ?? null
+}
+
+const goBackToProject = (): void => {
+  if (projectId.value == null) {
+    void router.push({ name: 'home' })
+    return
+  }
+
+  void router.push({ name: 'projects-index', params: { id: projectId.value } })
 }
 
 const openCaptureImageModal = (imageId: number): void => {
   modalCaptureImagesRef.value?.onOpen(imageId)
+}
+
+const openLocalImagePicker = (): void => {
+  fileInputRef.value?.click()
+}
+
+const onChangeLocalImages = async (event: Event): Promise<void> => {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  input.value = ''
+
+  if (!files.length || !workspaceId.value) return
+
+  for (const file of files) {
+    const dataUrl = await readFileAsDataUrl(file)
+    const name = file.name.replace(/\.[^.]+$/, '') || file.name
+    const saved = await createCaptureWithImage({
+      workspaceId: String(workspaceId.value),
+      name,
+      dataUrl,
+      currentUrl: ''
+    })
+
+    if (!saved) continue
+
+    screenshots.value.unshift({
+      id: saved.id,
+      name,
+      src: toFileSrc(saved.imgPath, `${Date.now()}`),
+      imgPath: saved.imgPath
+    })
+  }
 }
 
 const onToggleSelectCaptureImage = (imageId: number): void => {
@@ -349,7 +635,8 @@ const { selectedIds, isDragging, selectionStyle, onMouseDown, onClickItem, cance
   useDragSelect({
     containerRef: gridContainerRef,
     dataAttr: 'shot-id',
-    itemIds: screenshotIds
+    itemIds: screenshotIds,
+    toggleOnClick: true
   })
 
 const selectedImageIds = computed(() => Array.from(selectedIds.value))
@@ -362,21 +649,61 @@ interface Document {
   description: string
   thumbnail: string
   status: string
-  createdAt: string
+  updatedAt: string
+  updatedTime: number
+  functionCount: number
   sortOrder: number
 }
 
-
 const documents = ref<Document[]>([])
-const deletingDoc = ref<Document | null>(null)
 const modalConfirmRef = ref<ComponentRef<'ModalConfirm'> | null>(null)
+const modalDocActionRef = ref<ComponentRef<'ModalBase'> | null>(null)
+const pendingDeleteDocumentIds = ref<number[]>([])
+const isEditMode = ref(false)
+const selectedDocumentIds = ref<Set<number>>(new Set())
+const draggingDocumentId = ref<number | null>(null)
+const dragOverDocumentId = ref<number | null>(null)
+const docAction = ref<'copy' | 'move'>('copy')
+const transferWorkspaces = ref<Workspace[]>([])
+const targetWorkspaceId = ref<number | null>(null)
+const isDocActioning = ref(false)
+const isWorkspaceMenuOpen = ref(false)
+const targetWorkspaceButtonRef = ref<HTMLElement | null>(null)
+const workspaceMenuStyle = ref<Record<string, string>>({})
+const docActionMessage = ref('')
+const docActionWorkspaceId = ref<number | null>(null)
 
-const formatDocCreatedAt = (dateText: string): string => {
+const targetWorkspaces = computed(() =>
+  transferWorkspaces.value.filter((workspace) => workspace.id !== Number(workspaceId.value))
+)
+
+const targetWorkspaceName = computed(
+  () =>
+    targetWorkspaces.value.find((workspace) => workspace.id === targetWorkspaceId.value)?.name ?? ''
+)
+
+const formatDocDate = (dateText: string): string => {
   const date = new Date(dateText)
   if (Number.isNaN(date.getTime())) return dateText
 
   const pad = (n: number): string => String(n).padStart(2, '0')
   return `${pad(date.getMonth() + 1)}.${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+const getDocTime = (dateText: string): number => {
+  const time = new Date(dateText).getTime()
+  return Number.isNaN(time) ? 0 : time
+}
+
+const getFunctionCount = (contentJson: string | null | undefined): number => {
+  if (!contentJson) return 0
+
+  try {
+    const parsed = JSON.parse(contentJson)
+    return Array.isArray(parsed) ? parsed.length : 0
+  } catch {
+    return 0
+  }
 }
 
 const loadDocList = async (): Promise<void> => {
@@ -394,28 +721,57 @@ const loadDocList = async (): Promise<void> => {
       description: doc.description,
       thumbnail: thumbnailPath ? toFileSrc(thumbnailPath, thumbnailVersion) : '',
       status: doc.status,
-      createdAt: formatDocCreatedAt(doc.created_at),
+      updatedAt: formatDocDate(doc.updated_at),
+      updatedTime: getDocTime(doc.updated_at),
+      functionCount: getFunctionCount(doc.content_json),
       sortOrder: doc.sort_order
     }
   })
 }
 
-const openDeleteDocConfirm = (doc: Document): void => {
-  deletingDoc.value = doc
-  modalConfirmRef.value?.onOpen()
+const toggleEditMode = (): void => {
+  isEditMode.value = !isEditMode.value
+  selectedDocumentIds.value = new Set()
+  pendingDeleteDocumentIds.value = []
+  draggingDocumentId.value = null
+  dragOverDocumentId.value = null
 }
 
-const onConfirmDeleteDoc = async (): Promise<void> => {
-  const target = deletingDoc.value
-  if (!target) return
+const toggleDocumentSelection = (docId: number): void => {
+  const next = new Set(selectedDocumentIds.value)
+  if (next.has(docId)) {
+    next.delete(docId)
+  } else {
+    next.add(docId)
+  }
+  selectedDocumentIds.value = next
+}
 
-  await deleteDoc(target.id)
-  documents.value = documents.value
-    .filter((doc) => doc.id !== target.id)
-    .map((doc, index) => ({
-      ...doc,
-      sortOrder: index + 1
-    }))
+const onClickDocumentCard = (docId: number, event: Event): void => {
+  if (!isEditMode.value) return
+  event.preventDefault()
+  event.stopPropagation()
+  toggleDocumentSelection(docId)
+}
+
+const isAllDocumentsSelected = computed(() => {
+  if (filteredDocuments.value.length === 0) return false
+  return filteredDocuments.value.every((doc) => selectedDocumentIds.value.has(doc.id))
+})
+
+const toggleSelectAllDocuments = (): void => {
+  if (isAllDocumentsSelected.value) {
+    selectedDocumentIds.value = new Set()
+    return
+  }
+  selectedDocumentIds.value = new Set(filteredDocuments.value.map((doc) => doc.id))
+}
+
+const persistDocumentSortOrders = async (): Promise<void> => {
+  documents.value = documents.value.map((doc, index) => ({
+    ...doc,
+    sortOrder: index + 1
+  }))
 
   await updateDocSortOrders(
     documents.value.map((doc) => ({
@@ -423,7 +779,172 @@ const onConfirmDeleteDoc = async (): Promise<void> => {
       sortOrder: doc.sortOrder
     }))
   )
-  deletingDoc.value = null
+}
+
+const reorderDocumentList = (draggedId: number, targetId?: number): void => {
+  const currentList = [...documents.value]
+  const fromIndex = currentList.findIndex((doc) => doc.id === draggedId)
+  if (fromIndex < 0) return
+
+  const [draggedDoc] = currentList.splice(fromIndex, 1)
+  if (!draggedDoc) return
+
+  if (targetId == null) {
+    currentList.push(draggedDoc)
+  } else {
+    const toIndex = currentList.findIndex((doc) => doc.id === targetId)
+    if (toIndex < 0) {
+      currentList.push(draggedDoc)
+    } else {
+      currentList.splice(toIndex, 0, draggedDoc)
+    }
+  }
+
+  documents.value = currentList
+}
+
+const onDocumentDragStart = (docId: number, event: DragEvent): void => {
+  if (!isEditMode.value) return
+  draggingDocumentId.value = docId
+  event.dataTransfer?.setData('text/plain', String(docId))
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
+}
+
+const onDocumentDragOver = (docId: number): void => {
+  if (!isEditMode.value) return
+  dragOverDocumentId.value = docId
+}
+
+const onDocumentDrop = (targetDocId: number): void => {
+  if (!isEditMode.value) return
+  const draggedId = draggingDocumentId.value
+  dragOverDocumentId.value = null
+  if (draggedId == null || draggedId === targetDocId) return
+  reorderDocumentList(draggedId, targetDocId)
+  void persistDocumentSortOrders()
+}
+
+const onDocumentGridDragOver = (): void => {
+  if (!isEditMode.value) return
+}
+
+const onDocumentGridDrop = (): void => {
+  if (!isEditMode.value) return
+  const draggedId = draggingDocumentId.value
+  dragOverDocumentId.value = null
+  if (draggedId == null) return
+  reorderDocumentList(draggedId)
+  void persistDocumentSortOrders()
+}
+
+const onDocumentDragEnd = (): void => {
+  draggingDocumentId.value = null
+  dragOverDocumentId.value = null
+}
+
+const openDeleteSelectedConfirm = (): void => {
+  const idsToDelete = Array.from(selectedDocumentIds.value)
+  if (idsToDelete.length === 0) return
+  pendingDeleteDocumentIds.value = idsToDelete
+  modalConfirmRef.value?.onOpen()
+}
+
+const openDocAction = async (action: 'copy' | 'move'): Promise<void> => {
+  if (selectedDocumentIds.value.size === 0 || projectId.value == null) return
+
+  docAction.value = action
+  targetWorkspaceId.value = null
+  isWorkspaceMenuOpen.value = false
+  transferWorkspaces.value = await getWorkspaces({
+    project_id: projectId.value,
+    limit: 100,
+    offset: 0
+  })
+  modalDocActionRef.value?.onOpen()
+}
+
+const setWorkspaceMenuStyle = (): void => {
+  const button = targetWorkspaceButtonRef.value
+  if (!button) return
+
+  const rect = button.getBoundingClientRect()
+  workspaceMenuStyle.value = {
+    left: `${rect.left}px`,
+    top: `${rect.bottom + 4}px`,
+    width: `${rect.width}px`
+  }
+}
+
+const toggleWorkspaceMenu = async (): Promise<void> => {
+  if (targetWorkspaces.value.length === 0) return
+
+  isWorkspaceMenuOpen.value = !isWorkspaceMenuOpen.value
+  if (!isWorkspaceMenuOpen.value) return
+
+  await nextTick()
+  setWorkspaceMenuStyle()
+}
+
+const selectTargetWorkspace = (workspaceId: number): void => {
+  targetWorkspaceId.value = workspaceId
+  isWorkspaceMenuOpen.value = false
+}
+
+const onConfirmDocAction = async (close: () => void): Promise<void> => {
+  if (targetWorkspaceId.value == null || selectedDocumentIds.value.size === 0) return
+
+  const docIds = Array.from(selectedDocumentIds.value)
+  const action = docAction.value
+  const nextWorkspaceId = targetWorkspaceId.value
+  isDocActioning.value = true
+
+  try {
+    const params = {
+      docIds,
+      workspaceId: nextWorkspaceId
+    }
+    const success = action === 'copy' ? await copyDocs(params) : await moveDocs(params)
+    if (!success) return
+
+    if (action === 'move') {
+      const movedIdSet = new Set(docIds)
+      documents.value = documents.value.filter((doc) => !movedIdSet.has(doc.id))
+      await persistDocumentSortOrders()
+    }
+
+    selectedDocumentIds.value = new Set()
+    docActionWorkspaceId.value = nextWorkspaceId
+    docActionMessage.value = `문서 ${docIds.length}개를 ${action === 'copy' ? '복사' : '이동'}했습니다.`
+    close()
+  } finally {
+    isDocActioning.value = false
+  }
+}
+
+const clearDocActionMessage = (): void => {
+  docActionMessage.value = ''
+  docActionWorkspaceId.value = null
+}
+
+const goToActionWorkspace = async (): Promise<void> => {
+  const nextWorkspaceId = docActionWorkspaceId.value
+  if (nextWorkspaceId == null) return
+
+  clearDocActionMessage()
+  await router.push({ name: 'workspace-detail', params: { id: nextWorkspaceId } })
+}
+
+const onConfirmDeleteDoc = async (): Promise<void> => {
+  if (pendingDeleteDocumentIds.value.length === 0) return
+
+  const deletingIdSet = new Set(pendingDeleteDocumentIds.value)
+  await Promise.all(pendingDeleteDocumentIds.value.map((id) => deleteDoc(id)))
+  documents.value = documents.value.filter((doc) => !deletingIdSet.has(doc.id))
+  selectedDocumentIds.value = new Set(
+    Array.from(selectedDocumentIds.value).filter((id) => !deletingIdSet.has(id))
+  )
+  pendingDeleteDocumentIds.value = []
+  await persistDocumentSortOrders()
 }
 
 // --- Cross-Panel Drag & Drop ---
@@ -478,7 +999,9 @@ const createDocsFromDroppedShots = async (droppedIds: number[]): Promise<void> =
       description,
       thumbnail: createdDoc.orgnImgPath ? toFileSrc(createdDoc.orgnImgPath) : shot.src,
       status: '작업대기',
-      createdAt: dateStr,
+      updatedAt: dateStr,
+      updatedTime: now.getTime(),
+      functionCount: 0,
       sortOrder
     })
   }
@@ -493,34 +1016,75 @@ const filteredScreenshots = computed(() => {
   if (!keyword) return screenshots.value
 
   return screenshots.value.filter((item) =>
-    String(item.name ?? '').toLowerCase().includes(keyword)
+    String(item.name ?? '')
+      .toLowerCase()
+      .includes(keyword)
   )
 })
 
 const filteredDocuments = computed(() => {
+  if (isEditMode.value) return documents.value
+
   const keyword = documentSearchKeyword.value.trim().toLowerCase()
-  if (!keyword) return documents.value
+  const filtered = keyword
+    ? documents.value.filter((doc) =>
+        [doc.title, doc.description, doc.status].some((text) =>
+          String(text ?? '')
+            .toLowerCase()
+            .includes(keyword)
+        )
+      )
+    : documents.value
 
-  return documents.value.filter((doc) =>
-    [doc.title, doc.description, doc.status]
-      .some((text) => String(text ?? '').toLowerCase().includes(keyword))
-  )
+  return [...filtered].sort((a, b) => {
+    if (documentSortMode.value === 'custom') {
+      return a.sortOrder - b.sortOrder
+    }
+
+    if (documentSortMode.value === 'functionCount') {
+      return b.functionCount - a.functionCount || b.updatedTime - a.updatedTime
+    }
+
+    return b.updatedTime - a.updatedTime
+  })
 })
-
-
-
-
-
-
 
 watch(screenshotSearchKeyword, () => {
   selectedIds.value = new Set()
 })
 
-onMounted(() => {
-  console.log('workspaceId:', workspaceId.value)
+watch(documentSearchKeyword, () => {
+  selectedDocumentIds.value = new Set()
+})
+
+const resetWorkspaceState = (): void => {
+  workspaceName.value = ''
+  projectId.value = null
+  screenshots.value = []
+  documents.value = []
+  selectedIds.value = new Set()
+  selectedDocumentIds.value = new Set()
+  pendingDeleteDocumentIds.value = []
+  draggingDocumentId.value = null
+  dragOverDocumentId.value = null
+  transferWorkspaces.value = []
+  targetWorkspaceId.value = null
+  isWorkspaceMenuOpen.value = false
+}
+
+const loadPage = (): void => {
   void loadWorkspaceDetail()
   void loadCaptureList()
   void loadDocList()
+}
+
+watch(workspaceId, () => {
+  resetWorkspaceState()
+  loadPage()
+})
+
+onMounted(() => {
+  console.log('workspaceId:', workspaceId.value)
+  loadPage()
 })
 </script>

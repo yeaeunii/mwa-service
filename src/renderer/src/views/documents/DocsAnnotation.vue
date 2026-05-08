@@ -79,7 +79,11 @@
               </button>
             </div>
             <div class="flex items-center gap-3">
-              <EditorTools v-model="activeTool" v-model:color-value="activeColor" />
+              <EditorTools
+                v-model="activeTool"
+                v-model:color-value="activeColor"
+                @select-color="onSelectColor"
+              />
               <div class="h-4 w-px bg-base-content/10"></div>
               <ZoomControls v-model:zoom-pct="zoomPct" />
               <div class="flex items-center gap-1">
@@ -140,7 +144,11 @@
           </div>
         </section>
 
-        <FunctionList :items="funcItems" @reorder="onReorderFunctionList" />
+        <FunctionList
+          :items="funcItems"
+          @select="onSelectFunctionItem"
+          @reorder="onReorderFunctionList"
+        />
       </div>
     </div>
 
@@ -243,6 +251,8 @@ interface CanvasEditorRef {
   setZoom: (pct: number) => void
   setZoomAtPoint: (pct: number, point: { x: number; y: number }) => void
   resetViewport: () => void
+  selectAnnotation: (annotationId: string) => void
+  applyColor: (color: string) => void
   rotateSelectedAnnotationCCW90: () => void
   exportImageDataURL: () => string | null
 }
@@ -437,6 +447,15 @@ const hydrateFunctionItems = (contentItems: ContentJsonItem[]): void => {
 const getAnnotationOrder = (annotation: CanvasAnnotation): number =>
   annotation.order ?? annotation.number ?? annotation.zIndex ?? 0
 
+// 기능 항목 선택
+const onSelectFunctionItem = (annotationId: string): void => {
+  canvasEditorRef.value?.selectAnnotation(annotationId)
+}
+
+const onSelectColor = (color: string): void => {
+  canvasEditorRef.value?.applyColor(color)
+}
+
 // 기능 목록 재정렬
 const onReorderFunctionList = (payload: {
   visibleIds: string[]
@@ -447,20 +466,15 @@ const onReorderFunctionList = (payload: {
   if (payload.fromIndex === payload.toIndex) return
 
   const visibleIdSet = new Set(payload.visibleIds)
+  const itemById = new Map(funcItems.value.map((item) => [item.id, item]))
 
   // 전체 정렬
   const sortedFull = [...funcItems.value].sort((a, b) => a.orderNo - b.orderNo)
 
-  const visibleItems = sortedFull.filter((item) => visibleIdSet.has(item.id))
+  const visibleItems = payload.visibleIds
+    .map((id) => itemById.get(id))
+    .filter((item): item is FunctionalityItem => Boolean(item))
   if (!visibleItems.length) return
-
-  const from = Math.max(0, Math.min(payload.fromIndex, visibleItems.length - 1))
-  const to = Math.max(0, Math.min(payload.toIndex, visibleItems.length - 1))
-  if (from === to) return
-
-  // 이동 처리
-  const moved = visibleItems.splice(from, 1)[0]
-  visibleItems.splice(to, 0, moved)
 
   // 표시 목록 치환
   let visiblePtr = 0
@@ -523,7 +537,6 @@ const toFileSrc = (imgPath: string, version?: string): string => {
 const toDocumentItem = (doc: Doc): DocumentItem => {
   const thumbnailPath = doc.draw_img_path || doc.orgn_img_path
   const thumbnailVersion = doc.updated_at
-
 
   return {
     id: doc.id,

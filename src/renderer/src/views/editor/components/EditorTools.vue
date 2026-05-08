@@ -11,7 +11,7 @@
         "
         :style="{ backgroundColor: color }"
         :aria-label="`색상 ${color}`"
-        @click="emit('update:colorValue', color)"
+        @click="selectColor(color)"
       />
     </div>
 
@@ -33,7 +33,10 @@
       >
         <i-lucide-circle-plus v-if="tool.value === 'number'" class="h-3.5 w-3.5" />
         <i-lucide-square v-else-if="tool.value === 'strokebox'" class="h-3.5 w-3.5" />
-        <span v-else-if="tool.value === 'filled-box'" class="h-3.5 w-3.5 rounded-[2px] bg-current"></span>
+        <span
+          v-else-if="tool.value === 'filled-box'"
+          class="h-3.5 w-3.5 rounded-[2px] bg-current"
+        ></span>
         <i-lucide-square-dashed v-else class="h-3.5 w-3.5" />
         <span>{{ tool.label }}</span>
       </button>
@@ -65,7 +68,7 @@ const toolItems: Array<{
 }> = [
   { value: 'number', label: '번호' },
   { value: 'strokebox', label: '테두리 박스' },
-  { value: 'filled-box', label: '박스' },
+  { value: 'filled-box', label: '박스' }
   // { value: 'mosaic', label: '모자이크' }
 ]
 
@@ -77,7 +80,17 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [value: ToolMode]
   'update:colorValue': [value: string]
+  'select-color': [value: string]
 }>()
+
+const selectColor = (color: string): void => {
+  const isSameColor = props.colorValue === color
+
+  emit('update:colorValue', color)
+  if (isSameColor) {
+    emit('select-color', color)
+  }
+}
 
 const toggleTool = (tool: ActiveToolMode): void => {
   emit('update:modelValue', props.modelValue === tool ? null : tool)

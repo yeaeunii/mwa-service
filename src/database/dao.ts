@@ -2,8 +2,8 @@ import { app } from 'electron'
 import { copyFileSync, existsSync, mkdirSync } from 'fs'
 import { unlink, writeFile } from 'fs/promises'
 import path from 'path'
-import { selectList,selectOne,  runQuery } from './conn'
-import { Project, Workspace } from './dto'
+import { selectList, selectOne, runQuery, transaction } from './conn'
+import { Doc, Project, Workspace } from './dto'
 import dayjs from 'dayjs'
 
 // 프로젝트 조회
@@ -39,7 +39,6 @@ export const getProjectList = (params?: Record<string, unknown>): Project[] => {
 }
 // 프로젝트 생성
 export const createProject = (project: Record<string, unknown>): number => {
-
   const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
 
   const query = `
@@ -143,7 +142,6 @@ export const getWorkspaceList = (params?: Record<string, unknown>): Workspace[] 
   return selectList<Workspace>(query, queryParams) as Workspace[]
 }
 
-
 // 워크스페이스 생성
 export const createWorkspace = (workspace: Record<string, unknown>): number => {
   const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
@@ -164,7 +162,6 @@ export const createWorkspace = (workspace: Record<string, unknown>): number => {
     `,
     { id: workspace.project_id }
   )
-
 
   const query = `
     INSERT INTO t_workspace (
@@ -197,8 +194,6 @@ export const createWorkspace = (workspace: Record<string, unknown>): number => {
   return Number(result.lastInsertRowid)
 }
 
-
-
 // 워크스페이스 수정
 export const updateWorkspace = (project: Record<string, unknown>): void => {
   const query = `
@@ -227,10 +222,9 @@ export const deleteWorkspace = (id: string | number): void => {
   runQuery(query, { id })
 }
 
-
 //프로젝트명 워크스페이스명 조회
-export const getWorkspaceDetail = (id:string | number ) => {
-const query = `
+export const getWorkspaceDetail = (id: string | number) => {
+  const query = `
     SELECT
       w.id,
       w.name,
@@ -243,9 +237,8 @@ const query = `
     WHERE w.id = @id
 `
 
-return selectOne(query, { id })
+  return selectOne(query, { id })
 }
-
 
 //캡쳐 이미지 조회
 export const getCaptureList = (params: Record<string, unknown>) => {
@@ -263,8 +256,6 @@ export const getCaptureList = (params: Record<string, unknown>) => {
 
   return selectList(query, params)
 }
-
-
 
 //캡쳐이미지 local & DB 저장
 export const createCaptureWithImage = async (
@@ -330,7 +321,6 @@ export const createCaptureWithImage = async (
   }
 }
 
-
 //캡쳐이름 수정
 export const updateCaptureName = (capture: Record<string, unknown>): void => {
   const query = `
@@ -341,7 +331,6 @@ export const updateCaptureName = (capture: Record<string, unknown>): void => {
 
   runQuery(query, capture)
 }
-
 
 //캡쳐 삭제
 export const deleteCapture = async (capture: Record<string, unknown>): Promise<void> => {
@@ -591,4 +580,174 @@ export const updateDocSortOrders = (docs: Array<{ id: number; sortOrder: number 
       updated_at: now
     })
   }
+}
+
+const copyDocFile = (docId: number, imgPath: string, prefix: 'orgnImg' | 'drawImg'): string => {
+  if (!imgPath) return ''
+
+  const fileRootDir = path.join(app.getPath('userData'), 'FILE')
+  const docsDir = path.join(fileRootDir, 'DOCS')
+  const relativePath = imgPath.replace(/\\/g, '/').replace(/^\/+/, '')
+  const sourceAbsPath = path.resolve(app.getPath('userData'), relativePath)
+  const resolvedBase = path.resolve(fileRootDir)
+  const normalizedBase = resolvedBase + path.sep
+  const isInsideBase = sourceAbsPath === resolvedBase || sourceAbsPath.startsWith(normalizedBase)
+
+  if (!isInsideBase) {
+    throw new Error(`Forbidden file path: ${imgPath}`)
+  }
+
+  if (!existsSync(sourceAbsPath)) return ''
+  if (!existsSync(docsDir)) {
+    mkdirSync(docsDir, { recursive: true })
+  }
+
+  const copiedName = `${prefix}_${docId}.png`
+  const copiedAbsPath = path.join(docsDir, copiedName)
+  const copiedPath = path.join('FILE', 'DOCS', copiedName).replace(/\\/g, '/')
+
+  copyFileSync(sourceAbsPath, copiedAbsPath)
+  return copiedPath
+}
+
+export const moveDocs = (params: { docIds: number[]; workspaceId: number }): void => {
+  const docIds = Array.isArray(params.docIds) ? params.docIds.map(Number).filter(Boolean) : []
+  const workspaceId = Number(params.workspaceId)
+  if (!docIds.length || !workspaceId) return
+
+  transaction((db) => {
+    const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    const maxSort = db
+      .prepare(
+        `
+            SELECT COALESCE(MAX(sort_order), 0) AS sortOrder
+            FROM t_doc
+            WHERE workspace_id = @workspaceId
+          `
+      )
+      .get({ workspaceId }) as { sortOrder: number }
+
+    const update = db.prepare(`
+      UPDATE t_doc
+      SET workspace_id = @workspaceId,
+          sort_order = @sortOrder,
+          updated_at = @updated_at
+      WHERE id = @id
+    `)
+
+    docIds.forEach((id, index) => {
+      update.run({
+        id,
+        workspaceId,
+        sortOrder: Number(maxSort.sortOrder ?? 0) + index + 1,
+        updated_at: now
+      })
+    })
+  })
+}
+
+export const copyDocs = (params: { docIds: number[]; workspaceId: number }): void => {
+  const docIds = Array.isArray(params.docIds) ? params.docIds.map(Number).filter(Boolean) : []
+  const workspaceId = Number(params.workspaceId)
+  if (!docIds.length || !workspaceId) return
+
+  transaction((db) => {
+    const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    const maxSort = db
+      .prepare(
+        `
+            SELECT COALESCE(MAX(sort_order), 0) AS sortOrder
+            FROM t_doc
+            WHERE workspace_id = @workspaceId
+          `
+      )
+      .get({ workspaceId }) as { sortOrder: number }
+
+    const selectDoc = db.prepare(`
+      SELECT
+        id,
+        workspace_id,
+        title,
+        description,
+        status,
+        doc_meta_json,
+        content_json,
+        annotation_json,
+        orgn_img_path,
+        draw_img_path,
+        sort_order,
+        created_at,
+        updated_at
+      FROM t_doc
+      WHERE id = @id
+    `)
+
+    const insertDoc = db.prepare(`
+      INSERT INTO t_doc (
+        workspace_id,
+        title,
+        description,
+        status,
+        doc_meta_json,
+        content_json,
+        annotation_json,
+        orgn_img_path,
+        draw_img_path,
+        sort_order,
+        created_at,
+        updated_at
+      )
+      VALUES (
+        @workspaceId,
+        @title,
+        @description,
+        @status,
+        @docMetaJson,
+        @contentJson,
+        @annotationJson,
+        '',
+        '',
+        @sortOrder,
+        @created_at,
+        @updated_at
+      )
+    `)
+
+    const updateImages = db.prepare(`
+      UPDATE t_doc
+      SET orgn_img_path = @orgnImgPath,
+          draw_img_path = @drawImgPath,
+          updated_at = @updated_at
+      WHERE id = @id
+    `)
+
+    docIds.forEach((id, index) => {
+      const doc = selectDoc.get({ id }) as Doc | undefined
+      if (!doc) return
+
+      const result = insertDoc.run({
+        workspaceId,
+        title: doc.title,
+        description: doc.description,
+        status: doc.status,
+        docMetaJson: doc.doc_meta_json,
+        contentJson: doc.content_json,
+        annotationJson: doc.annotation_json,
+        sortOrder: Number(maxSort.sortOrder ?? 0) + index + 1,
+        created_at: now,
+        updated_at: now
+      })
+
+      const newDocId = Number(result.lastInsertRowid)
+      const orgnImgPath = copyDocFile(newDocId, doc.orgn_img_path, 'orgnImg')
+      const drawImgPath = copyDocFile(newDocId, doc.draw_img_path, 'drawImg')
+
+      updateImages.run({
+        id: newDocId,
+        orgnImgPath,
+        drawImgPath,
+        updated_at: now
+      })
+    })
+  })
 }

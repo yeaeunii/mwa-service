@@ -22,7 +22,6 @@ export const getProjects = async (params: Record<string, unknown>): Promise<Proj
   }
 }
 
-
 export const getWorkspaces = async (params: Record<string, unknown>): Promise<Workspace[]> => {
   try {
     return (await window.api.invoke('dao:call', 'getWorkspaceList', params)) as Workspace[]
@@ -32,8 +31,9 @@ export const getWorkspaces = async (params: Record<string, unknown>): Promise<Wo
   }
 }
 
-
-export const createWorkspace = async (workspace: Record<string, unknown>): Promise<number | null> => {
+export const createWorkspace = async (
+  workspace: Record<string, unknown>
+): Promise<number | null> => {
   try {
     return (await window.api.invoke('dao:call', 'createWorkspace', workspace)) as number
   } catch (error) {
@@ -65,12 +65,9 @@ export const getWorkspaceDetail = async (id: string): Promise<WorkspaceDetail | 
     console.error(error)
     return null
   }
-
 }
 
-export const getCaptureList = async (params: {
-  workspaceId: number
-}): Promise<Capture[]> => {
+export const getCaptureList = async (params: { workspaceId: number }): Promise<Capture[]> => {
   try {
     return (await window.api.invoke('dao:call', 'getCaptureList', params)) as Capture[]
   } catch (error) {
@@ -96,10 +93,7 @@ export const createCaptureWithImage = async (capture: {
   }
 }
 
-export const updateCaptureName = async (capture: {
-  id: number
-  name: string
-}): Promise<void> => {
+export const updateCaptureName = async (capture: { id: number; name: string }): Promise<void> => {
   try {
     await window.api.invoke('dao:call', 'updateCaptureName', capture)
   } catch (error) {
@@ -191,13 +185,41 @@ export const deleteDoc = async (id: number): Promise<void> => {
   }
 }
 
-export const updateDocSortOrders = async (docs: Array<{
-  id: number
-  sortOrder: number
-}>): Promise<void> => {
+export const updateDocSortOrders = async (
+  docs: Array<{
+    id: number
+    sortOrder: number
+  }>
+): Promise<void> => {
   try {
     await window.api.invoke('dao:call', 'updateDocSortOrders', docs)
   } catch (error) {
     console.error(error)
+  }
+}
+
+export const moveDocs = async (params: {
+  docIds: number[]
+  workspaceId: number
+}): Promise<boolean> => {
+  try {
+    await window.api.invoke('dao:call', 'moveDocs', params)
+    return true
+  } catch (error) {
+    console.error(error)
+    return false
+  }
+}
+
+export const copyDocs = async (params: {
+  docIds: number[]
+  workspaceId: number
+}): Promise<boolean> => {
+  try {
+    await window.api.invoke('dao:call', 'copyDocs', params)
+    return true
+  } catch (error) {
+    console.error(error)
+    return false
   }
 }

@@ -9,6 +9,7 @@ declare global {
   const EffectScope: typeof import('vue').EffectScope
   const acceptHMRUpdate: typeof import('pinia').acceptHMRUpdate
   const computed: typeof import('vue').computed
+  const copyDocs: typeof import('./database/index').copyDocs
   const createApp: typeof import('vue').createApp
   const createCapture: typeof import('./database/index').createCapture
   const createCaptureWithImage: typeof import('./database/index').createCaptureWithImage
@@ -49,6 +50,7 @@ declare global {
   const mapStores: typeof import('pinia').mapStores
   const mapWritableState: typeof import('pinia').mapWritableState
   const markRaw: typeof import('vue').markRaw
+  const moveDocs: typeof import('./database/index').moveDocs
   const nextTick: typeof import('vue').nextTick
   const onActivated: typeof import('vue').onActivated
   const onBeforeMount: typeof import('vue').onBeforeMount
@@ -139,6 +141,7 @@ declare module 'vue' {
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
     readonly acceptHMRUpdate: UnwrapRef<typeof import('pinia')['acceptHMRUpdate']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
+    readonly copyDocs: UnwrapRef<typeof import('./database/index')['copyDocs']>
     readonly createApp: UnwrapRef<typeof import('vue')['createApp']>
     readonly createCaptureWithImage: UnwrapRef<typeof import('./database/index')['createCaptureWithImage']>
     readonly createDoc: UnwrapRef<typeof import('./database/index')['createDoc']>
@@ -175,6 +178,7 @@ declare module 'vue' {
     readonly mapStores: UnwrapRef<typeof import('pinia')['mapStores']>
     readonly mapWritableState: UnwrapRef<typeof import('pinia')['mapWritableState']>
     readonly markRaw: UnwrapRef<typeof import('vue')['markRaw']>
+    readonly moveDocs: UnwrapRef<typeof import('./database/index')['moveDocs']>
     readonly nextTick: UnwrapRef<typeof import('vue')['nextTick']>
     readonly onActivated: UnwrapRef<typeof import('vue')['onActivated']>
     readonly onBeforeMount: UnwrapRef<typeof import('vue')['onBeforeMount']>
