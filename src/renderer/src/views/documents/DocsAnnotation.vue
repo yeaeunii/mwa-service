@@ -17,32 +17,22 @@
                 {{ currentDocTitle || '문서 편집' }}
               </div>
               <div
-                v-if="isSaving || showSavedStatus"
+                v-if="isAutoSavePending || isSaving || showSavedStatus"
                 class="flex items-center gap-1.5 text-xs text-base-content/50"
               >
-                <template v-if="isSaving">
-                  <i-lucide-loader-circle class="h-3 w-3 animate-spin" />
-                  저장중...
+                <template v-if="isAutoSavePending || isSaving">
+                  <i-lucide-loader-circle class="h-3 w-3 animate-spin text-primary" />
+                  저장 중
                 </template>
                 <template v-else-if="showSavedStatus">
-                  <i-lucide-check-circle class="h-3 w-3 text-success" />
-                  방금전 저장됨
+                  <i-lucide-check-circle class="h-3 w-3 text-primary" />
+                  {{ savedStatusMessage }}
                 </template>
               </div>
             </div>
           </div>
         </div>
         <div class="flex items-center gap-1">
-          <button
-            type="button"
-            class="btn btn-primary btn-sm gap-1.5"
-            :disabled="isSaving"
-            @click="saveAnnotationDoc"
-          >
-            <span v-if="isSaving" class="loading loading-spinner loading-xs"></span>
-            <i-lucide-save v-else class="h-4 w-4" />
-            {{ isSaving ? '저장중' : '저장' }}
-          </button>
           <label for="mainDrawer" class="btn btn-ghost btn-sm gap-1.5">
             문서목록
             <i-lucide-panel-right-open class="h-4 w-4" />
@@ -217,17 +207,6 @@
       </div>
     </div>
 
-    <div v-if="saveToast" class="toast toast-end toast-top z-50">
-      <div
-        class="alert gap-2 shadow-lg"
-        :class="saveToast.type === 'success' ? 'alert-success' : 'alert-error'"
-      >
-        <i-lucide-check-circle v-if="saveToast.type === 'success'" class="h-4 w-4" />
-        <i-lucide-circle-alert v-else class="h-4 w-4" />
-        <span>{{ saveToast.message }}</span>
-      </div>
-    </div>
-
     <ModalConfirm ref="resetConfirmRef" ok-text="초기화" @on-confirm="onConfirmResetAnnotations">
       <template #message>
         <div class="text-center">
@@ -289,9 +268,13 @@ const router = useRouter()
 const openDrawer = ref(false)
 const isLoading = ref(false)
 const isSaving = ref(false)
+const isAutoSavePending = ref(false)
 const showSavedStatus = ref(false)
-const saveToast = ref<{ type: 'success' | 'error'; message: string } | null>(null)
-let saveToastTimeout: ReturnType<typeof setTimeout> | null = null
+const savedAt = ref<number | null>(null)
+const nowTime = ref(Date.now())
+let relativeTimeTimer: ReturnType<typeof setInterval> | null = null
+let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
+let saveAgainAfterCurrent = false
 const resetConfirmRef = ref<ComponentRef<'ModalConfirm'> | null>(null)
 
 // 문서 상태
@@ -321,7 +304,15 @@ const redoStack = ref<HistorySnapshot[]>([])
 let isApplyingHistory = false
 const MAX_HISTORY_COUNT = 80
 
-// content_json 파싱
+// 저장 상태 문구
+const savedStatusMessage = computed(() => {
+  if (!savedAt.value) return '자동저장됨'
+
+  const diffSeconds = Math.max(0, Math.floor((nowTime.value - savedAt.value) / 1000))
+  return diffSeconds < 10 ? '방금 전 자동저장' : '자동저장됨'
+})
+
+// JSON 파싱
 const parseContentItems = (value: string | null | undefined): ContentJsonItem[] => {
   try {
     const parsed = JSON.parse(value || '[]')
@@ -338,6 +329,27 @@ const parseContentItems = (value: string | null | undefined): ContentJsonItem[] 
     console.error(error)
     return []
   }
+}
+
+const parseAnnotations = (value: string | null | undefined): CanvasAnnotation[] => {
+  try {
+    const parsed = JSON.parse(value || '[]')
+
+    if (Array.isArray(parsed)) {
+      return parsed.filter((item): item is CanvasAnnotation => Boolean(item?.id && item?.toolType))
+    }
+
+    if (parsed && typeof parsed === 'object') {
+      return Object.entries(parsed).map(([id, item]) => ({
+        id,
+        ...(item as Omit<CanvasAnnotation, 'id'>)
+      }))
+    }
+  } catch (error) {
+    console.error(error)
+  }
+
+  return []
 }
 
 // 히스토리 복제
@@ -408,40 +420,33 @@ const redoAnnotation = (): void => {
   applyHistorySnapshot(nextSnapshot)
 }
 
-// 기능 목록 동기화
+// 기능 설명 목록은 번호 어노테이션만 대상으로 만든다.
+const getNumberAnnotations = (): CanvasAnnotation[] =>
+  annotations.value
+    .filter((item) => item.toolType === 'number')
+    .sort((a, b) => {
+      const aOrder = a.number ?? a.order ?? 0
+      const bOrder = b.number ?? b.order ?? 0
+      return aOrder - bOrder
+    })
+
+const buildFunctionItems = (contentById: Map<string, string>): FunctionalityItem[] =>
+  getNumberAnnotations().map((item, index) => ({
+    id: item.id,
+    orderNo: item.number ?? item.order ?? index + 1,
+    content: contentById.get(item.id) ?? ''
+  }))
+
+// 어노테이션 변경 후 기능 설명 목록을 다시 맞춘다.
 const syncFunctionItemsFromAnnotations = (): void => {
   const prevContentById = new Map(funcItems.value.map((item) => [item.id, item.content]))
-  const numberAnnotations = annotations.value
-    .filter((item) => item.toolType === 'number')
-    .sort((a, b) => {
-      const aOrder = a.number ?? a.order ?? 0
-      const bOrder = b.number ?? b.order ?? 0
-      return aOrder - bOrder
-    })
-
-  funcItems.value = numberAnnotations.map((item, index) => ({
-    id: item.id,
-    orderNo: item.number ?? item.order ?? index + 1,
-    content: prevContentById.get(item.id) ?? ''
-  }))
+  funcItems.value = buildFunctionItems(prevContentById)
 }
 
-// 기능 목록 복원
+// DB에서 불러온 기능 설명을 번호 어노테이션에 연결한다.
 const hydrateFunctionItems = (contentItems: ContentJsonItem[]): void => {
   const contentByAnnotationId = new Map(contentItems.map((item) => [item.annotationId, item.text]))
-  const numberAnnotations = annotations.value
-    .filter((item) => item.toolType === 'number')
-    .sort((a, b) => {
-      const aOrder = a.number ?? a.order ?? 0
-      const bOrder = b.number ?? b.order ?? 0
-      return aOrder - bOrder
-    })
-
-  funcItems.value = numberAnnotations.map((item, index) => ({
-    id: item.id,
-    orderNo: item.number ?? item.order ?? index + 1,
-    content: contentByAnnotationId.get(item.id) ?? ''
-  }))
+  funcItems.value = buildFunctionItems(contentByAnnotationId)
 }
 
 const getAnnotationOrder = (annotation: CanvasAnnotation): number =>
@@ -456,19 +461,13 @@ const onSelectColor = (color: string): void => {
   canvasEditorRef.value?.applyColor(color)
 }
 
-// 기능 목록 재정렬
-const onReorderFunctionList = (payload: {
-  visibleIds: string[]
-  fromIndex: number
-  toIndex: number
-}): void => {
+// 기능 설명 순서를 바꾸면 번호 어노테이션의 번호도 함께 바꾼다.
+const onReorderFunctionList = (payload: { visibleIds: string[] }): void => {
   if (!payload.visibleIds.length) return
-  if (payload.fromIndex === payload.toIndex) return
 
   const visibleIdSet = new Set(payload.visibleIds)
   const itemById = new Map(funcItems.value.map((item) => [item.id, item]))
 
-  // 전체 정렬
   const sortedFull = [...funcItems.value].sort((a, b) => a.orderNo - b.orderNo)
 
   const visibleItems = payload.visibleIds
@@ -476,7 +475,6 @@ const onReorderFunctionList = (payload: {
     .filter((item): item is FunctionalityItem => Boolean(item))
   if (!visibleItems.length) return
 
-  // 표시 목록 치환
   let visiblePtr = 0
   const newSortedFull = sortedFull.map((item) => {
     if (!visibleIdSet.has(item.id)) return item
@@ -484,7 +482,6 @@ const onReorderFunctionList = (payload: {
     return next ?? item
   })
 
-  // 번호 재부여
   const nextOrderById = new Map<string, number>()
 
   newSortedFull.forEach((item, index) => {
@@ -501,7 +498,8 @@ const onReorderFunctionList = (payload: {
     return {
       ...annotation,
       number: nextOrder,
-      order: nextOrder
+      order: nextOrder,
+      zIndex: nextOrder
     }
   })
 
@@ -556,28 +554,6 @@ const filteredDocumentItems = computed(() => {
   return documentItems.value.filter((doc) => doc.title.toLowerCase().includes(keyword))
 })
 
-// annotation_json 파싱
-const parseAnnotations = (value: string | null | undefined): CanvasAnnotation[] => {
-  try {
-    const parsed = JSON.parse(value || '[]')
-
-    if (Array.isArray(parsed)) {
-      return parsed.filter((item): item is CanvasAnnotation => Boolean(item?.id && item?.toolType))
-    }
-
-    if (parsed && typeof parsed === 'object') {
-      return Object.entries(parsed).map(([id, item]) => ({
-        id,
-        ...(item as Omit<CanvasAnnotation, 'id'>)
-      }))
-    }
-  } catch (error) {
-    console.error(error)
-  }
-
-  return []
-}
-
 // 문서 목록 조회
 const loadDocumentItems = async (workspaceId: number): Promise<void> => {
   const list = await getDocList({
@@ -592,7 +568,9 @@ const loadDoc = async (): Promise<void> => {
   if (!curDocId.value) return
 
   isLoading.value = true
+  isAutoSavePending.value = false
   showSavedStatus.value = false
+  savedAt.value = null
   try {
     const [doc] = await getDocList({
       id: curDocId.value
@@ -660,6 +638,8 @@ const onClickResetAnnotations = (): void => {
 const onConfirmResetAnnotations = (): void => {
   annotations.value = []
   funcItems.value = []
+  wheelZoomPoint = null
+  zoomPct.value = 100
   canvasEditorRef.value?.resetViewport()
 }
 
@@ -698,24 +678,16 @@ const toAnnotationJson = (): CanvasAnnotation[] =>
       height: annotation.height
     }))
 
-// 저장 토스트
-const showSaveToast = (type: 'success' | 'error', message: string): void => {
-  if (saveToastTimeout) {
-    clearTimeout(saveToastTimeout)
+// 문서 자동저장
+const saveAnnotationDoc = async (): Promise<void> => {
+  if (!curDocId.value) return
+  if (isSaving.value) {
+    saveAgainAfterCurrent = true
+    return
   }
 
-  saveToast.value = { type, message }
-  saveToastTimeout = setTimeout(() => {
-    saveToast.value = null
-    saveToastTimeout = null
-  }, 1800)
-}
-
-// 문서 저장
-const saveAnnotationDoc = async (): Promise<void> => {
-  if (!curDocId.value || isSaving.value) return
-
   isSaving.value = true
+  isAutoSavePending.value = false
   showSavedStatus.value = false
   try {
     const drawDataUrl = canvasEditorRef.value?.exportImageDataURL() ?? null
@@ -726,18 +698,53 @@ const saveAnnotationDoc = async (): Promise<void> => {
       drawDataUrl
     })
 
-    showSaveToast(
-      isSaved ? 'success' : 'error',
-      isSaved ? '저장되었습니다.' : '저장에 실패했습니다.'
-    )
     showSavedStatus.value = isSaved
+    savedAt.value = isSaved ? Date.now() : null
   } finally {
     isSaving.value = false
+
+    if (saveAgainAfterCurrent) {
+      saveAgainAfterCurrent = false
+      scheduleAutoSave()
+    }
   }
+}
+
+// 변경 직후 바로 저장하지 않고 잠깐 기다렸다가 한 번만 저장한다.
+const scheduleAutoSave = (): void => {
+  if (isLoading.value || isApplyingHistory) return
+
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer)
+  }
+
+  showSavedStatus.value = false
+  savedAt.value = null
+  isAutoSavePending.value = true
+
+  autoSaveTimer = setTimeout(() => {
+    autoSaveTimer = null
+    isAutoSavePending.value = false
+    void saveAnnotationDoc()
+  }, 600)
+}
+
+// 문서 이동/화면 종료 전에 예약된 저장을 즉시 실행한다.
+const flushPendingAutoSave = (): void => {
+  if (!autoSaveTimer) return
+
+  clearTimeout(autoSaveTimer)
+  autoSaveTimer = null
+  isAutoSavePending.value = false
+  void saveAnnotationDoc()
 }
 
 // 초기 조회
 onMounted(() => {
+  relativeTimeTimer = setInterval(() => {
+    nowTime.value = Date.now()
+  }, 1000)
+
   void loadDoc()
 })
 
@@ -759,6 +766,7 @@ watch(
     const nextDocId = Number(docId || 0)
     if (!nextDocId || nextDocId === curDocId.value) return
 
+    flushPendingAutoSave()
     curDocId.value = nextDocId
     void loadDoc()
   }
@@ -768,18 +776,20 @@ watch(
 watch(
   [annotations, funcItems],
   () => {
-    if (isLoading.value || isSaving.value || isApplyingHistory) return
+    if (isLoading.value || isApplyingHistory) return
     pushHistory()
-    showSavedStatus.value = false
+    scheduleAutoSave()
   },
   { deep: true }
 )
 
 // 정리
 onUnmounted(() => {
-  if (saveToastTimeout) {
-    clearTimeout(saveToastTimeout)
-    saveToastTimeout = null
+  flushPendingAutoSave()
+
+  if (relativeTimeTimer) {
+    clearInterval(relativeTimeTimer)
+    relativeTimeTimer = null
   }
 })
 </script>

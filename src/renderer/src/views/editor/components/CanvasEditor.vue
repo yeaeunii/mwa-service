@@ -151,6 +151,7 @@ let drawBox: Rect | null = null
 let drawing = false
 let startX = 0
 let startY = 0
+let pendingSelectAnnotationId: string | null = null
 
 // 복제 상태
 let copiedAnnotation: CanvasAnnotation | null = null // 복사해둔 어노테이션
@@ -177,6 +178,14 @@ const setNumberRing = (obj: CanvasObj | null, selected: boolean): void => {
     hasBorders: !fromFunctionList
   })
   obj.setCoords()
+}
+
+const isDrawingTool = (tool: ToolMode): boolean =>
+  tool === 'number' || tool === 'strokebox' || tool === 'filled-box' || tool === 'mosaic'
+
+const syncCanvasSelectionMode = (): void => {
+  if (!canvas) return
+  canvas.selection = !isDrawingTool(props.activeTool)
 }
 
 // 선택 해제
@@ -662,7 +671,7 @@ const buildObject = (annotation: CanvasAnnotation): CanvasObj | null => {
 const syncCanvasObjects = (): void => {
   if (!canvas) return
 
-  const selectedId = selectedObj.value?.annotationId ?? null
+  const selectedId = pendingSelectAnnotationId ?? selectedObj.value?.annotationId ?? null
 
   for (const obj of [...canvas.getObjects()]) {
     if (obj !== baseImg) {
@@ -696,7 +705,9 @@ const syncCanvasObjects = (): void => {
       canvas.setActiveObject(active)
       selectedObj.value = active
       setNumberRing(active, true)
+      pendingSelectAnnotationId = null
     } else {
+      pendingSelectAnnotationId = null
       clearSel()
     }
   }
@@ -1003,6 +1014,9 @@ const emitObjectUpdate = (obj: CanvasObj, overrides?: Partial<CanvasAnnotation>)
 const startBox = (left: number, top: number): void => {
   if (!canvas) return
 
+  canvas.discardActiveObject()
+  clearSel()
+  canvas.selection = false
   drawing = true
   startX = left
   startY = top
@@ -1061,6 +1075,7 @@ const setupCanvas = (): void => {
     height: MIN_CANVAS_HEIGHT,
     selection: true
   })
+  syncCanvasSelectionMode()
 
   canvas.on('selection:created', syncSel)
   canvas.on('selection:updated', syncSel)
@@ -1130,8 +1145,10 @@ const setupCanvas = (): void => {
 
     if (props.activeTool === 'number') {
       const nextNumber = getNextNumber()
+      const annotationId = `ann-${Date.now()}`
+      pendingSelectAnnotationId = annotationId
       emit('add-annotation', {
-        id: `ann-${Date.now()}`,
+        id: annotationId,
         toolType: 'number',
         color: props.activeColor,
         number: nextNumber,
@@ -1175,8 +1192,9 @@ const setupCanvas = (): void => {
       return
     }
 
+    const annotationId = `ann-${Date.now()}`
     const nextAnnotation: CanvasAnnotation = {
-      id: `ann-${Date.now()}`,
+      id: annotationId,
       toolType: props.activeTool as CanvasAnnotation['toolType'],
       color: props.activeColor,
       x: drawBox.left ?? 0,
@@ -1189,6 +1207,7 @@ const setupCanvas = (): void => {
     canvas.remove(drawBox)
     drawBox = null
     drawing = false
+    pendingSelectAnnotationId = annotationId
     emit('add-annotation', nextAnnotation)
   })
 }
@@ -1210,6 +1229,14 @@ watch(
     syncCanvasObjects()
   },
   { deep: true }
+)
+
+watch(
+  () => props.activeTool,
+  () => {
+    syncCanvasSelectionMode()
+  },
+  { immediate: true }
 )
 
 // 색상 watch

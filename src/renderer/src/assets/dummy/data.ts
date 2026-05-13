@@ -42,6 +42,30 @@ export interface DummyEditorFolder {
   screenshots: DummyEditorScreenshot[]
 }
 
+export interface DummyDeliverableItem {
+  id: string
+  title: string
+  date: string
+}
+
+export const deliverableItems: DummyDeliverableItem[] = [
+  {
+    id: 'deliverable-result-report-2024-h1',
+    title: '2024 상반기 프로젝트 결과 보고서',
+    date: '2024년 06월 15일'
+  },
+  {
+    id: 'deliverable-requirements-v1-2',
+    title: '제품 기획 요구사항 정의서 (v1.2)',
+    date: '2024년 06월 12일'
+  },
+  {
+    id: 'deliverable-marketing-analysis',
+    title: '마케팅 캠페인 성과 분석 데이터',
+    date: '2024년 06월 01일'
+  }
+]
+
 export const manualCaseItems: {
   id: number
   title: string

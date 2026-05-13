@@ -24,6 +24,7 @@ declare global {
   const deleteCapture: typeof import('./database/index').deleteCapture
   const deleteDoc: typeof import('./database/index').deleteDoc
   const deleteProject: typeof import('./database/index').deleteProject
+  const deleteWorkspace: typeof import('./database/index').deleteWorkspace
   const effectScope: typeof import('vue').effectScope
   const getActivePinia: typeof import('pinia').getActivePinia
   const getCaptureList: typeof import('./database/index').getCaptureList
@@ -91,7 +92,9 @@ declare global {
   const updateDoc: typeof import('./database/index').updateDoc
   const updateDocAnnotation: typeof import('./database/index').updateDocAnnotation
   const updateDocSortOrders: typeof import('./database/index').updateDocSortOrders
+  const updateDocStatus: typeof import('./database/index').updateDocStatus
   const updateProject: typeof import('./database/index').updateProject
+  const updateWorkspace: typeof import('./database/index').updateWorkspace
   const useAttrs: typeof import('vue').useAttrs
   const useContextMenu: typeof import('./composables/useContextMenu').useContextMenu
   const useCounterStore: typeof import('./stores/counter').useCounterStore
@@ -155,6 +158,7 @@ declare module 'vue' {
     readonly deleteCapture: UnwrapRef<typeof import('./database/index')['deleteCapture']>
     readonly deleteDoc: UnwrapRef<typeof import('./database/index')['deleteDoc']>
     readonly deleteProject: UnwrapRef<typeof import('./database/index')['deleteProject']>
+    readonly deleteWorkspace: UnwrapRef<typeof import('./database/index')['deleteWorkspace']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly getActivePinia: UnwrapRef<typeof import('pinia')['getActivePinia']>
     readonly getCaptureList: UnwrapRef<typeof import('./database/index')['getCaptureList']>
@@ -218,7 +222,9 @@ declare module 'vue' {
     readonly updateDoc: UnwrapRef<typeof import('./database/index')['updateDoc']>
     readonly updateDocAnnotation: UnwrapRef<typeof import('./database/index')['updateDocAnnotation']>
     readonly updateDocSortOrders: UnwrapRef<typeof import('./database/index')['updateDocSortOrders']>
+    readonly updateDocStatus: UnwrapRef<typeof import('./database/index')['updateDocStatus']>
     readonly updateProject: UnwrapRef<typeof import('./database/index')['updateProject']>
+    readonly updateWorkspace: UnwrapRef<typeof import('./database/index')['updateWorkspace']>
     readonly useAttrs: UnwrapRef<typeof import('vue')['useAttrs']>
     readonly useContextMenu: UnwrapRef<typeof import('./composables/useContextMenu')['useContextMenu']>
     readonly useCounterStore: UnwrapRef<typeof import('./stores/counter')['useCounterStore']>

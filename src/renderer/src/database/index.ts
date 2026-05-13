@@ -42,6 +42,14 @@ export const createWorkspace = async (
   }
 }
 
+export const updateWorkspace = async (workspace: Record<string, unknown>): Promise<void> => {
+  try {
+    await window.api.invoke('dao:call', 'updateWorkspace', workspace)
+  } catch (error) {
+    console.error(error)
+  }
+}
+
 export const updateProject = async (project: Record<string, unknown>): Promise<void> => {
   try {
     await window.api.invoke('dao:call', 'updateProject', project)
@@ -53,6 +61,14 @@ export const updateProject = async (project: Record<string, unknown>): Promise<v
 export const deleteProject = async (id: string): Promise<void> => {
   try {
     await window.api.invoke('dao:call', 'deleteProject', id)
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+export const deleteWorkspace = async (id: string | number): Promise<void> => {
+  try {
+    await window.api.invoke('dao:call', 'deleteWorkspace', id)
   } catch (error) {
     console.error(error)
   }
@@ -170,6 +186,16 @@ export const updateDocAnnotation = async (doc: {
 }): Promise<boolean> => {
   try {
     await window.api.invoke('dao:call', 'updateDocAnnotation', doc)
+    return true
+  } catch (error) {
+    console.error(error)
+    return false
+  }
+}
+
+export const updateDocStatus = async (doc: { id: number; status: string }): Promise<boolean> => {
+  try {
+    await window.api.invoke('dao:call', 'updateDocStatus', doc)
     return true
   } catch (error) {
     console.error(error)

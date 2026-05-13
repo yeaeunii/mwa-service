@@ -21,23 +21,39 @@
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <button
-            type="button"
-            class="btn btn-primary btn-sm gap-1.5"
-            :class="{ 'btn-disabled': isSaving }"
-            :disabled="!selectedDocId || isSaving"
-            @click="onClickSave"
+          <div
+            v-if="currentAutoSaveState.status !== 'idle'"
+            class="flex items-center gap-1.5 text-xs text-base-content/50"
           >
-            <span v-if="isSaving" class="loading loading-spinner loading-xs"></span>
-            <i-lucide-save v-else class="h-4 w-4" />
-            저장
-          </button>
-          <div class="mx-1 h-5 w-px bg-base-content/10"></div>
+            <template v-if="isAutoSaving">
+              <i-lucide-loader-circle class="h-3 w-3 animate-spin text-primary" />
+              {{ autoSaveMessage }}
+            </template>
+            <template v-else-if="currentAutoSaveState.status === 'saved'">
+              <i-lucide-check-circle class="h-3 w-3 text-primary" />
+              {{ autoSaveMessage }}
+            </template>
+            <template v-else-if="currentAutoSaveState.status === 'error'">
+              <i-lucide-circle-alert class="h-3 w-3 text-error" />
+              {{ autoSaveMessage }}
+            </template>
+          </div>
           <button class="btn btn-ghost btn-sm" @click="onClickPrev">
             <i-lucide-chevron-left class="h-4 w-4" />
           </button>
           <button class="btn btn-ghost btn-sm" @click="onClickNext">
             <i-lucide-chevron-right class="h-4 w-4" />
+          </button>
+          <div class="mx-1 h-5 w-px bg-base-content/10"></div>
+          <button
+            type="button"
+            class="btn btn-sm gap-1.5"
+            :class="currentDocDone ? 'btn-success' : 'btn-outline btn-success'"
+            :disabled="!currentDoc"
+            @click="toggleDone"
+          >
+            <i-lucide-check-circle class="h-4 w-4" />
+            {{ currentDocDone ? '작업완료' : '작업중' }}
           </button>
           <div class="mx-1 h-5 w-px bg-base-content/10"></div>
           <label for="drawerRight" aria-label="open sidebar" class="btn btn-ghost btn-sm">
@@ -47,56 +63,50 @@
       </nav>
 
       <!-- Page content -->
-      <div class="flex-1 overflow-hidden bg-base-200">
-        <div class="mx-auto h-full max-w-[960px]">
-          <div ref="carouselRef" class="carousel h-full w-full">
+      <div class="flex-1 overflow-y-auto bg-base-200">
+        <div class="mx-auto min-h-full max-w-[960px]">
+          <div ref="carouselRef" class="carousel min-h-full w-full">
             <div
               v-for="doc in docs"
               :id="`slide-item-${doc.id}`"
               :key="doc.id"
               :data-doc-id="doc.id"
-              class="carousel-item h-full w-full"
+              class="carousel-item w-full"
             >
-              <div class="h-full w-full overflow-y-auto p-4 md:p-6">
+              <div class="w-full p-4 md:p-6">
                 <div class="rounded-xl border border-base-content/10 bg-base-100 shadow-sm">
                   <!-- Form Header -->
                   <div class="border-b border-base-content/5 p-5">
-                    <div
-                      class="tooltip tooltip-neutral tooltip-top mb-4 w-full before:left-2 before:translate-x-0 after:left-5 after:translate-x-0"
-                      data-tip="문서 제목"
-                    >
+                    <label class="floating-label mb-4 block w-full">
+                      <span>문서 제목</span>
                       <input
                         v-model="doc.title"
                         type="text"
-                        class="input input-ghost w-full text-lg font-bold focus:outline-none bg-slate-50"
-                        placeholder="문서 제목을 입력하세요"
+                        placeholder="문서 제목을 입력해주세요"
+                        class="input input-md w-full bg-base-200/50"
+                        @input="scheduleAutoSave(doc)"
                       />
-                    </div>
-                    <div
-                      class="tooltip tooltip-neutral tooltip-top mb-4 w-full before:left-2 before:translate-x-0 after:left-5 after:translate-x-0"
-                      data-tip="문서 설명"
-                    >
+                    </label>
+                    <label class="floating-label mb-4 block w-full">
+                      <span>문서 설명</span>
                       <textarea
                         v-model.trim="doc.description"
                         rows="2"
-                        class="textarea textarea-ghost w-full resize-none text-sm focus:outline-none bg-slate-50"
-                        placeholder="문서에 대한 설명을 입력하세요"
+                        placeholder="문서 설명을 입력해주세요"
+                        class="textarea textarea-md w-full resize-none bg-base-200/50"
+                        @input="scheduleAutoSave(doc)"
                       ></textarea>
-                    </div>
-                    <div
-                      class="tooltip tooltip-neutral tooltip-top w-full before:left-2 before:translate-x-0 after:left-5 after:translate-x-0"
-                      data-tip="진입경로"
-                    >
-                      <div class="flex items-center gap-2 bg-slate-50 px-2 rounded-lg">
-                        <i-lucide-route class="h-4 w-4 shrink-0 text-base-content/30" />
-                        <input
-                          v-model="doc.entryPath"
-                          type="text"
-                          class="input input-ghost w-full text-sm focus:outline-none bg-slate-50"
-                          placeholder="진입경로 예) 홈 > 마켓 > AI 솔루션"
-                        />
-                      </div>
-                    </div>
+                    </label>
+                    <label class="floating-label block w-full">
+                      <span>진입경로</span>
+                      <input
+                        v-model="doc.entryPath"
+                        type="text"
+                        placeholder="ex) 메인>로그인"
+                        class="input input-md w-full bg-base-200/50"
+                        @input="scheduleAutoSave(doc)"
+                      />
+                    </label>
                   </div>
 
                   <!-- Screenshot -->
@@ -162,17 +172,17 @@
     <div class="drawer-side is-drawer-close:overflow-visible z-20">
       <label for="drawerRight" aria-label="close sidebar" class="drawer-overlay"></label>
       <div
-        class="flex min-h-full flex-col bg-base-100 border-l border-base-content/10 is-drawer-close:w-0 is-drawer-open:w-72"
+        class="flex h-screen min-h-0 flex-col bg-base-100 border-l border-base-content/10 is-drawer-close:w-0 is-drawer-open:w-72"
       >
-        <div class="w-full is-drawer-close:hidden">
-          <div class="flex items-center justify-between border-b border-base-content/5 px-4 py-3">
+        <div class="flex min-h-0 w-full flex-1 flex-col is-drawer-close:hidden">
+          <div class="shrink-0 flex items-center justify-between border-b border-base-content/5 px-4 py-3">
             <div class="flex items-center gap-2">
               <i-lucide-layers class="h-4 w-4 text-primary" />
               <span class="text-sm font-semibold">문서 목록</span>
               <span class="badge badge-sm badge-ghost">{{ docs.length }}</span>
             </div>
           </div>
-          <div class="overflow-y-auto p-3">
+          <div class="min-h-0 flex-1 overflow-y-auto p-3">
             <div class="space-y-2">
               <a
                 v-for="doc in docs"
@@ -197,10 +207,10 @@
                 </div>
                 <div class="p-2.5">
                   <div class="text-sm font-semibold leading-tight line-clamp-1">
-                    {{ doc.savedTitle }}
+                    {{ doc.title }}
                   </div>
                   <div class="mt-0.5 text-xs text-base-content/50 line-clamp-1">
-                    {{ doc.savedDescription }}
+                    {{ doc.description }}
                   </div>
                 </div>
               </a>
@@ -209,39 +219,24 @@
         </div>
       </div>
     </div>
-
-    <div v-if="saveToast" class="toast toast-end toast-top z-50">
-      <div
-        class="alert gap-2 shadow-lg"
-        :class="saveToast.type === 'success' ? 'alert-success' : 'alert-error'"
-      >
-        <i-lucide-check-circle v-if="saveToast.type === 'success'" class="h-4 w-4" />
-        <i-lucide-circle-alert v-else class="h-4 w-4" />
-        <span>{{ saveToast.message }}</span>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { getDocList, updateDoc } from '@/database'
+import { getDocList, updateDoc, updateDocStatus } from '@/database'
 
 const router = useRouter()
 const route = useRoute()
 const workspaceId = computed(() => route.params.id)
 const routeDocId = computed(() => Number(route.params.docId || 0))
 const selectedDocId = ref(0)
-const isSaving = ref(false)
-const saveToast = ref<{ type: 'success' | 'error'; message: string } | null>(null)
-let saveToastTimeout: ReturnType<typeof setTimeout> | null = null
 const carouselRef = ref<HTMLElement | null>(null)
 
 type Doc = {
   id: number
   title: string
   description: string
-  savedTitle: string
-  savedDescription: string
+  status: string
   entryPath: string
   docMetaJson: string
   functionItems: FunctionContentItem[]
@@ -256,11 +251,47 @@ type FunctionContentItem = {
   text: string
 }
 
+type AutoSaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'error'
+
+type AutoSaveState = {
+  status: AutoSaveStatus
+  savedAt: number | null
+}
+
 const docs = ref<Doc[]>([])
+const nowTime = ref(Date.now())
+const autoSaveByDoc = reactive<Record<number, AutoSaveState>>({})
+const autoSaveTimers = new Map<number, number>()
+const autoSaveVersions = new Map<number, number>()
 
 const selectedDocIndex = computed(() => {
   const index = docs.value.findIndex((doc) => doc.id === selectedDocId.value)
   return index === -1 ? 0 : index + 1
+})
+
+const currentDoc = computed(() => docs.value.find((doc) => doc.id === selectedDocId.value) ?? null)
+const currentDocDone = computed(() => currentDoc.value?.status === '작업완료')
+const currentAutoSaveState = computed<AutoSaveState>(() =>
+  currentDoc.value
+    ? (autoSaveByDoc[currentDoc.value.id] ?? { status: 'idle', savedAt: null })
+    : { status: 'idle', savedAt: null }
+)
+const isAutoSaving = computed(
+  () =>
+    currentAutoSaveState.value.status === 'pending' ||
+    currentAutoSaveState.value.status === 'saving'
+)
+const autoSaveMessage = computed(() => {
+  const state = currentAutoSaveState.value
+
+  if (state.status === 'pending') return '저장 중'
+  if (state.status === 'saving') return '자동저장 중'
+  if (state.status === 'error') return '자동저장 실패'
+  if (state.status !== 'saved' || !state.savedAt) return ''
+
+  const diffSeconds = Math.max(0, Math.floor((nowTime.value - state.savedAt) / 1000))
+  if (diffSeconds < 10) return '방금 전 자동저장'
+  return '자동저장됨'
 })
 
 const toFileSrc = (imgPath: string, version?: string): string => {
@@ -296,6 +327,74 @@ const parseFunctionItems = (value: string): FunctionContentItem[] => {
   }
 }
 
+const getNextAutoSaveVersion = (docId: number): number => {
+  const nextVersion = (autoSaveVersions.get(docId) ?? 0) + 1
+  autoSaveVersions.set(docId, nextVersion)
+  return nextVersion
+}
+
+const saveDoc = async (doc: Doc, version: number): Promise<void> => {
+  autoSaveByDoc[doc.id] = {
+    status: 'saving',
+    savedAt: autoSaveByDoc[doc.id]?.savedAt ?? null
+  }
+
+  const docMeta = parseDocMeta(doc.docMetaJson)
+  docMeta.entry_path = doc.entryPath
+  const docMetaJson = JSON.stringify(docMeta)
+
+  const isSaved = await updateDoc({
+    id: doc.id,
+    title: doc.title,
+    description: doc.description,
+    docMetaJson
+  })
+
+  if (autoSaveVersions.get(doc.id) !== version) return
+
+  if (isSaved) {
+    doc.docMetaJson = docMetaJson
+    autoSaveByDoc[doc.id] = {
+      status: 'saved',
+      savedAt: Date.now()
+    }
+    return
+  }
+
+  autoSaveByDoc[doc.id] = {
+    status: 'error',
+    savedAt: autoSaveByDoc[doc.id]?.savedAt ?? null
+  }
+}
+
+const scheduleAutoSave = (doc: Doc): void => {
+  const version = getNextAutoSaveVersion(doc.id)
+  const prevTimer = autoSaveTimers.get(doc.id)
+  if (prevTimer) window.clearTimeout(prevTimer)
+
+  autoSaveByDoc[doc.id] = {
+    status: 'pending',
+    savedAt: autoSaveByDoc[doc.id]?.savedAt ?? null
+  }
+
+  const timer = window.setTimeout(() => {
+    autoSaveTimers.delete(doc.id)
+    void saveDoc(doc, version)
+  }, 600)
+
+  autoSaveTimers.set(doc.id, timer)
+}
+
+const flushPendingAutoSaves = (): void => {
+  autoSaveTimers.forEach((timer, docId) => {
+    window.clearTimeout(timer)
+    const doc = docs.value.find((item) => item.id === docId)
+    const version = autoSaveVersions.get(docId)
+    if (doc && version) void saveDoc(doc, version)
+  })
+  autoSaveTimers.clear()
+}
+
 const loadDocs = async (): Promise<void> => {
   const list = await getDocList({
     workspaceId: Number(workspaceId.value)
@@ -311,8 +410,7 @@ const loadDocs = async (): Promise<void> => {
       id: doc.id,
       title: doc.title,
       description: doc.description,
-      savedTitle: doc.title,
-      savedDescription: doc.description,
+      status: doc.status === '작업완료' ? '작업완료' : '작업중',
       entryPath: String(docMeta.entry_path ?? ''),
       docMetaJson: doc.doc_meta_json,
       functionItems: parseFunctionItems(doc.content_json),
@@ -340,54 +438,18 @@ const onClickSelectDoc = (id: number): void => {
   scrollToDoc(id)
 }
 
-const onClickSave = (): void => {
-  if (!selectedDocId.value || isSaving.value) return
-  void saveCurrentDoc()
-}
+const toggleDone = async (): Promise<void> => {
+  const target = currentDoc.value
+  if (!target) return
 
-const showSaveToast = (type: 'success' | 'error', message: string): void => {
-  if (saveToastTimeout) {
-    clearTimeout(saveToastTimeout)
-  }
+  const nextStatus = target.status === '작업완료' ? '작업중' : '작업완료'
+  const isUpdated = await updateDocStatus({
+    id: target.id,
+    status: nextStatus
+  })
 
-  saveToast.value = { type, message }
-  saveToastTimeout = setTimeout(() => {
-    saveToast.value = null
-    saveToastTimeout = null
-  }, 1800)
-}
-
-const saveCurrentDoc = async (): Promise<void> => {
-  const target = docs.value.find((doc) => doc.id === selectedDocId.value)
-  if (!target || isSaving.value) return
-
-  isSaving.value = true
-  try {
-    const docMeta = {
-      ...parseDocMeta(target.docMetaJson),
-      writer: '담당자',
-      entry_path: target.entryPath.trim()
-    }
-
-    const isSaved = await updateDoc({
-      id: target.id,
-      title: target.title.trim(),
-      description: target.description.trim(),
-      docMetaJson: JSON.stringify(docMeta)
-    })
-
-    if (!isSaved) {
-      showSaveToast('error', '저장에 실패했습니다.')
-      return
-    }
-
-    target.docMetaJson = JSON.stringify(docMeta)
-    target.savedTitle = target.title.trim()
-    target.savedDescription = target.description.trim()
-    showSaveToast('success', '저장되었습니다.')
-  } finally {
-    isSaving.value = false
-  }
+  if (!isUpdated) return
+  target.status = nextStatus
 }
 
 const onClickPrev = (): void => {
@@ -403,6 +465,15 @@ const onClickNext = (): void => {
 }
 
 onMounted(() => {
+  const relativeTimeTimer = window.setInterval(() => {
+    nowTime.value = Date.now()
+  }, 1000)
+
+  onUnmounted(() => {
+    window.clearInterval(relativeTimeTimer)
+    flushPendingAutoSaves()
+  })
+
   void (async () => {
     await loadDocs()
 
@@ -426,12 +497,5 @@ onMounted(() => {
     scrollToDoc(routeDocId.value || docs.value[0]?.id || 0)
     onUnmounted(() => observer.disconnect())
   })()
-})
-
-onUnmounted(() => {
-  if (saveToastTimeout) {
-    clearTimeout(saveToastTimeout)
-    saveToastTimeout = null
-  }
 })
 </script>

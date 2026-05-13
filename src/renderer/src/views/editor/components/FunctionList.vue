@@ -120,13 +120,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   select: [id: string]
-  reorder: [
-    payload: {
-      visibleIds: string[]
-      fromIndex: number
-      toIndex: number
-    }
-  ]
+  reorder: [payload: { visibleIds: string[] }]
 }>()
 
 const localItems = computed(() => props.items)
@@ -206,7 +200,7 @@ useDraggable(funcListRef, localItems, {
     visibleIds.splice(newIndex, 0, movedId)
     dragStartIds = []
 
-    emit('reorder', { visibleIds, fromIndex: oldIndex, toIndex: newIndex })
+    emit('reorder', { visibleIds })
   },
   onEnd: () => {
     dragStartIds = []

@@ -67,7 +67,7 @@ watch(isOpen, (newVal, oldVal) => {
   <div>
     <input type="checkbox" :id="props.id" v-model="isOpen" class="modal-toggle" />
     <div class="modal" role="dialog">
-      <div class="modal-box" :class="props.width">
+      <div class="modal-box overflow-visible" :class="props.width">
         <!-- Header -->
         <div v-if="props.title || $slots.header" class="mb-4">
           <slot name="header">

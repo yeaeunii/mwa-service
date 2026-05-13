@@ -1,10 +1,31 @@
 import { app } from 'electron'
-import { copyFileSync, existsSync, mkdirSync } from 'fs'
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'fs'
 import { unlink, writeFile } from 'fs/promises'
 import path from 'path'
 import { selectList, selectOne, runQuery, transaction } from './conn'
 import { Doc, Project, Workspace } from './dto'
 import dayjs from 'dayjs'
+
+const saveThumbnail = (
+  target: 'project' | 'workspace',
+  id: string | number,
+  dataUrl: unknown
+): string | null => {
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/')) return null
+
+  const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '')
+  if (!base64Data) return null
+
+  const thumbnailsDir = path.join(app.getPath('userData'), 'FILE', 'Thumbnails')
+  mkdirSync(thumbnailsDir, { recursive: true })
+
+  const thumbnailName = `thumbnail_${target}_${id}.png`
+  const thumbnailAbsPath = path.join(thumbnailsDir, thumbnailName)
+  const thumbnailPath = path.join('FILE', 'Thumbnails', thumbnailName).replace(/\\/g, '/')
+
+  writeFileSync(thumbnailAbsPath, Buffer.from(base64Data, 'base64'))
+  return thumbnailPath
+}
 
 // 프로젝트 조회
 export const getProjectList = (params?: Record<string, unknown>): Project[] => {
@@ -75,23 +96,51 @@ export const createProject = (project: Record<string, unknown>): number => {
   }
 
   const result = runQuery(query, payload)
-  return Number(result.lastInsertRowid)
+  const projectId = Number(result.lastInsertRowid)
+  const thumbnailPath = saveThumbnail('project', projectId, project.thumbnail)
+
+  if (thumbnailPath) {
+    runQuery(
+      `
+        UPDATE t_project
+        SET thumbnail_path = @thumbnailPath,
+            updated_at = @updated_at
+        WHERE id = @id
+      `,
+      {
+        id: projectId,
+        thumbnailPath,
+        updated_at: now
+      }
+    )
+  }
+
+  return projectId
 }
 
 // 프로젝트 수정
 export const updateProject = (project: Record<string, unknown>): void => {
+  const thumbnailPath =
+    project.thumbnail === null
+      ? ''
+      : saveThumbnail('project', project.id as string | number, project.thumbnail)
   const query = `
     UPDATE t_project
     SET
       name = @name,
       description = @description,
       serv_url = @serv_url,
+      thumbnail_path = CASE
+        WHEN @thumbnailPath IS NULL THEN thumbnail_path
+        ELSE @thumbnailPath
+      END,
       updated_at = @updated_at
     WHERE id = @id
   `
 
   const payload = {
     updated_at: new Date().toISOString(),
+    thumbnailPath,
     ...project
   }
 
@@ -191,22 +240,50 @@ export const createWorkspace = (workspace: Record<string, unknown>): number => {
   }
 
   const result = runQuery(query, payload)
-  return Number(result.lastInsertRowid)
+  const workspaceId = Number(result.lastInsertRowid)
+  const thumbnailPath = saveThumbnail('workspace', workspaceId, workspace.thumbnail)
+
+  if (thumbnailPath) {
+    runQuery(
+      `
+        UPDATE t_workspace
+        SET thumbnail_path = @thumbnailPath,
+            updated_at = @updated_at
+        WHERE id = @id
+      `,
+      {
+        id: workspaceId,
+        thumbnailPath,
+        updated_at: now
+      }
+    )
+  }
+
+  return workspaceId
 }
 
 // 워크스페이스 수정
-export const updateWorkspace = (project: Record<string, unknown>): void => {
+export const updateWorkspace = (workspace: Record<string, unknown>): void => {
+  const thumbnailPath =
+    workspace.thumbnail === null
+      ? ''
+      : saveThumbnail('workspace', workspace.id as string | number, workspace.thumbnail)
   const query = `
     UPDATE t_workspace
     SET
       name = @name,
+      thumbnail_path = CASE
+        WHEN @thumbnailPath IS NULL THEN thumbnail_path
+        ELSE @thumbnailPath
+      END,
       updated_at = @updated_at
     WHERE id = @id
   `
 
   const payload = {
     updated_at: new Date().toISOString(),
-    ...project
+    thumbnailPath,
+    ...workspace
   }
 
   runQuery(query, payload)
@@ -214,12 +291,28 @@ export const updateWorkspace = (project: Record<string, unknown>): void => {
 
 // 워크스페이스 삭제
 export const deleteWorkspace = (id: string | number): void => {
-  const query = `
-    DELETE FROM t_workspace
-    WHERE id = @id
-  `
+  transaction((db) => {
+    db.prepare(
+      `
+        DELETE FROM t_doc
+        WHERE workspace_id = @id
+      `
+    ).run({ id })
 
-  runQuery(query, { id })
+    db.prepare(
+      `
+        DELETE FROM t_capture
+        WHERE workspace_id = @id
+      `
+    ).run({ id })
+
+    db.prepare(
+      `
+        DELETE FROM t_workspace
+        WHERE id = @id
+      `
+    ).run({ id })
+  })
 }
 
 //프로젝트명 워크스페이스명 조회
@@ -512,6 +605,21 @@ export const updateDoc = (doc: Record<string, unknown>): void => {
     title: doc.title,
     description: doc.description,
     docMetaJson: doc.docMetaJson,
+    updated_at: dayjs().format('YYYY-MM-DD HH:mm:ss')
+  })
+}
+
+export const updateDocStatus = (doc: Record<string, unknown>): void => {
+  const query = `
+    UPDATE t_doc
+    SET status = @status,
+        updated_at = @updated_at
+    WHERE id = @id
+  `
+
+  runQuery(query, {
+    id: doc.id,
+    status: doc.status,
     updated_at: dayjs().format('YYYY-MM-DD HH:mm:ss')
   })
 }

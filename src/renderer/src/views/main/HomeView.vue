@@ -49,7 +49,9 @@
           <!-- Thumbnail -->
           <div class="relative overflow-hidden">
             <img
-              src="https://placehold.co/600x300/f1f5f9/94a3b8?text=thumbnail"
+              :src="
+                project.thumbnail ?? 'https://placehold.co/600x300/f1f5f9/94a3b8?text=thumbnail'
+              "
               alt="project thumbnail"
               class="h-44 w-full object-cover transition-transform duration-300 group-hover:scale-105"
             />
@@ -57,12 +59,50 @@
               class="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
             />
             <div class="absolute right-2.5 top-2.5">
-              <span
-                class="badge badge-sm font-bold shadow-sm"
-                :class="project.filter === '완료' ? 'badge-primary' : 'badge-success'"
-              >
-                {{ project.status }}
-              </span>
+              <div class="flex items-center gap-1.5">
+                <span
+                  class="badge badge-sm font-bold shadow-sm"
+                  :class="project.filter === '완료' ? 'badge-primary' : 'badge-success'"
+                >
+                  {{ project.status }}
+                </span>
+                <div class="dropdown dropdown-end" @click.stop.prevent @mousedown.stop>
+                  <button
+                    tabindex="0"
+                    type="button"
+                    class="btn btn-xs btn-circle border-none bg-black/35 text-white shadow-sm backdrop-blur-sm hover:bg-black/50"
+                    @click.stop.prevent
+                  >
+                    <i-lucide-more-vertical class="h-3.5 w-3.5" />
+                  </button>
+                  <ul
+                    tabindex="0"
+                    class="dropdown-content menu z-20 w-36 rounded-xl border border-base-content/10 bg-base-100 p-1.5 shadow-lg"
+                    @click.stop.prevent
+                  >
+                    <li>
+                      <button
+                        type="button"
+                        class="rounded-lg text-sm"
+                        @click.stop.prevent="openEditProject(project)"
+                      >
+                        <i-lucide-pencil class="h-4 w-4 opacity-60" />
+                        수정
+                      </button>
+                    </li>
+                    <li>
+                      <button
+                        type="button"
+                        class="rounded-lg text-sm text-error"
+                        @click.stop.prevent="openDeleteProject(project)"
+                      >
+                        <i-lucide-trash-2 class="h-4 w-4 opacity-60" />
+                        삭제
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -114,14 +154,21 @@
       </div>
     </div>
 
-    <ModalNewProject ref="modalCreateProjectRef" @on-submit="CreateProject" />
-    <ModalConfirm ref="modalConfirmRef" @on-confirm="onConfirmDeleteProject" />
+    <ModalNewProject ref="modalCreateProjectRef" @on-submit="onSubmitProject" />
+    <ModalConfirm ref="modalConfirmRef" ok-text="삭제" @on-confirm="onConfirmDeleteProject">
+      <template #message>
+        <div class="text-center">
+          <h3 class="mb-2 text-lg font-bold">{{ deletingProject?.title }}</h3>
+          <p class="text-sm text-gray-500">프로젝트를 정말 삭제하시겠습니까?</p>
+        </div>
+      </template>
+    </ModalConfirm>
   </div>
 </template>
 
 <script setup lang="ts">
 import type { Project } from '@database/dto'
-import { createProject, getProjects } from '@/database'
+import { createProject, deleteProject, getProjects, updateProject } from '@/database'
 import { formatDate } from '@/utils/datetime'
 
 type Filter = '전체' | '진행중' | '완료'
@@ -135,6 +182,8 @@ interface ProjectCard {
   rawDescription: string
   status: '진행중' | '완료'
   filter: '진행중' | '완료'
+  thumbnail: string | null
+  url: string
 }
 
 const EMPTY_DESCRIPTION = '프로젝트 설명을 아직 작성하지 않았습니다.'
@@ -143,9 +192,15 @@ const selectedFilter = ref<Filter>('전체')
 const router = useRouter()
 const modalCreateProjectRef = ref<ComponentRef<'ModalCreateProject'> | null>(null)
 const modalConfirmRef = ref<ComponentRef<'ModalConfirm'> | null>(null)
-const deletingProjectId = ref<string | null>(null)
+const deletingProject = ref<ProjectCard | null>(null)
 
 const projects = ref<ProjectCard[]>([])
+
+const toFileSrc = (imgPath: string, version?: string): string => {
+  const normalizedPath = imgPath.replace(/\\/g, '/')
+  const cacheKey = version ? `?v=${encodeURIComponent(version)}` : ''
+  return `appimg:///${normalizedPath}${cacheKey}`
+}
 
 const normalizeProjectStatus = (status: string): ProjectCard['status'] => {
   return status === '완료' ? '완료' : '진행중'
@@ -162,7 +217,11 @@ const mapProjectToCard = (project: Project): ProjectCard => {
     description: project.description ?? '',
     rawDescription: project.description ?? '',
     status,
-    filter: status
+    filter: status,
+    thumbnail: project.thumbnail_path
+      ? toFileSrc(project.thumbnail_path, project.updated_at)
+      : null,
+    url: project.serv_url ?? ''
   }
 }
 
@@ -171,10 +230,8 @@ const goToWorkspace = async (projectId: string): Promise<void> => {
   await router.push({ name: 'projects-index', params: { id: projectId } })
 }
 
-
 // 프로젝트 조회
 const loadProjects = async (): Promise<void> => {
-
   const rows = await getProjects({ limit: 10, offset: 0 })
   console.log('loaded rows:', rows)
   projects.value = rows.map(mapProjectToCard)
@@ -191,33 +248,60 @@ const filteredProjects = computed(() => {
   }
 })
 
+const openEditProject = (project: ProjectCard): void => {
+  modalCreateProjectRef.value?.onOpenEdit({
+    id: project.id,
+    name: project.title,
+    description: project.rawDescription,
+    url: project.url,
+    thumbnail: project.thumbnail
+  })
+}
 
-//프로젝트 생성
-const CreateProject = async (payload: {
+const openDeleteProject = (project: ProjectCard): void => {
+  deletingProject.value = project
+  modalConfirmRef.value?.onOpen()
+}
+
+//프로젝트 생성/수정
+const onSubmitProject = async (payload: {
+  id?: string
   name: string
   description: string
   url: string
+  thumbnail: string | null
 }): Promise<void> => {
+  if (payload.id) {
+    await updateProject({
+      id: payload.id,
+      name: payload.name,
+      description: payload.description,
+      serv_url: payload.url,
+      thumbnail: payload.thumbnail
+    })
+    await loadProjects()
+    return
+  }
+
   const projectId = await createProject({
     name: payload.name,
     description: payload.description,
-    serv_url: payload.url
+    serv_url: payload.url,
+    thumbnail: payload.thumbnail
   })
   if (projectId === null) return
 
-console.log('created projectId:', projectId)
+  console.log('created projectId:', projectId)
   await loadProjects()
   await goToWorkspace(String(projectId))
 }
 
 const onConfirmDeleteProject = async (): Promise<void> => {
-  if (!deletingProjectId.value) return
+  if (!deletingProject.value) return
 
-  await window.api.invoke('project:delete', {
-    projectId: deletingProjectId.value
-  })
+  await deleteProject(deletingProject.value.id)
 
-  deletingProjectId.value = null
+  deletingProject.value = null
   await loadProjects()
 }
 

@@ -2,8 +2,49 @@
   <!-- Confirm 스타일 -->
   <ModalBase ref="modalRef" width="w-11/12 max-w-5xl" @close="onClose">
     <div class="mb-4 flex items-center justify-between gap-3">
-      <div class="min-w-0 flex items-center gap-2 text-lg font-bold">
-        <span class="truncate">{{ modalTitle }}</span>
+      <div class="min-w-0 flex flex-1 items-center gap-1.5">
+        <template v-if="isEditingName">
+          <input
+            ref="nameInputRef"
+            v-model="editName"
+            type="text"
+            class="input input-sm h-8 w-96 max-w-[52vw] border-base-300 bg-base-100 px-2 text-lg font-bold focus:border-primary"
+            placeholder="캡쳐 이름"
+            @keydown.enter.prevent="saveName"
+            @keydown.esc.prevent="cancelNameEdit"
+          />
+          <button
+            type="button"
+            class="btn btn-ghost btn-xs btn-circle tooltip tooltip-bottom text-primary"
+            data-tip="저장"
+            @click="saveName"
+          >
+            <i-lucide-check class="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            class="btn btn-ghost btn-xs btn-circle tooltip tooltip-bottom"
+            data-tip="취소"
+            @click="cancelNameEdit"
+          >
+            <i-lucide-x class="h-3.5 w-3.5" />
+          </button>
+        </template>
+
+        <template v-else>
+          <h3 class="min-w-0 truncate text-lg font-bold">
+            {{ currentZoomItem?.name || props.title || '캡쳐 이미지' }}
+          </h3>
+          <button
+            v-if="!props.readonly && currentZoomItem"
+            type="button"
+            class="btn btn-ghost btn-xs btn-circle tooltip tooltip-bottom"
+            data-tip="이름 수정"
+            @click="startNameEdit"
+          >
+            <i-lucide-pencil class="h-3.5 w-3.5" />
+          </button>
+        </template>
       </div>
       <div class="flex shrink-0 items-center gap-2">
         <button
@@ -64,8 +105,8 @@
             class="mx-auto max-h-full max-w-full rounded-md object-contain"
           />
         </div>
-        </div>
       </div>
+    </div>
     <ModalConfirm ref="modalConfirmRef" ok-text="삭제" @on-confirm="confirmRemoveImage">
       <template #message>
         <div class="text-center">
@@ -78,10 +119,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 const emits = defineEmits<{
   onRemoveImage: [id: number]
   onToggleSelectImage: [id: number]
+  onRenameImage: [payload: { id: number; name: string }]
 }>()
 
 const modalRef = ref<ComponentRef<'ModalBase'> | null>(null)
@@ -102,6 +144,9 @@ const selecteImageId = ref<number | null>(null)
 
 const removeImageId = ref<number | null>(null)
 const selectedZoomImageId = ref<number | null>(null)
+const editName = ref('')
+const isEditingName = ref(false)
+const nameInputRef = ref<HTMLInputElement | null>(null)
 const modalConfirmRef = ref<ComponentRef<'ModalConfirm'> | null>(null)
 
 const currentZoomIndex = computed(() =>
@@ -114,15 +159,20 @@ const currentZoomItem = computed(() => {
   return props.captureImageItems[index] ?? null
 })
 
+watch(currentZoomItem, (item) => {
+  editName.value = item?.name ?? props.title ?? ''
+  isEditingName.value = false
+})
+
 const removeImageItem = computed(
   () => props.captureImageItems.find((item) => item.id === removeImageId.value) ?? null
 )
 
-const modalTitle = computed(() => currentZoomItem.value?.name || props.title || '캡쳐 이미지')
 const selectedImageIdSet = computed(() => new Set(props.selectedImageIds))
 
 const onOpen = (zoomImageId?: number): void => {
   selectedZoomImageId.value = zoomImageId ?? null
+  editName.value = currentZoomItem.value?.name ?? props.title ?? ''
   modalRef.value?.onOpen()
 }
 
@@ -130,6 +180,8 @@ const onClose = (): void => {
   selecteImageId.value = null
   removeImageId.value = null
   selectedZoomImageId.value = null
+  editName.value = ''
+  isEditingName.value = false
 }
 
 const closeModal = (): void => {
@@ -146,6 +198,41 @@ const isSelected = (imageId: number): boolean => {
 
 const toggleSelectImage = (imageId: number): void => {
   emits('onToggleSelectImage', imageId)
+}
+
+const resetName = (): void => {
+  editName.value = currentZoomItem.value?.name ?? props.title ?? ''
+}
+
+const startNameEdit = async (): Promise<void> => {
+  resetName()
+  isEditingName.value = true
+  await nextTick()
+  nameInputRef.value?.focus()
+  nameInputRef.value?.select()
+}
+
+const cancelNameEdit = (): void => {
+  resetName()
+  isEditingName.value = false
+}
+
+const saveName = (): void => {
+  const item = currentZoomItem.value
+  const name = editName.value.trim()
+  if (!item) return
+  if (!name) {
+    cancelNameEdit()
+    return
+  }
+  if (name === item.name) {
+    isEditingName.value = false
+    return
+  }
+
+  editName.value = name
+  isEditingName.value = false
+  emits('onRenameImage', { id: item.id, name })
 }
 
 const openRemoveConfirm = (imageId: number): void => {
@@ -174,5 +261,4 @@ const showNextImage = (): void => {
   const nextIndex = (currentZoomIndex.value + 1) % props.captureImageItems.length
   selectedZoomImageId.value = props.captureImageItems[nextIndex].id
 }
-
 </script>
