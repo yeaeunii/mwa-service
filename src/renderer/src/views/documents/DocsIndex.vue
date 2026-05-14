@@ -5,7 +5,7 @@
       <!-- Navbar -->
       <nav class="navbar shrink-0 border-b border-base-content/10 bg-base-100 px-4">
         <div class="flex flex-1 items-center gap-3">
-          <button class="btn btn-ghost btn-sm" @click="router.push(`/workspace/${workspaceId}`)">
+          <button class="btn btn-ghost btn-sm" @click="goBack">
             <i-lucide-arrow-left class="h-4 w-4" />
           </button>
           <div class="flex items-center gap-2">
@@ -102,7 +102,7 @@
                       <input
                         v-model="doc.entryPath"
                         type="text"
-                        placeholder="ex) 메인>로그인"
+                        placeholder="ex) 산출물 관리 > 미리보기"
                         class="input input-md w-full bg-base-200/50"
                         @input="scheduleAutoSave(doc)"
                       />
@@ -175,7 +175,9 @@
         class="flex h-screen min-h-0 flex-col bg-base-100 border-l border-base-content/10 is-drawer-close:w-0 is-drawer-open:w-72"
       >
         <div class="flex min-h-0 w-full flex-1 flex-col is-drawer-close:hidden">
-          <div class="shrink-0 flex items-center justify-between border-b border-base-content/5 px-4 py-3">
+          <div
+            class="shrink-0 flex items-center justify-between border-b border-base-content/5 px-4 py-3"
+          >
             <div class="flex items-center gap-2">
               <i-lucide-layers class="h-4 w-4 text-primary" />
               <span class="text-sm font-semibold">문서 목록</span>
@@ -268,6 +270,21 @@ const selectedDocIndex = computed(() => {
   const index = docs.value.findIndex((doc) => doc.id === selectedDocId.value)
   return index === -1 ? 0 : index + 1
 })
+
+const goBack = (): void => {
+  if (route.query.from === 'deliverable-structure') {
+    void router.push({
+      name: 'deliverable-structure',
+      params: {
+        id: String(route.query.projectId ?? ''),
+        deliverableId: String(route.query.deliverableId ?? '')
+      }
+    })
+    return
+  }
+
+  void router.push(`/workspace/${workspaceId.value}`)
+}
 
 const currentDoc = computed(() => docs.value.find((doc) => doc.id === selectedDocId.value) ?? null)
 const currentDocDone = computed(() => currentDoc.value?.status === '작업완료')

@@ -1,9 +1,10 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import HomeView from '@/views/main/HomeView.vue'
 import CaptureIndex from '@/views/captures/CaptureIndex.vue'
-// import DashboardIndex from '@/views/dashboard/DashboardIndex.vue'
 import WorkspaceDetail from '@/views/workspace/WorkspaceDetail.vue'
 import ProjectIndex from '@/views/projects/ProjectIndex.vue'
+import DeliverableStructure from '@/views/deliverables/DeliverableStructure.vue'
+import DeliverablePreview from '@/views/deliverables/DeliverablePreview.vue'
 import DocsIndex from '@/views/documents/DocsIndex.vue'
 import DocsAnnotation from '@/views/documents/DocsAnnotation.vue'
 
@@ -21,15 +22,20 @@ const router = createRouter({
       component: ProjectIndex
     },
     {
+      path: '/projects/:id/deliverables/:deliverableId/structure',
+      name: 'deliverable-structure',
+      component: DeliverableStructure
+    },
+    {
+      path: '/projects/:id/deliverables/:deliverableId/preview',
+      name: 'deliverable-preview',
+      component: DeliverablePreview
+    },
+    {
       path: '/capture/:workspaceId',
       name: 'capture-index',
       component: CaptureIndex
     },
-    // {
-    //   path: '/dashboard',
-    //   name: 'dashboard-index',
-    //   component: DashboardIndex
-    // },
     {
       path: '/workspace/:id',
       name: 'workspace-detail',

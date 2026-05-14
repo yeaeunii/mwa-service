@@ -67,7 +67,12 @@
       <div class="mx-auto max-w-[1200px] px-6 py-6">
         <div class="tabs tabs-lift">
           <label class="tab gap-2">
-            <input type="radio" name="project_detail_tabs" checked="checked" />
+            <input
+              v-model="activeProjectTab"
+              type="radio"
+              name="project_detail_tabs"
+              value="workspaces"
+            />
             <i-lucide-layout-grid class="h-4 w-4 text-primary" />
             워크스페이스
           </label>
@@ -91,8 +96,7 @@
                   <div class="relative h-44 overflow-hidden">
                     <img
                       :src="
-                        ws.thumbnail ??
-                        'https://placehold.co/600x300/475569/94a3b8?text=WORKSPACE'
+                        ws.thumbnail ?? 'https://placehold.co/600x300/475569/94a3b8?text=WORKSPACE'
                       "
                       alt="workspace thumbnail"
                       class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
@@ -177,7 +181,12 @@
           </div>
 
           <label class="tab gap-2">
-            <input type="radio" name="project_detail_tabs" />
+            <input
+              v-model="activeProjectTab"
+              type="radio"
+              name="project_detail_tabs"
+              value="deliverables"
+            />
             <i-lucide-folder-kanban class="h-4 w-4 text-primary" />
             산출물 관리
           </label>
@@ -215,7 +224,9 @@
                 <div
                   v-for="item in deliverables"
                   :key="item.id"
-                  class="flex items-center gap-4 rounded-lg border border-primary/15 bg-primary/5 px-4 py-3"
+                  class="flex cursor-pointer items-center gap-4 rounded-lg border border-primary/20 bg-base-100 px-4 py-3 transition hover:border-primary/35 hover:bg-primary/10"
+                  @click="openDeliverableStructure(item.id)"
+                  @contextmenu.prevent.stop="openDeliverableContextMenu(item, $event)"
                 >
                   <div
                     class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
@@ -229,6 +240,7 @@
                       type="text"
                       :data-deliverable-editor-id="item.id"
                       class="input input-primary input-xs w-full max-w-sm font-bold"
+                      @click.stop
                       @blur="confirmRenameDeliverable"
                       @keydown.enter.prevent="confirmRenameDeliverable"
                       @keydown.esc.prevent="cancelRenameDeliverable"
@@ -260,6 +272,7 @@
                       type="button"
                       class="tooltip tooltip-left btn btn-ghost btn-xs btn-square"
                       data-tip="미리보기"
+                      @click.stop="openDeliverablePreview(item.id)"
                     >
                       <i-lucide-eye class="h-4 w-4" />
                     </button>
@@ -292,43 +305,6 @@
                     >
                       <i-lucide-copy class="h-4 w-4" />
                     </button>
-                    <div class="dropdown dropdown-end">
-                      <button
-                        tabindex="0"
-                        type="button"
-                        class="tooltip tooltip-left btn btn-ghost btn-xs btn-square"
-                        data-tip="더보기"
-                        @click.stop
-                      >
-                        <i-lucide-more-vertical class="h-4 w-4" />
-                      </button>
-                      <ul
-                        tabindex="0"
-                        class="dropdown-content menu z-20 w-36 rounded-xl border border-base-content/10 bg-base-100 p-1.5 shadow-lg"
-                        @click.stop
-                      >
-                        <li>
-                          <button
-                            type="button"
-                            class="rounded-lg text-sm"
-                            @click.stop="renameDeliverable(item.id)"
-                          >
-                            <i-lucide-pencil class="h-4 w-4 opacity-60" />
-                            이름수정
-                          </button>
-                        </li>
-                        <li>
-                          <button
-                            type="button"
-                            class="rounded-lg text-sm text-error"
-                            @click.stop="openDeleteDeliverable(item)"
-                          >
-                            <i-lucide-trash-2 class="h-4 w-4 opacity-60" />
-                            삭제
-                          </button>
-                        </li>
-                      </ul>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -340,6 +316,34 @@
 
     <ModalNewProject ref="modalEditProjectRef" @on-submit="onSubmitEditProject" />
     <ModalNewWorkspace ref="modalNewWorkspaceRef" @on-submit="onSubmitWorkspace" />
+
+    <ul
+      v-if="deliverableContextMenu.isOpen"
+      class="menu fixed z-[9999] w-40 rounded-xl border border-base-content/10 bg-base-100 p-1.5 shadow-xl"
+      :style="{
+        left: `${deliverableContextMenu.x}px`,
+        top: `${deliverableContextMenu.y}px`
+      }"
+      @click.stop
+      @contextmenu.prevent.stop
+    >
+      <li>
+        <button type="button" class="rounded-lg text-sm" @click="renameContextDeliverable">
+          <i-lucide-pencil class="h-4 w-4 opacity-60" />
+          이름수정
+        </button>
+      </li>
+      <li>
+        <button
+          type="button"
+          class="rounded-lg text-sm text-error"
+          @click="deleteContextDeliverable"
+        >
+          <i-lucide-trash-2 class="h-4 w-4 opacity-60" />
+          삭제
+        </button>
+      </li>
+    </ul>
 
     <modal-confirm
       ref="modalConfirmRef"
@@ -391,12 +395,24 @@ const confirmMsgHtml = ref<string>('')
 const projectThumbnail = ref<string | null>(null)
 const workspaces = ref<Workspace[]>([])
 const curProject = ref<Project | null>(null)
+const activeProjectTab = ref(route.query.tab === 'deliverables' ? 'deliverables' : 'workspaces')
 const deletingWorkspace = ref<Workspace | null>(null)
 const deletingDeliverable = ref<DummyDeliverableItem | null>(null)
 const deliverables = ref<DummyDeliverableItem[]>(deliverableItems.map((item) => ({ ...item })))
 const editingDeliverableId = ref<string | null>(null)
 const editingDeliverableTitle = ref('')
 const downloadStatusById = ref<Record<string, 'downloading' | 'done'>>({})
+const deliverableContextMenu = reactive<{
+  isOpen: boolean
+  x: number
+  y: number
+  item: DummyDeliverableItem | null
+}>({
+  isOpen: false,
+  x: 0,
+  y: 0,
+  item: null
+})
 
 const toFileSrc = (imgPath: string, version?: string): string => {
   const normalizedPath = imgPath.replace(/\\/g, '/')
@@ -567,6 +583,49 @@ const copyDeliverable = (id: string): void => {
   ]
 }
 
+const openDeliverableStructure = (id: string): void => {
+  void router.push(`/projects/${route.params.id}/deliverables/${id}/structure`)
+}
+
+const openDeliverablePreview = (id: string): void => {
+  void router.push(`/projects/${route.params.id}/deliverables/${id}/preview`)
+}
+
+watch(
+  () => route.query.tab,
+  (tab) => {
+    activeProjectTab.value = tab === 'deliverables' ? 'deliverables' : 'workspaces'
+  }
+)
+
+const closeDeliverableContextMenu = (): void => {
+  deliverableContextMenu.isOpen = false
+  deliverableContextMenu.item = null
+}
+
+const openDeliverableContextMenu = (item: DummyDeliverableItem, event: MouseEvent): void => {
+  deliverableContextMenu.item = item
+  deliverableContextMenu.x = event.clientX
+  deliverableContextMenu.y = event.clientY
+  deliverableContextMenu.isOpen = true
+}
+
+const renameContextDeliverable = (): void => {
+  const item = deliverableContextMenu.item
+  closeDeliverableContextMenu()
+  if (!item) return
+
+  renameDeliverable(item.id)
+}
+
+const deleteContextDeliverable = (): void => {
+  const item = deliverableContextMenu.item
+  closeDeliverableContextMenu()
+  if (!item) return
+
+  openDeleteDeliverable(item)
+}
+
 const downloadDeliverable = (id: string): void => {
   downloadStatusById.value = {
     ...downloadStatusById.value,
@@ -685,5 +744,12 @@ const onDeleteProject = (): void => {
 onMounted(() => {
   void loadProject()
   void loadWorkspaces()
+  document.addEventListener('click', closeDeliverableContextMenu)
+  document.addEventListener('contextmenu', closeDeliverableContextMenu)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', closeDeliverableContextMenu)
+  document.removeEventListener('contextmenu', closeDeliverableContextMenu)
 })
 </script>
