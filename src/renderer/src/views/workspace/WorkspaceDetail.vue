@@ -217,7 +217,7 @@
                 class="rounded-full px-3 py-1.5 text-sm font-semibold transition-colors"
                 :class="
                   docFilter === 'all'
-                    ? 'bg-success/10 text-success shadow-sm'
+                    ? 'bg-warning/10 text-warning shadow-sm'
                     : 'text-base-content/55 hover:text-base-content'
                 "
                 @click="docFilter = 'all'"
@@ -230,7 +230,7 @@
                 class="rounded-full px-3 py-1.5 text-sm font-semibold transition-colors"
                 :class="
                   docFilter === 'doing'
-                    ? 'bg-success/10 text-success shadow-sm'
+                    ? 'bg-warning/10 text-warning shadow-sm'
                     : 'text-base-content/55 hover:text-base-content'
                 "
                 @click="docFilter = 'doing'"
@@ -243,7 +243,7 @@
                 class="rounded-full px-3 py-1.5 text-sm font-semibold transition-colors"
                 :class="
                   docFilter === 'done'
-                    ? 'bg-success/10 text-success shadow-sm'
+                    ? 'bg-warning/10 text-warning shadow-sm'
                     : 'text-base-content/55 hover:text-base-content'
                 "
                 @click="docFilter = 'done'"
@@ -271,8 +271,8 @@
 
         <div class="relative flex-1 overflow-y-auto p-6">
           <div
-            ref="docGridRef"
             v-show="docList.length > 0"
+            ref="docGridRef"
             class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
           >
             <component

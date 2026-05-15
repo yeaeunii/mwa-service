@@ -452,6 +452,28 @@ const hydrateFunctionItems = (contentItems: ContentJsonItem[]): void => {
 const getAnnotationOrder = (annotation: CanvasAnnotation): number =>
   annotation.order ?? annotation.number ?? annotation.zIndex ?? 0
 
+const reorderNumberAnnotations = (): void => {
+  const nextOrderById = new Map<string, number>()
+
+  getNumberAnnotations().forEach((annotation, index) => {
+    nextOrderById.set(annotation.id, index + 1)
+  })
+
+  annotations.value = annotations.value.map((annotation) => {
+    if (annotation.toolType !== 'number') return annotation
+
+    const nextOrder = nextOrderById.get(annotation.id)
+    if (!nextOrder) return annotation
+
+    return {
+      ...annotation,
+      number: nextOrder,
+      order: nextOrder,
+      zIndex: nextOrder
+    }
+  })
+}
+
 // 기능 항목 선택
 const onSelectFunctionItem = (annotationId: string): void => {
   canvasEditorRef.value?.selectAnnotation(annotationId)
@@ -607,6 +629,7 @@ const updateAnnotation = (annotation: CanvasAnnotation): void => {
 // 어노테이션 삭제
 const removeAnnotation = (annotationId: string): void => {
   annotations.value = annotations.value.filter((item) => item.id !== annotationId)
+  reorderNumberAnnotations()
   syncFunctionItemsFromAnnotations()
 }
 

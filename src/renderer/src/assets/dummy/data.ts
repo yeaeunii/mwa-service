@@ -67,18 +67,18 @@ export interface StructureWorkspace {
 
 export const deliverableItems: DummyDeliverableItem[] = [
   {
-    id: 'deliverable-user-manual-package',
-    title: '사용자 매뉴얼 산출물 패키지',
-    date: '2026년 04월 15일'
-  },
-  {
     id: 'deliverable-admin-manual-v1-2',
     title: '관리자 운영 매뉴얼 (v1.2)',
     date: '2026년 05월 12일'
   },
   {
+    id: 'deliverable-user-manual-package',
+    title: '전남대학교병원 MWA 사용자 매뉴얼',
+    date: '2026년 04월 15일'
+  },
+  {
     id: 'deliverable-review-checklist',
-    title: '매뉴얼 검수 체크리스트',
+    title: '조선대학교병원 MWA 사용자 매뉴얼',
     date: '2026년 05월 01일'
   }
 ]

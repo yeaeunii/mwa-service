@@ -58,52 +58,48 @@
             <div
               class="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
             />
-            <div class="absolute right-2.5 top-2.5">
-              <div class="flex items-center gap-1.5">
-                <span
-                  class="badge badge-sm font-bold shadow-sm"
-                  :class="project.filter === '완료' ? 'badge-primary' : 'badge-success'"
-                >
-                  {{ project.status }}
-                </span>
-                <div class="dropdown dropdown-end" @click.stop.prevent @mousedown.stop>
+            <div class="dropdown dropdown-end absolute right-2.5 top-2.5 z-10" @click.stop.prevent @mousedown.stop>
+              <button
+                tabindex="0"
+                type="button"
+                class="btn btn-xs btn-circle border-none bg-black/35 text-white shadow-sm backdrop-blur-sm hover:bg-black/50"
+                @click.stop.prevent
+              >
+                <i-lucide-more-vertical class="h-3.5 w-3.5" />
+              </button>
+              <ul
+                tabindex="0"
+                class="dropdown-content menu z-20 w-36 rounded-xl border border-base-content/10 bg-base-100 p-1.5 shadow-lg"
+                @click.stop.prevent
+              >
+                <li>
                   <button
-                    tabindex="0"
                     type="button"
-                    class="btn btn-xs btn-circle border-none bg-black/35 text-white shadow-sm backdrop-blur-sm hover:bg-black/50"
-                    @click.stop.prevent
+                    class="rounded-lg text-sm"
+                    @click.stop.prevent="openEditProject(project)"
                   >
-                    <i-lucide-more-vertical class="h-3.5 w-3.5" />
+                    <i-lucide-pencil class="h-4 w-4 opacity-60" />
+                    수정
                   </button>
-                  <ul
-                    tabindex="0"
-                    class="dropdown-content menu z-20 w-36 rounded-xl border border-base-content/10 bg-base-100 p-1.5 shadow-lg"
-                    @click.stop.prevent
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    class="rounded-lg text-sm text-error"
+                    @click.stop.prevent="openDeleteProject(project)"
                   >
-                    <li>
-                      <button
-                        type="button"
-                        class="rounded-lg text-sm"
-                        @click.stop.prevent="openEditProject(project)"
-                      >
-                        <i-lucide-pencil class="h-4 w-4 opacity-60" />
-                        수정
-                      </button>
-                    </li>
-                    <li>
-                      <button
-                        type="button"
-                        class="rounded-lg text-sm text-error"
-                        @click.stop.prevent="openDeleteProject(project)"
-                      >
-                        <i-lucide-trash-2 class="h-4 w-4 opacity-60" />
-                        삭제
-                      </button>
-                    </li>
-                  </ul>
-                </div>
-              </div>
+                    <i-lucide-trash-2 class="h-4 w-4 opacity-60" />
+                    삭제
+                  </button>
+                </li>
+              </ul>
             </div>
+            <span
+              class="badge badge-sm absolute bottom-2.5 right-2.5 z-10 font-bold shadow-sm"
+              :class="project.filter === '완료' ? 'badge-primary' : 'badge-success'"
+            >
+              {{ project.status }}
+            </span>
           </div>
 
           <!-- Info -->
