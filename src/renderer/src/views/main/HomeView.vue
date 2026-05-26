@@ -49,16 +49,24 @@
           <!-- Thumbnail -->
           <div class="relative overflow-hidden">
             <img
-              :src="
-                project.thumbnail ?? 'https://placehold.co/600x300/f1f5f9/94a3b8?text=thumbnail'
-              "
+              v-if="project.thumbnail"
+              :src="project.thumbnail"
               alt="project thumbnail"
               class="h-44 w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+            <DefaultThumbnail
+              v-else
+              :id="Number(project.id)"
+              class="h-44 w-full transition-transform duration-300 group-hover:scale-105"
             />
             <div
               class="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
             />
-            <div class="dropdown dropdown-end absolute right-2.5 top-2.5 z-10" @click.stop.prevent @mousedown.stop>
+            <div
+              class="dropdown dropdown-end absolute right-2.5 top-2.5 z-10"
+              @click.stop.prevent
+              @mousedown.stop
+            >
               <button
                 tabindex="0"
                 type="button"
@@ -95,7 +103,7 @@
               </ul>
             </div>
             <span
-              class="badge badge-sm absolute bottom-2.5 right-2.5 z-10 font-bold shadow-sm"
+              class="badge badge-sm absolute bottom-2.5 left-2.5 z-10 font-bold shadow-sm"
               :class="project.filter === '완료' ? 'badge-primary' : 'badge-success'"
             >
               {{ project.status }}
@@ -115,27 +123,9 @@
                 <i-lucide-clock class="h-3 w-3" />
                 {{ project.updatedAt }}
               </div>
-              <div class="flex items-center gap-1 text-xs text-base-content/40">
-                <i-lucide-file-check class="h-3 w-3" />
-                {{ project.progress }}
-              </div>
             </div>
           </div>
         </div>
-
-        <!-- New Project Card -->
-        <button
-          type="button"
-          class="flex min-h-72 flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed border-base-content/15 bg-base-100/50 transition-all duration-200 hover:border-primary/40 hover:bg-primary/5"
-          @click.stop="modalCreateProjectRef?.onOpen()"
-        >
-          <div
-            class="flex h-14 w-14 items-center justify-center rounded-full bg-base-content/10 transition-colors group-hover:bg-primary/20"
-          >
-            <i-lucide-plus class="h-6 w-6 text-base-content/40" />
-          </div>
-          <span class="text-sm font-bold text-base-content/40">새 프로젝트 만들기</span>
-        </button>
       </section>
 
       <!-- Empty State -->
@@ -173,6 +163,7 @@ interface ProjectCard {
   id: string
   title: string
   updatedAt: string
+  updatedTime: number
   progress: string
   description: string
   rawDescription: string
@@ -209,6 +200,7 @@ const mapProjectToCard = (project: Project): ProjectCard => {
     id: String(project.id),
     title: project.name,
     updatedAt: formatDate(new Date(project.updated_at), 'YYYY.MM.DD HH:mm'),
+    updatedTime: new Date(project.updated_at).getTime(),
     progress: '-',
     description: project.description ?? '',
     rawDescription: project.description ?? '',
@@ -230,7 +222,9 @@ const goToWorkspace = async (projectId: string): Promise<void> => {
 const loadProjects = async (): Promise<void> => {
   const rows = await getProjects({ limit: 10, offset: 0 })
   console.log('loaded rows:', rows)
-  projects.value = rows.map(mapProjectToCard)
+  projects.value = rows
+    .map(mapProjectToCard)
+    .sort((left, right) => right.updatedTime - left.updatedTime)
 }
 
 const filteredProjects = computed(() => {

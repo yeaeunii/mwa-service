@@ -11,12 +11,12 @@ export const getDatabasePath = (): string => join(app.getPath('userData'), 'miso
 export const initDatabase = (): Database => {
   if (database) return database
 
-  
   const dbPath = getDatabasePath()
   const dbDir = dirname(dbPath)
+  const isNewDatabase = !existsSync(dbPath)
 
   console.log('dbPath', dbPath)
-  
+
   if (!existsSync(dbDir)) {
     mkdirSync(dbDir, { recursive: true })
   }
@@ -24,7 +24,7 @@ export const initDatabase = (): Database => {
   database = new Database(dbPath)
   database.pragma('foreign_keys = ON')
 
-  if (app.getVersion() === '0.1.1') {
+  if (isNewDatabase || app.getVersion() === '0.1.2') {
     database.exec(schemaSql)
   }
 

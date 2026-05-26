@@ -17,7 +17,7 @@ defineExpose({ onOpen })
     <p class="text-center py-4">{{ message }}</p>
     <template #footer="{ close }">
       <button class="btn btn-sm btn-ghost" @click="close">
-        <IconGmi name="baseline-check" /> 확인
+        <i-lucide-check class="h-4 w-4" /> 확인
       </button>
     </template>
   </ModalBase>

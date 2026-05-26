@@ -1,6 +1,6 @@
 <template>
   <div class="drawer lg:drawer-open drawer-end">
-    <input id="drawerRight" type="checkbox" class="drawer-toggle" checked />
+    <input id="drawerRight" v-model="isDocDrawerOpen" type="checkbox" class="drawer-toggle" />
     <div class="drawer-content flex flex-col h-screen">
       <!-- Navbar -->
       <nav class="navbar shrink-0 border-b border-base-content/10 bg-base-100 px-4">
@@ -14,16 +14,33 @@
             </div>
             <div>
               <div class="text-sm font-bold leading-tight">문서 편집</div>
-              <div class="text-xs text-base-content/50">
+            </div>
+            <div class="mx-1 h-5 w-px bg-base-content/10"></div>
+            <div class="join">
+              <button
+                class="btn btn-ghost btn-sm join-item"
+                :disabled="!prevDoc"
+                @click="goPrevDoc"
+              >
+                <i-lucide-chevron-left class="h-4 w-4" />
+              </button>
+              <div class="join-item flex h-8 items-center px-2 text-sm font-bold tabular-nums">
                 {{ selectedDocIndex }} / {{ docs.length }}
               </div>
+              <button
+                class="btn btn-ghost btn-sm join-item"
+                :disabled="!nextDoc"
+                @click="goNextDoc"
+              >
+                <i-lucide-chevron-right class="h-4 w-4" />
+              </button>
             </div>
           </div>
         </div>
         <div class="flex items-center gap-2">
           <div
             v-if="currentAutoSaveState.status !== 'idle'"
-            class="flex items-center gap-1.5 text-xs text-base-content/50"
+            class="mr-3 flex items-center gap-1.5 text-xs text-base-content/50"
           >
             <template v-if="isAutoSaving">
               <i-lucide-loader-circle class="h-3 w-3 animate-spin text-primary" />
@@ -38,13 +55,7 @@
               {{ autoSaveMessage }}
             </template>
           </div>
-          <button class="btn btn-ghost btn-sm" @click="onClickPrev">
-            <i-lucide-chevron-left class="h-4 w-4" />
-          </button>
-          <button class="btn btn-ghost btn-sm" @click="onClickNext">
-            <i-lucide-chevron-right class="h-4 w-4" />
-          </button>
-          <div class="mx-1 h-5 w-px bg-base-content/10"></div>
+
           <button
             type="button"
             class="btn btn-sm gap-1.5"
@@ -57,15 +68,16 @@
           </button>
           <div class="mx-1 h-5 w-px bg-base-content/10"></div>
           <label for="drawerRight" aria-label="open sidebar" class="btn btn-ghost btn-sm">
-            <i-lucide-panel-right-open class="h-4 w-4" />
+            <i-lucide-panel-right-close v-if="isDocDrawerOpen" class="h-4 w-4" />
+            <i-lucide-panel-right-open v-else class="h-4 w-4" />
           </label>
         </div>
       </nav>
 
       <!-- Page content -->
       <div class="flex-1 overflow-y-auto bg-base-200">
-        <div class="mx-auto min-h-full max-w-[960px]">
-          <div ref="carouselRef" class="carousel min-h-full w-full">
+        <div class="mx-auto max-w-[960px] py-4 md:py-6">
+          <div ref="carouselRef" class="carousel w-full">
             <div
               v-for="doc in docs"
               :id="`slide-item-${doc.id}`"
@@ -73,43 +85,48 @@
               :data-doc-id="doc.id"
               class="carousel-item w-full"
             >
-              <div class="w-full p-4 md:p-6">
+              <div class="w-full px-4 md:px-6">
                 <div class="rounded-xl border border-base-content/10 bg-base-100 shadow-sm">
                   <!-- Form Header -->
-                  <div class="border-b border-base-content/5 p-5">
-                    <label class="floating-label mb-4 block w-full">
-                      <span>문서 제목</span>
+                  <div class="space-y-4 border-b border-base-content/5 p-5">
+                    <label class="block w-full">
+                      <div class="mb-1.5 text-sm font-semibold">제목</div>
                       <input
                         v-model="doc.title"
                         type="text"
-                        placeholder="문서 제목을 입력해주세요"
-                        class="input input-md w-full bg-base-200/50"
+                        placeholder="제목을 입력해주세요"
+                        class="input input-lg h-12 w-full bg-base-200/50 text-2xl font-black leading-tight"
                         @input="scheduleAutoSave(doc)"
                       />
                     </label>
-                    <label class="floating-label mb-4 block w-full">
-                      <span>문서 설명</span>
+                    <label class="block w-full">
+                      <div class="mb-1.5 text-sm font-semibold">진입경로</div>
+                      <label class="input input-md w-full bg-base-200/50">
+                        <i-lucide-folder-open class="h-3 w-3 text-base-content/50" />
+                        <input
+                          v-model="doc.entryPath"
+                          type="text"
+                          placeholder="진입경로 ex) 메인>로그인화면"
+                          @input="scheduleAutoSave(doc)"
+                        />
+                      </label>
+                    </label>
+                    <label class="block w-full">
+                      <div class="mb-1.5 text-sm font-semibold">화면 설명</div>
                       <textarea
                         v-model.trim="doc.description"
                         rows="2"
-                        placeholder="문서 설명을 입력해주세요"
+                        placeholder="화면 설명을 입력해주세요"
                         class="textarea textarea-md w-full resize-none bg-base-200/50"
                         @input="scheduleAutoSave(doc)"
                       ></textarea>
                     </label>
-                    <label class="floating-label block w-full">
-                      <span>진입경로</span>
-                      <input
-                        v-model="doc.entryPath"
-                        type="text"
-                        placeholder="ex) 산출물 관리 > 미리보기"
-                        class="input input-md w-full bg-base-200/50"
-                        @input="scheduleAutoSave(doc)"
-                      />
-                    </label>
                   </div>
 
                   <!-- Screenshot -->
+                  <div class="border-b border-base-content/5 px-5 py-3">
+                    <span class="text-sm font-semibold">화면 구성</span>
+                  </div>
                   <div class="group relative bg-base-200">
                     <img
                       :src="doc.thumbnail"
@@ -131,7 +148,6 @@
                   <!-- Step List -->
                   <div class="p-5">
                     <div class="mb-3 flex items-center gap-2">
-                      <i-lucide-list-ordered class="h-4 w-4 text-primary" />
                       <span class="text-sm font-semibold">기능 설명</span>
                       <span class="badge badge-sm badge-ghost">{{ doc.functionItems.length }}</span>
                     </div>
@@ -178,16 +194,49 @@
           <div
             class="shrink-0 flex items-center justify-between border-b border-base-content/5 px-4 py-3"
           >
-            <div class="flex items-center gap-2">
-              <i-lucide-layers class="h-4 w-4 text-primary" />
+            <div class="flex h-9.5 items-center gap-2">
               <span class="text-sm font-semibold">문서 목록</span>
               <span class="badge badge-sm badge-ghost">{{ docs.length }}</span>
+            </div>
+          </div>
+          <div class="shrink-0 space-y-2 border-b border-base-content/5 px-3 py-2">
+            <label class="input input-sm w-full">
+              <i-lucide-search class="h-3.5 w-3.5 opacity-40" />
+              <input v-model="docListSearchKeyword" type="search" placeholder="문서 검색..." />
+            </label>
+            <div
+              class="flex items-center gap-1 rounded-md bg-base-200 p-1 text-[11px] font-bold text-base-content/55"
+            >
+              <button
+                type="button"
+                class="h-6 flex-1 rounded px-2 transition-colors"
+                :class="docListFilter === 'all' ? 'bg-base-100 text-base-content shadow-sm' : ''"
+                @click="docListFilter = 'all'"
+              >
+                전체
+              </button>
+              <button
+                type="button"
+                class="h-6 flex-1 rounded px-2 transition-colors"
+                :class="docListFilter === 'doing' ? 'bg-base-100 text-base-content shadow-sm' : ''"
+                @click="docListFilter = 'doing'"
+              >
+                작업중
+              </button>
+              <button
+                type="button"
+                class="h-6 flex-1 rounded px-2 transition-colors"
+                :class="docListFilter === 'done' ? 'bg-base-100 text-base-content shadow-sm' : ''"
+                @click="docListFilter = 'done'"
+              >
+                작업완료
+              </button>
             </div>
           </div>
           <div class="min-h-0 flex-1 overflow-y-auto p-3">
             <div class="space-y-2">
               <a
-                v-for="doc in docs"
+                v-for="doc in filteredSidebarDocs"
                 :key="doc.id"
                 class="block cursor-pointer overflow-hidden rounded-lg border-2 bg-base-100 shadow-sm transition-all duration-200 hover:shadow-md"
                 :class="
@@ -198,7 +247,12 @@
                 @click="onClickSelectDoc(doc.id)"
               >
                 <div class="relative bg-base-200">
-                  <img :src="doc.thumbnail" class="h-24 w-full object-contain" />
+                  <img :src="doc.thumbnail" class="h-24 w-full object-cover" />
+                  <div
+                    class="absolute left-2 top-2 flex h-5 min-w-5 items-center justify-center rounded bg-black px-1.5 text-[10px] font-black tabular-nums text-white shadow-sm"
+                  >
+                    {{ getDocOrder(doc) }}
+                  </div>
                   <div v-if="selectedDocId === doc.id" class="absolute right-2 top-2">
                     <div
                       class="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-white"
@@ -207,15 +261,31 @@
                     </div>
                   </div>
                 </div>
-                <div class="p-2.5">
-                  <div class="text-sm font-semibold leading-tight line-clamp-1">
-                    {{ doc.title }}
+                <div class="min-w-0 p-2.5">
+                  <div class="flex min-w-0 items-center justify-between gap-2">
+                    <div class="min-w-0 flex-1 truncate text-sm font-semibold leading-tight">
+                      {{ getDocTitle(doc) }}
+                    </div>
+                    <div
+                      class="badge badge-xs shrink-0 border-0 font-bold"
+                      :class="docStatusClass(doc)"
+                    >
+                      {{ docStatusText(doc) }}
+                    </div>
                   </div>
-                  <div class="mt-0.5 text-xs text-base-content/50 line-clamp-1">
-                    {{ doc.description }}
+                  <div
+                    class="mt-0.5 line-clamp-2 min-h-8 overflow-hidden break-all text-xs leading-relaxed text-base-content/50"
+                  >
+                    {{ getDocDescription(doc) }}
                   </div>
                 </div>
               </a>
+            </div>
+            <div
+              v-if="filteredSidebarDocs.length === 0"
+              class="flex min-h-40 items-center justify-center text-center text-sm text-base-content/40"
+            >
+              {{ docListSearchKeyword ? '검색 결과가 없습니다' : '조건에 맞는 문서가 없습니다' }}
             </div>
           </div>
         </div>
@@ -233,6 +303,7 @@ const workspaceId = computed(() => route.params.id)
 const routeDocId = computed(() => Number(route.params.docId || 0))
 const selectedDocId = ref(0)
 const carouselRef = ref<HTMLElement | null>(null)
+const isDocDrawerOpen = ref(true)
 
 type Doc = {
   id: number
@@ -260,7 +331,12 @@ type AutoSaveState = {
   savedAt: number | null
 }
 
+const EMPTY_DOC_TITLE = '제목 없는 문서'
+const EMPTY_DOC_DESCRIPTION = '문서 설명을 아직 작성하지 않았습니다.'
+
 const docs = ref<Doc[]>([])
+const docListSearchKeyword = ref('')
+const docListFilter = ref<'all' | 'doing' | 'done'>('all')
 const nowTime = ref(Date.now())
 const autoSaveByDoc = reactive<Record<number, AutoSaveState>>({})
 const autoSaveTimers = new Map<number, number>()
@@ -270,6 +346,12 @@ const selectedDocIndex = computed(() => {
   const index = docs.value.findIndex((doc) => doc.id === selectedDocId.value)
   return index === -1 ? 0 : index + 1
 })
+
+const currentDocIndex = computed(() =>
+  docs.value.findIndex((doc) => doc.id === selectedDocId.value)
+)
+const prevDoc = computed(() => docs.value[currentDocIndex.value - 1] ?? null)
+const nextDoc = computed(() => docs.value[currentDocIndex.value + 1] ?? null)
 
 const goBack = (): void => {
   if (route.query.from === 'deliverable-structure') {
@@ -288,6 +370,35 @@ const goBack = (): void => {
 
 const currentDoc = computed(() => docs.value.find((doc) => doc.id === selectedDocId.value) ?? null)
 const currentDocDone = computed(() => currentDoc.value?.status === '작업완료')
+const isDoneDoc = (doc: Doc): boolean => doc.status === '작업완료'
+const docStatusText = (doc: Doc): string => (isDoneDoc(doc) ? '작업완료' : '작업중')
+const docStatusClass = (doc: Doc): string =>
+  isDoneDoc(doc)
+    ? 'border-success/20 bg-success/10 text-success'
+    : 'border-info/20 bg-info/10 text-info'
+const getDocTitle = (doc: Doc): string => doc.title.trim() || EMPTY_DOC_TITLE
+const getDocDescription = (doc: Doc): string => doc.description.trim() || EMPTY_DOC_DESCRIPTION
+const getDocOrder = (doc: Doc): number => {
+  const index = docs.value.findIndex((item) => item.id === doc.id)
+  return index === -1 ? 0 : index + 1
+}
+const filteredSidebarDocs = computed(() => {
+  const keyword = docListSearchKeyword.value.trim().toLowerCase()
+
+  return docs.value.filter((doc) => {
+    const matchesStatus =
+      docListFilter.value === 'all' ||
+      (docListFilter.value === 'done' && isDoneDoc(doc)) ||
+      (docListFilter.value === 'doing' && !isDoneDoc(doc))
+    if (!matchesStatus) return false
+
+    if (!keyword) return true
+
+    return [getDocTitle(doc), getDocDescription(doc)].some((text) =>
+      text.toLowerCase().includes(keyword)
+    )
+  })
+})
 const currentAutoSaveState = computed<AutoSaveState>(() =>
   currentDoc.value
     ? (autoSaveByDoc[currentDoc.value.id] ?? { status: 'idle', savedAt: null })
@@ -469,16 +580,12 @@ const toggleDone = async (): Promise<void> => {
   target.status = nextStatus
 }
 
-const onClickPrev = (): void => {
-  const currentIndex = docs.value.findIndex((doc) => doc.id === selectedDocId.value)
-  const prevDoc = docs.value[currentIndex - 1]
-  if (prevDoc) scrollToDoc(prevDoc.id)
+const goPrevDoc = (): void => {
+  if (prevDoc.value) scrollToDoc(prevDoc.value.id)
 }
 
-const onClickNext = (): void => {
-  const currentIndex = docs.value.findIndex((doc) => doc.id === selectedDocId.value)
-  const nextDoc = docs.value[currentIndex + 1]
-  if (nextDoc) scrollToDoc(nextDoc.id)
+const goNextDoc = (): void => {
+  if (nextDoc.value) scrollToDoc(nextDoc.value.id)
 }
 
 onMounted(() => {

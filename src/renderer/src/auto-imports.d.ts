@@ -13,6 +13,7 @@ declare global {
   const createApp: typeof import('vue').createApp
   const createCapture: typeof import('./database/index').createCapture
   const createCaptureWithImage: typeof import('./database/index').createCaptureWithImage
+  const createDeliverable: typeof import('./database/index').createDeliverable
   const createDoc: typeof import('./database/index').createDoc
   const createPinia: typeof import('pinia').createPinia
   const createProject: typeof import('./database/index').createProject
@@ -22,6 +23,7 @@ declare global {
   const defineComponent: typeof import('vue').defineComponent
   const defineStore: typeof import('pinia').defineStore
   const deleteCapture: typeof import('./database/index').deleteCapture
+  const deleteDeliverable: typeof import('./database/index').deleteDeliverable
   const deleteDoc: typeof import('./database/index').deleteDoc
   const deleteProject: typeof import('./database/index').deleteProject
   const deleteWorkspace: typeof import('./database/index').deleteWorkspace
@@ -31,6 +33,9 @@ declare global {
   const getCurrentInstance: typeof import('vue').getCurrentInstance
   const getCurrentScope: typeof import('vue').getCurrentScope
   const getCurrentWatcher: typeof import('vue').getCurrentWatcher
+  const getDeliverableDetail: typeof import('./database/index').getDeliverableDetail
+  const getDeliverableStructure: typeof import('./database/index').getDeliverableStructure
+  const getDeliverables: typeof import('./database/index').getDeliverables
   const getDocDetail: typeof import('./database/index').getDocDetail
   const getDocList: typeof import('./database/index').getDocList
   const getProject: typeof import('./database/index').getProject
@@ -75,6 +80,7 @@ declare global {
   const readonly: typeof import('vue').readonly
   const ref: typeof import('vue').ref
   const resolveComponent: typeof import('vue').resolveComponent
+  const saveDeliverableStructure: typeof import('./database/index').saveDeliverableStructure
   const setActivePinia: typeof import('pinia').setActivePinia
   const setMapStoreSuffix: typeof import('pinia').setMapStoreSuffix
   const shallowReactive: typeof import('vue').shallowReactive
@@ -89,11 +95,13 @@ declare global {
   const unref: typeof import('vue').unref
   const updateCaptureName: typeof import('./database/index').updateCaptureName
   const updateCapturePath: typeof import('./database/index').updateCapturePath
+  const updateDeliverableTitle: typeof import('./database/index').updateDeliverableTitle
   const updateDoc: typeof import('./database/index').updateDoc
   const updateDocAnnotation: typeof import('./database/index').updateDocAnnotation
   const updateDocSortOrders: typeof import('./database/index').updateDocSortOrders
   const updateDocStatus: typeof import('./database/index').updateDocStatus
   const updateProject: typeof import('./database/index').updateProject
+  const updateProjectStatus: typeof import('./database/index').updateProjectStatus
   const updateWorkspace: typeof import('./database/index').updateWorkspace
   const useAttrs: typeof import('vue').useAttrs
   const useContextMenu: typeof import('./composables/useContextMenu').useContextMenu
@@ -129,10 +137,10 @@ declare global {
   export type { UseDragSelectOptions, UseDragSelectReturn } from './composables/useDragSelect'
   import('./composables/useDragSelect')
   // @ts-ignore
-  export type { CaptureImage, ToolMode, CanvasAnnotation, AnnotationItem, ContentItem, Card, EditorDocGroup, EditorDoc } from './types/index'
+  export type { CaptureImage, ToolMode, CanvasAnnotation, AnnotationItem, ContentItem, Card, EditorDocGroup, EditorDoc, DownloadFormat, ManualExportBundle, ExportResult } from './types/index'
   import('./types/index')
   // @ts-ignore
-  export type { WorkspaceDetail } from './database/index'
+  export type { WorkspaceDetail, Capture, Deliverable, DeliverableSection, DeliverableSectionDoc, DeliverableStructureResponse, Doc, Project, SectionDocInput, SectionTreeInput, Workspace } from './database/index'
   import('./database/index')
 }
 
@@ -147,6 +155,7 @@ declare module 'vue' {
     readonly copyDocs: UnwrapRef<typeof import('./database/index')['copyDocs']>
     readonly createApp: UnwrapRef<typeof import('vue')['createApp']>
     readonly createCaptureWithImage: UnwrapRef<typeof import('./database/index')['createCaptureWithImage']>
+    readonly createDeliverable: UnwrapRef<typeof import('./database/index')['createDeliverable']>
     readonly createDoc: UnwrapRef<typeof import('./database/index')['createDoc']>
     readonly createPinia: UnwrapRef<typeof import('pinia')['createPinia']>
     readonly createProject: UnwrapRef<typeof import('./database/index')['createProject']>
@@ -156,6 +165,7 @@ declare module 'vue' {
     readonly defineComponent: UnwrapRef<typeof import('vue')['defineComponent']>
     readonly defineStore: UnwrapRef<typeof import('pinia')['defineStore']>
     readonly deleteCapture: UnwrapRef<typeof import('./database/index')['deleteCapture']>
+    readonly deleteDeliverable: UnwrapRef<typeof import('./database/index')['deleteDeliverable']>
     readonly deleteDoc: UnwrapRef<typeof import('./database/index')['deleteDoc']>
     readonly deleteProject: UnwrapRef<typeof import('./database/index')['deleteProject']>
     readonly deleteWorkspace: UnwrapRef<typeof import('./database/index')['deleteWorkspace']>
@@ -165,6 +175,9 @@ declare module 'vue' {
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
     readonly getCurrentWatcher: UnwrapRef<typeof import('vue')['getCurrentWatcher']>
+    readonly getDeliverableDetail: UnwrapRef<typeof import('./database/index')['getDeliverableDetail']>
+    readonly getDeliverableStructure: UnwrapRef<typeof import('./database/index')['getDeliverableStructure']>
+    readonly getDeliverables: UnwrapRef<typeof import('./database/index')['getDeliverables']>
     readonly getDocList: UnwrapRef<typeof import('./database/index')['getDocList']>
     readonly getProjects: UnwrapRef<typeof import('./database/index')['getProjects']>
     readonly getWorkspaceDetail: UnwrapRef<typeof import('./database/index')['getWorkspaceDetail']>
@@ -206,6 +219,7 @@ declare module 'vue' {
     readonly readonly: UnwrapRef<typeof import('vue')['readonly']>
     readonly ref: UnwrapRef<typeof import('vue')['ref']>
     readonly resolveComponent: UnwrapRef<typeof import('vue')['resolveComponent']>
+    readonly saveDeliverableStructure: UnwrapRef<typeof import('./database/index')['saveDeliverableStructure']>
     readonly setActivePinia: UnwrapRef<typeof import('pinia')['setActivePinia']>
     readonly setMapStoreSuffix: UnwrapRef<typeof import('pinia')['setMapStoreSuffix']>
     readonly shallowReactive: UnwrapRef<typeof import('vue')['shallowReactive']>
@@ -219,11 +233,13 @@ declare module 'vue' {
     readonly triggerRef: UnwrapRef<typeof import('vue')['triggerRef']>
     readonly unref: UnwrapRef<typeof import('vue')['unref']>
     readonly updateCaptureName: UnwrapRef<typeof import('./database/index')['updateCaptureName']>
+    readonly updateDeliverableTitle: UnwrapRef<typeof import('./database/index')['updateDeliverableTitle']>
     readonly updateDoc: UnwrapRef<typeof import('./database/index')['updateDoc']>
     readonly updateDocAnnotation: UnwrapRef<typeof import('./database/index')['updateDocAnnotation']>
     readonly updateDocSortOrders: UnwrapRef<typeof import('./database/index')['updateDocSortOrders']>
     readonly updateDocStatus: UnwrapRef<typeof import('./database/index')['updateDocStatus']>
     readonly updateProject: UnwrapRef<typeof import('./database/index')['updateProject']>
+    readonly updateProjectStatus: UnwrapRef<typeof import('./database/index')['updateProjectStatus']>
     readonly updateWorkspace: UnwrapRef<typeof import('./database/index')['updateWorkspace']>
     readonly useAttrs: UnwrapRef<typeof import('vue')['useAttrs']>
     readonly useContextMenu: UnwrapRef<typeof import('./composables/useContextMenu')['useContextMenu']>

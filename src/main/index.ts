@@ -18,8 +18,115 @@ import * as DAO from '../database/dao'
 import path from 'path'
 import { pathToFileURL } from 'url'
 import { existsSync, mkdirSync } from 'fs'
+import { writeFile } from 'fs/promises'
 
 const IMG_SCHEME = 'appimg'
+
+interface ManualExportPayload {
+  defaultFileName: string
+  html: string
+}
+
+interface ManualExportFile {
+  path: string
+  content: string
+  encoding?: 'utf-8' | 'base64'
+}
+
+interface ManualHtmlZipExportPayload {
+  defaultFileName: string
+  files: ManualExportFile[]
+}
+
+interface ExportResult {
+  canceled: boolean
+  filePath?: string
+}
+
+const getCrc32Table = (): number[] => {
+  const table: number[] = []
+
+  for (let index = 0; index < 256; index += 1) {
+    let crc = index
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = crc & 1 ? 0xedb88320 ^ (crc >>> 1) : crc >>> 1
+    }
+    table[index] = crc >>> 0
+  }
+
+  return table
+}
+
+const CRC32_TABLE = getCrc32Table()
+
+const getCrc32 = (buffer: Buffer): number => {
+  let crc = 0xffffffff
+  for (const byte of buffer) {
+    crc = CRC32_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8)
+  }
+  return (crc ^ 0xffffffff) >>> 0
+}
+
+const createZipBuffer = (files: { name: string; content: Buffer }[]): Buffer => {
+  const localParts: Buffer[] = []
+  const centralParts: Buffer[] = []
+  let offset = 0
+
+  for (const file of files) {
+    const nameBuffer = Buffer.from(file.name)
+    const crc32 = getCrc32(file.content)
+    const localHeader = Buffer.alloc(30)
+
+    localHeader.writeUInt32LE(0x04034b50, 0)
+    localHeader.writeUInt16LE(20, 4)
+    localHeader.writeUInt16LE(0, 6)
+    localHeader.writeUInt16LE(0, 8)
+    localHeader.writeUInt16LE(0, 10)
+    localHeader.writeUInt16LE(0, 12)
+    localHeader.writeUInt32LE(crc32, 14)
+    localHeader.writeUInt32LE(file.content.length, 18)
+    localHeader.writeUInt32LE(file.content.length, 22)
+    localHeader.writeUInt16LE(nameBuffer.length, 26)
+    localHeader.writeUInt16LE(0, 28)
+
+    localParts.push(localHeader, nameBuffer, file.content)
+
+    const centralHeader = Buffer.alloc(46)
+    centralHeader.writeUInt32LE(0x02014b50, 0)
+    centralHeader.writeUInt16LE(20, 4)
+    centralHeader.writeUInt16LE(20, 6)
+    centralHeader.writeUInt16LE(0, 8)
+    centralHeader.writeUInt16LE(0, 10)
+    centralHeader.writeUInt16LE(0, 12)
+    centralHeader.writeUInt16LE(0, 14)
+    centralHeader.writeUInt32LE(crc32, 16)
+    centralHeader.writeUInt32LE(file.content.length, 20)
+    centralHeader.writeUInt32LE(file.content.length, 24)
+    centralHeader.writeUInt16LE(nameBuffer.length, 28)
+    centralHeader.writeUInt16LE(0, 30)
+    centralHeader.writeUInt16LE(0, 32)
+    centralHeader.writeUInt16LE(0, 34)
+    centralHeader.writeUInt16LE(0, 36)
+    centralHeader.writeUInt32LE(0, 38)
+    centralHeader.writeUInt32LE(offset, 42)
+    centralParts.push(centralHeader, nameBuffer)
+
+    offset += localHeader.length + nameBuffer.length + file.content.length
+  }
+
+  const centralDirectory = Buffer.concat(centralParts)
+  const endRecord = Buffer.alloc(22)
+  endRecord.writeUInt32LE(0x06054b50, 0)
+  endRecord.writeUInt16LE(0, 4)
+  endRecord.writeUInt16LE(0, 6)
+  endRecord.writeUInt16LE(files.length, 8)
+  endRecord.writeUInt16LE(files.length, 10)
+  endRecord.writeUInt32LE(centralDirectory.length, 12)
+  endRecord.writeUInt32LE(offset, 16)
+  endRecord.writeUInt16LE(0, 20)
+
+  return Buffer.concat([...localParts, centralDirectory, endRecord])
+}
 
 //Light 테마 고정
 nativeTheme.themeSource = 'light'
@@ -111,7 +218,13 @@ app.whenReady().then(() => {
   })
 
     //파일 경로
-    const getFileStoragePaths = () => {
+    const getFileStoragePaths = (): {
+      userDataDir: string
+      fileRootDir: string
+      capturesDir: string
+      docsDir: string
+      thumbnailsDir: string
+    } => {
       const userDataDir = app.getPath('userData')
       const fileRootDir = path.join(userDataDir, 'FILE')
     
@@ -199,9 +312,82 @@ app.whenReady().then(() => {
     await shell.openExternal(url)
   })
 
+  ipcMain.handle('shell:showItemInFolder', (_, filePath: string) => {
+    shell.showItemInFolder(filePath)
+  })
+
   ipcMain.handle('app:getVersion', () => {
     return app.getVersion()
   })
+
+  ipcMain.handle(
+    'export:manualHtmlZip',
+    async (event, payload: ManualHtmlZipExportPayload): Promise<ExportResult> => {
+      const ownerWindow = BrowserWindow.fromWebContents(event.sender) ?? undefined
+      const options = {
+        title: 'HTML 매뉴얼 저장',
+        defaultPath: `${payload.defaultFileName}.zip`,
+        filters: [{ name: 'ZIP 파일', extensions: ['zip'] }]
+      }
+      const result = ownerWindow
+        ? await dialog.showSaveDialog(ownerWindow, options)
+        : await dialog.showSaveDialog(options)
+
+      if (result.canceled || !result.filePath) return { canceled: true }
+
+      const zipBuffer = createZipBuffer(
+        payload.files.map((file) => ({
+          name: file.path.replace(/\\/g, '/'),
+          content: Buffer.from(file.content, file.encoding ?? 'utf-8')
+        }))
+      )
+
+      await writeFile(result.filePath, zipBuffer)
+      return { canceled: false, filePath: result.filePath }
+    }
+  )
+
+  ipcMain.handle(
+    'export:manualPdf',
+    async (event, payload: ManualExportPayload): Promise<ExportResult> => {
+      const ownerWindow = BrowserWindow.fromWebContents(event.sender) ?? undefined
+      const options = {
+        title: 'PDF 매뉴얼 저장',
+        defaultPath: `${payload.defaultFileName}.pdf`,
+        filters: [{ name: 'PDF 문서', extensions: ['pdf'] }]
+      }
+      const result = ownerWindow
+        ? await dialog.showSaveDialog(ownerWindow, options)
+        : await dialog.showSaveDialog(options)
+
+      if (result.canceled || !result.filePath) return { canceled: true }
+
+      const printWindow = new BrowserWindow({
+        show: false,
+        autoHideMenuBar: true,
+        webPreferences: {
+          sandbox: false,
+          offscreen: true
+        }
+      })
+
+      try {
+        await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(payload.html)}`)
+        const pdfBuffer = await printWindow.webContents.printToPDF({
+          printBackground: true,
+          pageSize: 'A4',
+          margins: {
+            marginType: 'default'
+          }
+        })
+        await writeFile(result.filePath, pdfBuffer)
+      } finally {
+        printWindow.close()
+      }
+
+      return { canceled: false, filePath: result.filePath }
+    }
+  )
 
   ipcMain.handle('dao:call', (_, method: string, ...args: unknown[]) => {
     const daoMethod = (DAO as Record<string, unknown>)[method]

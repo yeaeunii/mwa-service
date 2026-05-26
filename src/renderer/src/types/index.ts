@@ -52,3 +52,20 @@ export type EditorDoc = {
   annoMap: Record<string, AnnotationItem>
 }
 
+export type DownloadFormat = 'html' | 'pdf'
+
+export type ManualExportBundle = {
+  html: string
+  css: string
+  js: string
+  images?: {
+    path: string
+    content: string
+    encoding: 'base64'
+  }[]
+}
+
+export type ExportResult = {
+  canceled: boolean
+  filePath?: string
+}

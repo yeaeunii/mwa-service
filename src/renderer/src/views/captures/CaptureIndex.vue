@@ -52,9 +52,9 @@
       <!-- Webview -->
       <div class="relative flex-1">
         <webview
-          v-if="currentUrl"
+          v-if="webviewSrc"
           ref="webviewRef"
-          :src="currentUrl"
+          :src="webviewSrc"
           allowpopups
           class="absolute inset-0 h-full w-full bg-white"
         ></webview>
@@ -77,13 +77,13 @@
           <li>
             <a>
               <i-lucide-folder />
-              {{ workspaceInfo?.name || 'Workspace명'  }}
+              {{ workspaceInfo?.name || 'Workspace명' }}
             </a>
           </li>
         </ul>
       </div>
       <div class="overflow-y-auto w-full p-3 bg-slate-50 rounded-md flex-1">
-            <!-- 캡쳐 이미지 목록 -->
+        <!-- 캡쳐 이미지 목록 -->
         <div class="grid grid-cols-2 gap-4">
           <div v-for="image in captureImages" :key="image.id" class="group">
             <div class="overflow-hidden border border-gray-300 rounded-md shadow-sm h-30 relative">
@@ -95,7 +95,11 @@
                   <button type="button" class="btn btn-sm btn-circle" @click="onEditCapture(image)">
                     <i-lucide-pencil />
                   </button>
-                  <button type="button" class="btn btn-sm btn-circle" @click="onDeleteCapture(image)">
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-circle"
+                    @click="onDeleteCapture(image)"
+                  >
                     <i-lucide-trash />
                   </button>
                 </div>
@@ -129,9 +133,8 @@ import {
   updateCaptureName,
   type WorkspaceDetail
 } from '@/database'
-import ModalCaptureName from './components/ModalCaptureName.vue'
 
-const modalCaptureNameRef = ref<InstanceType<typeof ModalCaptureName> | null>(null)
+const modalCaptureNameRef = ref<ComponentRef<'ModalCaptureName'> | null>(null)
 const modalConfirmRef = ref<ComponentRef<'ModalConfirm'> | null>(null)
 
 interface WebviewElement extends HTMLElement {
@@ -142,10 +145,7 @@ interface WebviewElement extends HTMLElement {
   canGoBack: () => boolean
   canGoForward: () => boolean
   capturePage: () => Promise<{ toDataURL: () => string }>
-  executeJavaScript: (code: string) => Promise<unknown>
-  addEventListener: (event: string, listener: (e: WebviewNavigationEvent) => void) => void
-
-  openDevTools: () => void
+  addEventListener: (event: string, listener: (event: WebviewNavigationEvent) => void) => void
 }
 
 interface WebviewNavigationEvent {
@@ -160,8 +160,26 @@ const webviewRef = ref<WebviewElement | null>(null)
 const router = useRouter()
 const route = useRoute()
 const workspaceId = computed(() => String(route.params.workspaceId ?? ''))
-const workspaceInfo = ref<WorkspaceDetail | null>(null)
 
+// 화면 상태
+const workspaceInfo = ref<WorkspaceDetail | null>(null)
+const urlInput = ref('')
+const webviewSrc = ref('')
+const currentUrl = ref('')
+const isLoading = ref(false)
+const canGoBack = ref(false)
+const canGoForward = ref(false)
+const isCaptureFlashVisible = ref(false)
+
+// 캡쳐 목록/모달 상태
+const captureImages = ref<CaptureImage[]>([])
+const editingCaptureId = ref<number | null>(null)
+const deletingCapture = ref<CaptureImage | null>(null)
+
+let captureFlashTimeout: ReturnType<typeof setTimeout> | null = null
+let webviewCaptureListener: (() => void) | null = null
+
+// 워크스페이스 정보와 최초 접속 URL 불러옴
 const loadWorkspaceInfo = async (): Promise<void> => {
   if (!workspaceId.value) return
 
@@ -170,23 +188,10 @@ const loadWorkspaceInfo = async (): Promise<void> => {
   const initialUrl = workspaceInfo.value?.latest_src_url || START_PAGE_URL
   urlInput.value = initialUrl
   currentUrl.value = initialUrl
+  webviewSrc.value = initialUrl
 }
 
-
-
-const urlInput = ref('')
-const currentUrl = ref('')
-const isLoading = ref(false)
-const canGoBack = ref(false)
-const canGoForward = ref(false)
-const isCaptureFlashVisible = ref(false)
-let captureFlashTimeout: ReturnType<typeof setTimeout> | null = null
-
-const captureImages = ref<CaptureImage[]>([])
-const editingCaptureId = ref<number | null>(null)
-const deletingCapture = ref<CaptureImage | null>(null)
-
-
+// 주소 입력창에서 이동할 때만 webview src 변경
 const navigate = (): void => {
   let url = urlInput.value.trim()
   if (!url) return
@@ -195,11 +200,7 @@ const navigate = (): void => {
     urlInput.value = url
   }
   currentUrl.value = url
-}
-
-const navigateWebviewTo = (url: string): void => {
-  urlInput.value = url
-  currentUrl.value = url
+  webviewSrc.value = url
 }
 
 const goBack = (): void => {
@@ -214,6 +215,7 @@ const reload = (): void => {
   webviewRef.value?.reload()
 }
 
+// 현재 webview 화면을 이미지 data URL로 캡쳐
 const getCaptureImageDataURL = async (): Promise<string | null> => {
   if (captureFlashTimeout) {
     clearTimeout(captureFlashTimeout)
@@ -228,23 +230,10 @@ const getCaptureImageDataURL = async (): Promise<string | null> => {
   return image?.toDataURL() ?? null
 }
 
-let webviewCaptureListener: (() => void) | null = null
-
+// webview 로딩 상태와 현재 URL 표시만 동기화
 const initWebview = (): void => {
   const webview = webviewRef.value
   if (!webview) return
-
-  webview.addEventListener('dom-ready', async () => {
-    // webview.openDevTools()
-    // const script = `
-    // (function() {
-    //   let theme= window.matchMedia('(prefers-color-scheme: dark)').matches;
-    //   console.log('theme', theme);
-    // })()
-    // `
-    // const result = await webview.executeJavaScript(script)
-    // console.log('result', result)
-  })
 
   webview.addEventListener('did-start-loading', () => {
     isLoading.value = true
@@ -259,16 +248,17 @@ const initWebview = (): void => {
   const syncCurrentUrl = (e: WebviewNavigationEvent): void => {
     if (e.isMainFrame === false || !e.url) return
 
-    navigateWebviewTo(e.url)
+    urlInput.value = e.url
+    currentUrl.value = e.url
     canGoBack.value = webview.canGoBack()
     canGoForward.value = webview.canGoForward()
   }
 
   webview.addEventListener('did-navigate', syncCurrentUrl)
-
   webview.addEventListener('did-navigate-in-page', syncCurrentUrl)
 }
 
+// 단축키 입력 시 캡쳐 이름 입력 모달 열기
 const onCaptureWebview = async (): Promise<void> => {
   const webview = webviewRef.value
   if (!webview) return
@@ -276,12 +266,13 @@ const onCaptureWebview = async (): Promise<void> => {
   modalCaptureNameRef.value?.onOpen()
 }
 
+// 로컬 저장 이미지 경로를 appimg URL로 변환
 const toFileSrc = (imgPath: string): string => {
   const normalizedPath = imgPath.replace(/\\/g, '/')
   return `appimg:///${normalizedPath}`
 }
 
-//켑쳐 이미지 조회
+// 저장된 캡쳐 이미지 목록 조회
 const loadCaptureList = async (): Promise<void> => {
   if (!workspaceId.value) return
 
@@ -297,7 +288,7 @@ const loadCaptureList = async (): Promise<void> => {
   }))
 }
 
-
+// 캡쳐 이미지 이름 수정 모달 열기
 const onEditCapture = (image: CaptureImage): void => {
   editingCaptureId.value = image.id
   modalCaptureNameRef.value?.onOpen({
@@ -307,11 +298,13 @@ const onEditCapture = (image: CaptureImage): void => {
   })
 }
 
+// 캡쳐 이미지 삭제 확인 모달 열기
 const onDeleteCapture = (image: CaptureImage): void => {
   deletingCapture.value = image
   modalConfirmRef.value?.onOpen()
 }
 
+// 캡쳐 이미지 DB row와 로컬 파일 삭제
 const onConfirmDeleteCapture = async (): Promise<void> => {
   const target = deletingCapture.value
   if (!target) return
@@ -325,7 +318,7 @@ const onConfirmDeleteCapture = async (): Promise<void> => {
   deletingCapture.value = null
 }
 
-// 캡쳐 이미지 저장/수정
+// 캡쳐 이미지 이름 저장 또는 신규 캡쳐 저장 처리
 const onCaptureNameConfirm = async (name: string): Promise<void> => {
   const nextName = name.trim()
   if (!nextName) return
@@ -355,18 +348,16 @@ const onCaptureNameConfirm = async (name: string): Promise<void> => {
   })
   if (!saved) return
 
-
   captureImages.value.unshift({
     id: saved.id,
     name: nextName,
     src: imageDataURL,
     imgPath: saved.imgPath
   })
-  
 }
 
+// 화면 진입 시 webview와 캡쳐 단축키 초기화
 onMounted(async () => {
-  // console.log('workspaceId:', workspaceId.value)
   await loadWorkspaceInfo()
   await nextTick()
   initWebview()
@@ -375,6 +366,7 @@ onMounted(async () => {
   webviewCaptureListener = window.api.on('shortcut:captureWebview', onCaptureWebview)
 })
 
+// 화면 이탈 시 타이머와 단축키 리스너 정리
 onUnmounted(() => {
   if (captureFlashTimeout) {
     clearTimeout(captureFlashTimeout)
@@ -384,8 +376,4 @@ onUnmounted(() => {
   webviewCaptureListener = null
   window.api.invoke('shortcut:unregister', CAPTURE_SHORTCUT_KEY)
 })
-
-
-
-
 </script>

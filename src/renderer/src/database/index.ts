@@ -1,4 +1,25 @@
-import type { Capture, Doc, Project, Workspace } from '@database/dto'
+import type {
+  Capture,
+  Deliverable,
+  DeliverableStructureResponse,
+  Doc,
+  Project,
+  SectionTreeInput,
+  Workspace
+} from '@database/dto'
+
+export type {
+  Capture,
+  Deliverable,
+  DeliverableSection,
+  DeliverableSectionDoc,
+  DeliverableStructureResponse,
+  Doc,
+  Project,
+  SectionDocInput,
+  SectionTreeInput,
+  Workspace
+} from '@database/dto'
 
 export interface WorkspaceDetail extends Workspace {
   project_name: string
@@ -53,6 +74,17 @@ export const updateWorkspace = async (workspace: Record<string, unknown>): Promi
 export const updateProject = async (project: Record<string, unknown>): Promise<void> => {
   try {
     await window.api.invoke('dao:call', 'updateProject', project)
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+export const updateProjectStatus = async (project: {
+  id: string | number
+  status: string
+}): Promise<void> => {
+  try {
+    await window.api.invoke('dao:call', 'updateProjectStatus', project)
   } catch (error) {
     console.error(error)
   }
@@ -243,6 +275,87 @@ export const copyDocs = async (params: {
 }): Promise<boolean> => {
   try {
     await window.api.invoke('dao:call', 'copyDocs', params)
+    return true
+  } catch (error) {
+    console.error(error)
+    return false
+  }
+}
+
+export const getDeliverables = async (params: { projectId: number }): Promise<Deliverable[]> => {
+  try {
+    return (await window.api.invoke('dao:call', 'getDeliverableList', params)) as Deliverable[]
+  } catch (error) {
+    console.error(error)
+    return []
+  }
+}
+
+export const getDeliverableDetail = async (id: number): Promise<Deliverable | null> => {
+  try {
+    return (await window.api.invoke('dao:call', 'getDeliverableDetail', id)) as Deliverable | null
+  } catch (error) {
+    console.error(error)
+    return null
+  }
+}
+
+export const createDeliverable = async (params: {
+  projectId: number
+  title: string
+  sourceDeliverableId?: number
+}): Promise<number | null> => {
+  try {
+    return (await window.api.invoke('dao:call', 'createDeliverable', params)) as number
+  } catch (error) {
+    console.error(error)
+    return null
+  }
+}
+
+export const updateDeliverableTitle = async (params: {
+  id: number
+  title: string
+}): Promise<boolean> => {
+  try {
+    await window.api.invoke('dao:call', 'updateDeliverableTitle', params)
+    return true
+  } catch (error) {
+    console.error(error)
+    return false
+  }
+}
+
+export const deleteDeliverable = async (id: number): Promise<boolean> => {
+  try {
+    await window.api.invoke('dao:call', 'deleteDeliverable', id)
+    return true
+  } catch (error) {
+    console.error(error)
+    return false
+  }
+}
+
+export const getDeliverableStructure = async (
+  deliverableId: number
+): Promise<DeliverableStructureResponse> => {
+  try {
+    return (await window.api.invoke('dao:call', 'getDeliverableStructure', {
+      deliverableId
+    })) as DeliverableStructureResponse
+  } catch (error) {
+    console.error(error)
+    return { sections: [], sectionDocs: [] }
+  }
+}
+
+export const saveDeliverableStructure = async (params: {
+  deliverableId: number
+  sections: SectionTreeInput[]
+}): Promise<boolean> => {
+  try {
+    const payload = JSON.parse(JSON.stringify(params)) as typeof params
+    await window.api.invoke('dao:call', 'saveDeliverableStructure', payload)
     return true
   } catch (error) {
     console.error(error)

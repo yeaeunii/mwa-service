@@ -151,7 +151,7 @@ defineExpose({ onOpen, onOpenEdit, onClose })
           v-model="wsName"
           type="text"
           class="input input-bordered h-11 w-full rounded-xl border-slate-200 bg-slate-50 text-slate-800 shadow-none outline-none focus:border-blue-400 focus:outline-none"
-          placeholder="예: AI 솔루션 매뉴얼"
+          placeholder="ex) AI 솔루션 화면"
         />
       </label>
     </div>

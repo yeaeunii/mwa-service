@@ -14,7 +14,7 @@
             </div>
             <div>
               <div class="text-sm font-bold leading-tight">
-                {{ currentDocTitle || '문서 편집' }}
+                {{ currentDocTitle || '화면 편집' }}
               </div>
               <div
                 v-if="isAutoSavePending || isSaving || showSavedStatus"
@@ -182,6 +182,11 @@
           >
             <div class="relative">
               <img :src="doc.thumbnail" alt="thumbnail" class="h-28 w-full object-cover" />
+              <div
+                class="absolute left-2 top-2 flex h-5 min-w-5 items-center justify-center rounded bg-black px-1.5 text-[10px] font-black tabular-nums text-white shadow-sm"
+              >
+                {{ doc.orderNo }}
+              </div>
               <div v-if="curDocId === doc.id" class="absolute right-2 top-2">
                 <div
                   class="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-white"
@@ -190,11 +195,21 @@
                 </div>
               </div>
             </div>
-            <div class="p-2.5">
-              <div class="text-sm font-semibold leading-tight line-clamp-1">
-                {{ doc.title }}
+            <div class="min-w-0 p-2.5">
+              <div class="flex min-w-0 items-center justify-between gap-2">
+                <div class="min-w-0 flex-1 truncate text-sm font-semibold leading-tight">
+                  {{ getDocTitle(doc) }}
+                </div>
+                <div
+                  class="badge badge-xs shrink-0 border-0 font-bold"
+                  :class="docStatusClass(doc)"
+                >
+                  {{ docStatusText(doc) }}
+                </div>
               </div>
-              <div class="mt-0.5 text-xs text-base-content/50">{{ doc.stepCount }} Steps</div>
+              <div class="mt-0.5 text-xs text-base-content/50">
+                {{ doc.stepCount }} {{ doc.stepCount <= 1 ? 'Step' : 'Steps' }}
+              </div>
             </div>
           </a>
         </div>
@@ -252,6 +267,8 @@ interface DocumentItem {
   title: string
   thumbnail: string
   stepCount: number
+  status: string
+  orderNo: number
 }
 
 interface ContentJsonItem {
@@ -284,6 +301,7 @@ const currentDocTitle = ref('')
 const imageSrc = ref('')
 const documentSearchKeyword = ref('')
 const documentItems = ref<DocumentItem[]>([])
+const EMPTY_DOC_TITLE = '제목 없는 문서'
 
 // 에디터 상태
 const annotations = ref<CanvasAnnotation[]>([])
@@ -553,8 +571,19 @@ const toFileSrc = (imgPath: string, version?: string): string => {
   return `appimg:///${normalizedPath}${cacheKey}`
 }
 
+const isDoneDoc = (doc: DocumentItem): boolean => doc.status === '작업완료'
+
+const docStatusText = (doc: DocumentItem): string => (isDoneDoc(doc) ? '작업완료' : '작업중')
+
+const docStatusClass = (doc: DocumentItem): string =>
+  isDoneDoc(doc)
+    ? 'border-success/20 bg-success/10 text-success'
+    : 'border-info/20 bg-info/10 text-info'
+
+const getDocTitle = (doc: DocumentItem): string => doc.title.trim() || EMPTY_DOC_TITLE
+
 // 문서 카드 데이터
-const toDocumentItem = (doc: Doc): DocumentItem => {
+const toDocumentItem = (doc: Doc, index: number): DocumentItem => {
   const thumbnailPath = doc.draw_img_path || doc.orgn_img_path
   const thumbnailVersion = doc.updated_at
 
@@ -564,7 +593,9 @@ const toDocumentItem = (doc: Doc): DocumentItem => {
     thumbnail: thumbnailPath
       ? toFileSrc(thumbnailPath, thumbnailVersion)
       : 'https://placehold.co/280x160/f1f5f9/94a3b8?text=thumbnail',
-    stepCount: parseContentItems(doc.content_json).length
+    stepCount: parseContentItems(doc.content_json).length,
+    status: doc.status === '작업완료' ? '작업완료' : '작업중',
+    orderNo: Number(doc.sort_order || 0) || index + 1
   }
 }
 
@@ -573,7 +604,7 @@ const filteredDocumentItems = computed(() => {
   const keyword = documentSearchKeyword.value.trim().toLowerCase()
   if (!keyword) return documentItems.value
 
-  return documentItems.value.filter((doc) => doc.title.toLowerCase().includes(keyword))
+  return documentItems.value.filter((doc) => getDocTitle(doc).toLowerCase().includes(keyword))
 })
 
 // 문서 목록 조회

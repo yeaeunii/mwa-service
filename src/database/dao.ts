@@ -1,9 +1,10 @@
 import { app } from 'electron'
-import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'fs'
-import { unlink, writeFile } from 'fs/promises'
+import type Database from 'better-sqlite3'
+import { copyFileSync, existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs'
+import { writeFile } from 'fs/promises'
 import path from 'path'
 import { selectList, selectOne, runQuery, transaction } from './conn'
-import { Doc, Project, Workspace } from './dto'
+import { Doc, Project, Workspace, type SectionTreeInput } from './dto'
 import dayjs from 'dayjs'
 
 const saveThumbnail = (
@@ -25,6 +26,70 @@ const saveThumbnail = (
 
   writeFileSync(thumbnailAbsPath, Buffer.from(base64Data, 'base64'))
   return thumbnailPath
+}
+
+const resolveStoredFilePath = (filePath: string | null | undefined): string | null => {
+  if (!filePath) return null
+
+  const fileRootDir = path.join(app.getPath('userData'), 'FILE')
+  const relativePath = filePath.replace(/\\/g, '/').replace(/^\/+/, '')
+  const absPath = path.resolve(app.getPath('userData'), relativePath)
+  const resolvedBase = path.resolve(fileRootDir)
+  const normalizedBase = resolvedBase + path.sep
+  const isInsideBase = absPath === resolvedBase || absPath.startsWith(normalizedBase)
+
+  if (!isInsideBase) {
+    throw new Error(`Forbidden file path: ${filePath}`)
+  }
+
+  return absPath
+}
+
+const deleteStoredFile = (filePath: string | null | undefined): void => {
+  const absPath = resolveStoredFilePath(filePath)
+  if (absPath && existsSync(absPath)) {
+    unlinkSync(absPath)
+  }
+}
+
+const deleteStoredFiles = (filePaths: Array<string | null | undefined>): void => {
+  Array.from(new Set(filePaths.filter(Boolean))).forEach((filePath) => deleteStoredFile(filePath))
+}
+
+const touchProject = (db: Database, projectId: string | number, updatedAt: string): void => {
+  db.prepare(
+    `
+      UPDATE t_project
+      SET updated_at = @updated_at
+      WHERE id = @projectId
+    `
+  ).run({ projectId, updated_at: updatedAt })
+}
+
+const touchWorkspaceAndProject = (
+  db: Database,
+  workspaceId: string | number,
+  updatedAt: string
+): void => {
+  db.prepare(
+    `
+      UPDATE t_workspace
+      SET updated_at = @updated_at
+      WHERE id = @workspaceId
+    `
+  ).run({ workspaceId, updated_at: updatedAt })
+
+  db.prepare(
+    `
+      UPDATE t_project
+      SET updated_at = @updated_at
+      WHERE id = (
+        SELECT project_id
+        FROM t_workspace
+        WHERE id = @workspaceId
+      )
+    `
+  ).run({ workspaceId, updated_at: updatedAt })
 }
 
 // 프로젝트 조회
@@ -120,47 +185,159 @@ export const createProject = (project: Record<string, unknown>): number => {
 
 // 프로젝트 수정
 export const updateProject = (project: Record<string, unknown>): void => {
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
   const thumbnailPath =
     project.thumbnail === null
       ? ''
       : saveThumbnail('project', project.id as string | number, project.thumbnail)
-  const query = `
-    UPDATE t_project
-    SET
-      name = @name,
-      description = @description,
-      serv_url = @serv_url,
-      thumbnail_path = CASE
-        WHEN @thumbnailPath IS NULL THEN thumbnail_path
-        ELSE @thumbnailPath
-      END,
-      updated_at = @updated_at
-    WHERE id = @id
-  `
 
   const payload = {
-    updated_at: new Date().toISOString(),
+    updated_at: now,
     thumbnailPath,
     ...project
   }
 
-  runQuery(query, payload)
+  transaction((db) => {
+    db.prepare(
+      `
+        UPDATE t_project
+        SET
+          name = @name,
+          description = @description,
+          serv_url = @serv_url,
+          thumbnail_path = CASE
+            WHEN @thumbnailPath IS NULL THEN thumbnail_path
+            ELSE @thumbnailPath
+          END,
+          updated_at = @updated_at
+        WHERE id = @id
+      `
+    ).run(payload)
+
+    db.prepare(
+      `
+        UPDATE t_workspace
+        SET
+          latest_src_url = @serv_url,
+          updated_at = @updated_at
+        WHERE project_id = @id
+          AND NOT EXISTS (
+            SELECT 1
+            FROM t_capture
+            WHERE t_capture.workspace_id = t_workspace.id
+          )
+      `
+    ).run(payload)
+  })
+}
+
+export const updateProjectStatus = (project: Record<string, unknown>): void => {
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+
+  runQuery(
+    `
+      UPDATE t_project
+      SET
+        status = @status,
+        updated_at = @updated_at
+      WHERE id = @id
+    `,
+    {
+      id: project.id,
+      status: project.status,
+      updated_at: now
+    }
+  )
 }
 
 // 프로젝트 삭제
 export const deleteProject = (id: string | number): void => {
-  const query = `
-    UPDATE t_project
-    SET
-      delete_yn = '1',
-      updated_at = @updated_at
-    WHERE id = @id
-  `
+  const filePaths: string[] = []
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
 
-  runQuery(query, {
-    id,
-    updated_at: new Date().toISOString()
+  transaction((db) => {
+    const project = db
+      .prepare(
+        `
+          SELECT thumbnail_path
+          FROM t_project
+          WHERE id = @id
+        `
+      )
+      .get({ id }) as { thumbnail_path: string | null } | undefined
+    if (project?.thumbnail_path) filePaths.push(project.thumbnail_path)
+
+    const workspaces = db
+      .prepare(
+        `
+          SELECT thumbnail_path
+          FROM t_workspace
+          WHERE project_id = @id
+        `
+      )
+      .all({ id }) as Array<{ thumbnail_path: string | null }>
+    workspaces.forEach((workspace) => {
+      if (workspace.thumbnail_path) filePaths.push(workspace.thumbnail_path)
+    })
+
+    const captures = db
+      .prepare(
+        `
+          SELECT c.img_path
+          FROM t_capture c
+          JOIN t_workspace w ON w.id = c.workspace_id
+          WHERE w.project_id = @id
+        `
+      )
+      .all({ id }) as Array<{ img_path: string | null }>
+    captures.forEach((capture) => {
+      if (capture.img_path) filePaths.push(capture.img_path)
+    })
+
+    const docs = db
+      .prepare(
+        `
+          SELECT d.orgn_img_path, d.draw_img_path
+          FROM t_doc d
+          JOIN t_workspace w ON w.id = d.workspace_id
+          WHERE w.project_id = @id
+        `
+      )
+      .all({ id }) as Array<{ orgn_img_path: string | null; draw_img_path: string | null }>
+    docs.forEach((doc) => {
+      if (doc.orgn_img_path) filePaths.push(doc.orgn_img_path)
+      if (doc.draw_img_path) filePaths.push(doc.draw_img_path)
+    })
+
+    db.prepare(
+      `
+        DELETE FROM t_deliverable
+        WHERE project_id = @id
+      `
+    ).run({ id })
+
+    db.prepare(
+      `
+        DELETE FROM t_workspace
+        WHERE project_id = @id
+      `
+    ).run({ id })
+
+    db.prepare(
+      `
+        UPDATE t_project
+        SET
+          delete_yn = '1',
+          updated_at = @updated_at
+        WHERE id = @id
+      `
+    ).run({
+      id,
+      updated_at: now
+    })
   })
+
+  deleteStoredFiles(filePaths)
 }
 
 // 워크스페이스 조회
@@ -239,31 +416,36 @@ export const createWorkspace = (workspace: Record<string, unknown>): number => {
     ...workspace
   }
 
-  const result = runQuery(query, payload)
-  const workspaceId = Number(result.lastInsertRowid)
-  const thumbnailPath = saveThumbnail('workspace', workspaceId, workspace.thumbnail)
+  const workspaceId = transaction((db) => {
+    const result = db.prepare(query).run(payload)
+    const newWorkspaceId = Number(result.lastInsertRowid)
+    const thumbnailPath = saveThumbnail('workspace', newWorkspaceId, workspace.thumbnail)
 
-  if (thumbnailPath) {
-    runQuery(
-      `
-        UPDATE t_workspace
-        SET thumbnail_path = @thumbnailPath,
-            updated_at = @updated_at
-        WHERE id = @id
-      `,
-      {
-        id: workspaceId,
+    if (thumbnailPath) {
+      db.prepare(
+        `
+          UPDATE t_workspace
+          SET thumbnail_path = @thumbnailPath,
+              updated_at = @updated_at
+          WHERE id = @id
+        `
+      ).run({
+        id: newWorkspaceId,
         thumbnailPath,
         updated_at: now
-      }
-    )
-  }
+      })
+    }
+
+    touchProject(db, workspace.project_id as string | number, now)
+    return newWorkspaceId
+  })
 
   return workspaceId
 }
 
 // 워크스페이스 수정
 export const updateWorkspace = (workspace: Record<string, unknown>): void => {
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
   const thumbnailPath =
     workspace.thumbnail === null
       ? ''
@@ -281,17 +463,73 @@ export const updateWorkspace = (workspace: Record<string, unknown>): void => {
   `
 
   const payload = {
-    updated_at: new Date().toISOString(),
+    updated_at: now,
     thumbnailPath,
     ...workspace
   }
 
-  runQuery(query, payload)
+  transaction((db) => {
+    db.prepare(query).run(payload)
+    db.prepare(
+      `
+        UPDATE t_project
+        SET updated_at = @updated_at
+        WHERE id = (
+          SELECT project_id
+          FROM t_workspace
+          WHERE id = @id
+        )
+      `
+    ).run({ id: workspace.id, updated_at: now })
+  })
 }
 
 // 워크스페이스 삭제
 export const deleteWorkspace = (id: string | number): void => {
+  const filePaths: string[] = []
+  let projectId: number | null = null
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+
   transaction((db) => {
+    const workspace = db
+      .prepare(
+        `
+          SELECT project_id, thumbnail_path
+          FROM t_workspace
+          WHERE id = @id
+        `
+      )
+      .get({ id }) as { project_id: number; thumbnail_path: string | null } | undefined
+    projectId = workspace?.project_id ?? null
+    if (workspace?.thumbnail_path) filePaths.push(workspace.thumbnail_path)
+
+    const captures = db
+      .prepare(
+        `
+          SELECT img_path
+          FROM t_capture
+          WHERE workspace_id = @id
+        `
+      )
+      .all({ id }) as Array<{ img_path: string | null }>
+    captures.forEach((capture) => {
+      if (capture.img_path) filePaths.push(capture.img_path)
+    })
+
+    const docs = db
+      .prepare(
+        `
+          SELECT orgn_img_path, draw_img_path
+          FROM t_doc
+          WHERE workspace_id = @id
+        `
+      )
+      .all({ id }) as Array<{ orgn_img_path: string | null; draw_img_path: string | null }>
+    docs.forEach((doc) => {
+      if (doc.orgn_img_path) filePaths.push(doc.orgn_img_path)
+      if (doc.draw_img_path) filePaths.push(doc.draw_img_path)
+    })
+
     db.prepare(
       `
         DELETE FROM t_doc
@@ -312,11 +550,17 @@ export const deleteWorkspace = (id: string | number): void => {
         WHERE id = @id
       `
     ).run({ id })
+
+    if (projectId) {
+      touchProject(db, projectId, now)
+    }
   })
+
+  deleteStoredFiles(filePaths)
 }
 
 //프로젝트명 워크스페이스명 조회
-export const getWorkspaceDetail = (id: string | number) => {
+export const getWorkspaceDetail = (id: string | number): Record<string, unknown> | null => {
   const query = `
     SELECT
       w.id,
@@ -334,7 +578,7 @@ export const getWorkspaceDetail = (id: string | number) => {
 }
 
 //캡쳐 이미지 조회
-export const getCaptureList = (params: Record<string, unknown>) => {
+export const getCaptureList = (params: Record<string, unknown>): Record<string, unknown>[] => {
   const query = `
     SELECT
       id,
@@ -394,19 +638,21 @@ export const createCaptureWithImage = async (
       imgPath
     }
   )
-  runQuery(
-    `
-      UPDATE t_workspace
-      SET latest_src_url = @latest_src_url,
-          updated_at = @updated_at
-      WHERE id = @id
-    `,
-    {
+  transaction((db) => {
+    db.prepare(
+      `
+        UPDATE t_workspace
+        SET latest_src_url = @latest_src_url,
+            updated_at = @updated_at
+        WHERE id = @id
+      `
+    ).run({
       id: workspaceId,
       latest_src_url: currentUrl,
       updated_at: now
-    }
-  )
+    })
+    touchWorkspaceAndProject(db, workspaceId, now)
+  })
 
   return {
     id: captureId,
@@ -416,43 +662,60 @@ export const createCaptureWithImage = async (
 
 //캡쳐이름 수정
 export const updateCaptureName = (capture: Record<string, unknown>): void => {
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
   const query = `
     UPDATE t_capture
     SET name = @name
     WHERE id = @id
   `
 
-  runQuery(query, capture)
+  transaction((db) => {
+    db.prepare(query).run(capture)
+    const row = db
+      .prepare(
+        `
+          SELECT workspace_id
+          FROM t_capture
+          WHERE id = @id
+        `
+      )
+      .get({ id: capture.id }) as { workspace_id: number } | undefined
+    if (row?.workspace_id) {
+      touchWorkspaceAndProject(db, row.workspace_id, now)
+    }
+  })
 }
 
 //캡쳐 삭제
 export const deleteCapture = async (capture: Record<string, unknown>): Promise<void> => {
   const id = capture.id as string | number
-  const imgPath = (capture.imgPath as string | null | undefined) ?? null
-
-  if (imgPath) {
-    const fileRootDir = path.join(app.getPath('userData'), 'FILE')
-    const relativePath = imgPath.replace(/\\/g, '/').replace(/^\/+/, '')
-    const absPath = path.resolve(app.getPath('userData'), relativePath)
-    const resolvedBase = path.resolve(fileRootDir)
-    const normalizedBase = resolvedBase + path.sep
-    const isInsideBase = absPath === resolvedBase || absPath.startsWith(normalizedBase)
-
-    if (!isInsideBase) {
-      throw new Error(`Forbidden file path: ${imgPath}`)
-    }
-
-    if (existsSync(absPath)) {
-      await unlink(absPath)
-    }
-  }
-
+  let imgPath = (capture.imgPath as string | null | undefined) ?? null
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
   const query = `
     DELETE FROM t_capture
     WHERE id = @id
   `
 
-  runQuery(query, { id })
+  transaction((db) => {
+    const row = db
+      .prepare(
+        `
+          SELECT workspace_id, img_path
+          FROM t_capture
+          WHERE id = @id
+        `
+      )
+      .get({ id }) as { workspace_id: number; img_path: string | null } | undefined
+    imgPath = imgPath ?? row?.img_path ?? null
+
+    db.prepare(query).run({ id })
+
+    if (row?.workspace_id) {
+      touchWorkspaceAndProject(db, row.workspace_id, now)
+    }
+  })
+
+  deleteStoredFile(imgPath)
 }
 
 //문서 생성
@@ -551,6 +814,10 @@ export const createDoc = (doc: Record<string, unknown>): { id: number; orgnImgPa
     }
   }
 
+  transaction((db) => {
+    touchWorkspaceAndProject(db, payload.workspaceId as string | number, now)
+  })
+
   return {
     id: docId,
     orgnImgPath
@@ -558,7 +825,7 @@ export const createDoc = (doc: Record<string, unknown>): { id: number; orgnImgPa
 }
 
 //문서 조회
-export const getDocList = (params: Record<string, unknown>) => {
+export const getDocList = (params: Record<string, unknown>): Doc[] => {
   const queryParams = {
     id: null,
     workspaceId: null,
@@ -586,11 +853,12 @@ export const getDocList = (params: Record<string, unknown>) => {
     ORDER BY sort_order ASC, id ASC
   `
 
-  return selectList(query, queryParams)
+  return selectList<Doc>(query, queryParams)
 }
 
 //문서 내용 수정
 export const updateDoc = (doc: Record<string, unknown>): void => {
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
   const query = `
     UPDATE t_doc
     SET title = @title,
@@ -600,16 +868,32 @@ export const updateDoc = (doc: Record<string, unknown>): void => {
     WHERE id = @id
   `
 
-  runQuery(query, {
-    id: doc.id,
-    title: doc.title,
-    description: doc.description,
-    docMetaJson: doc.docMetaJson,
-    updated_at: dayjs().format('YYYY-MM-DD HH:mm:ss')
+  transaction((db) => {
+    db.prepare(query).run({
+      id: doc.id,
+      title: doc.title,
+      description: doc.description,
+      docMetaJson: doc.docMetaJson,
+      updated_at: now
+    })
+
+    const row = db
+      .prepare(
+        `
+          SELECT workspace_id
+          FROM t_doc
+          WHERE id = @id
+        `
+      )
+      .get({ id: doc.id }) as { workspace_id: number } | undefined
+    if (row?.workspace_id) {
+      touchWorkspaceAndProject(db, row.workspace_id, now)
+    }
   })
 }
 
 export const updateDocStatus = (doc: Record<string, unknown>): void => {
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
   const query = `
     UPDATE t_doc
     SET status = @status,
@@ -617,10 +901,25 @@ export const updateDocStatus = (doc: Record<string, unknown>): void => {
     WHERE id = @id
   `
 
-  runQuery(query, {
-    id: doc.id,
-    status: doc.status,
-    updated_at: dayjs().format('YYYY-MM-DD HH:mm:ss')
+  transaction((db) => {
+    db.prepare(query).run({
+      id: doc.id,
+      status: doc.status,
+      updated_at: now
+    })
+
+    const row = db
+      .prepare(
+        `
+          SELECT workspace_id
+          FROM t_doc
+          WHERE id = @id
+        `
+      )
+      .get({ id: doc.id }) as { workspace_id: number } | undefined
+    if (row?.workspace_id) {
+      touchWorkspaceAndProject(db, row.workspace_id, now)
+    }
   })
 }
 
@@ -643,6 +942,7 @@ export const updateDocAnnotation = async (doc: Record<string, unknown>): Promise
   const docId = Number(doc.id)
   const drawDataUrl = typeof doc.drawDataUrl === 'string' ? doc.drawDataUrl : ''
   const drawImgPath = drawDataUrl ? await saveDrawImage(docId, drawDataUrl) : null
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
   const query = `
     UPDATE t_doc
     SET content_json = @contentJson,
@@ -652,23 +952,64 @@ export const updateDocAnnotation = async (doc: Record<string, unknown>): Promise
     WHERE id = @id
   `
 
-  runQuery(query, {
-    id: docId,
-    contentJson: doc.contentJson,
-    annotationJson: doc.annotationJson,
-    drawImgPath,
-    updated_at: dayjs().format('YYYY-MM-DD HH:mm:ss')
+  transaction((db) => {
+    db.prepare(query).run({
+      id: docId,
+      contentJson: doc.contentJson,
+      annotationJson: doc.annotationJson,
+      drawImgPath,
+      updated_at: now
+    })
+
+    const row = db
+      .prepare(
+        `
+          SELECT workspace_id
+          FROM t_doc
+          WHERE id = @id
+        `
+      )
+      .get({ id: docId }) as { workspace_id: number } | undefined
+    if (row?.workspace_id) {
+      touchWorkspaceAndProject(db, row.workspace_id, now)
+    }
   })
 }
 
 //문서 삭제
 export const deleteDoc = (id: string | number): void => {
+  let workspaceId: number | null = null
+  const filePaths: string[] = []
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
   const query = `
     DELETE FROM t_doc
     WHERE id = @id
   `
 
-  runQuery(query, { id })
+  transaction((db) => {
+    const row = db
+      .prepare(
+        `
+          SELECT workspace_id, orgn_img_path, draw_img_path
+          FROM t_doc
+          WHERE id = @id
+        `
+      )
+      .get({ id }) as
+      | { workspace_id: number; orgn_img_path: string | null; draw_img_path: string | null }
+      | undefined
+    workspaceId = row?.workspace_id ?? null
+    if (row?.orgn_img_path) filePaths.push(row.orgn_img_path)
+    if (row?.draw_img_path) filePaths.push(row.draw_img_path)
+
+    db.prepare(query).run({ id })
+
+    if (workspaceId) {
+      touchWorkspaceAndProject(db, workspaceId, now)
+    }
+  })
+
+  deleteStoredFiles(filePaths)
 }
 
 //문서 정렬 순서 수정
@@ -681,13 +1022,32 @@ export const updateDocSortOrders = (docs: Array<{ id: number; sortOrder: number 
   `
   const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
 
-  for (const doc of docs) {
-    runQuery(query, {
-      id: doc.id,
-      sortOrder: doc.sortOrder,
-      updated_at: now
+  transaction((db) => {
+    const touchedWorkspaceIds = new Set<number>()
+
+    for (const doc of docs) {
+      db.prepare(query).run({
+        id: doc.id,
+        sortOrder: doc.sortOrder,
+        updated_at: now
+      })
+
+      const row = db
+        .prepare(
+          `
+            SELECT workspace_id
+            FROM t_doc
+            WHERE id = @id
+          `
+        )
+        .get({ id: doc.id }) as { workspace_id: number } | undefined
+      if (row?.workspace_id) touchedWorkspaceIds.add(row.workspace_id)
+    }
+
+    touchedWorkspaceIds.forEach((workspaceId) => {
+      touchWorkspaceAndProject(db, workspaceId, now)
     })
-  }
+  })
 }
 
 const copyDocFile = (docId: number, imgPath: string, prefix: 'orgnImg' | 'drawImg'): string => {
@@ -725,15 +1085,25 @@ export const moveDocs = (params: { docIds: number[]; workspaceId: number }): voi
 
   transaction((db) => {
     const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
-    const maxSort = db
+    const oldWorkspaceIds = db
       .prepare(
         `
-            SELECT COALESCE(MAX(sort_order), 0) AS sortOrder
-            FROM t_doc
-            WHERE workspace_id = @workspaceId
-          `
+          SELECT DISTINCT workspace_id
+          FROM t_doc
+          WHERE id IN (${docIds.map(() => '?').join(',')})
+        `
       )
-      .get({ workspaceId }) as { sortOrder: number }
+      .all(...docIds) as Array<{ workspace_id: number }>
+    db.prepare(
+      `
+        UPDATE t_doc
+        SET sort_order = sort_order + @offset
+        WHERE workspace_id = @workspaceId
+      `
+    ).run({
+      workspaceId,
+      offset: docIds.length
+    })
 
     const update = db.prepare(`
       UPDATE t_doc
@@ -747,10 +1117,15 @@ export const moveDocs = (params: { docIds: number[]; workspaceId: number }): voi
       update.run({
         id,
         workspaceId,
-        sortOrder: Number(maxSort.sortOrder ?? 0) + index + 1,
+        sortOrder: index + 1,
         updated_at: now
       })
     })
+
+    oldWorkspaceIds.forEach((row) => {
+      if (row.workspace_id) touchWorkspaceAndProject(db, row.workspace_id, now)
+    })
+    touchWorkspaceAndProject(db, workspaceId, now)
   })
 }
 
@@ -761,15 +1136,16 @@ export const copyDocs = (params: { docIds: number[]; workspaceId: number }): voi
 
   transaction((db) => {
     const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
-    const maxSort = db
-      .prepare(
-        `
-            SELECT COALESCE(MAX(sort_order), 0) AS sortOrder
-            FROM t_doc
-            WHERE workspace_id = @workspaceId
-          `
-      )
-      .get({ workspaceId }) as { sortOrder: number }
+    db.prepare(
+      `
+        UPDATE t_doc
+        SET sort_order = sort_order + @offset
+        WHERE workspace_id = @workspaceId
+      `
+    ).run({
+      workspaceId,
+      offset: docIds.length
+    })
 
     const selectDoc = db.prepare(`
       SELECT
@@ -841,7 +1217,7 @@ export const copyDocs = (params: { docIds: number[]; workspaceId: number }): voi
         docMetaJson: doc.doc_meta_json,
         contentJson: doc.content_json,
         annotationJson: doc.annotation_json,
-        sortOrder: Number(maxSort.sortOrder ?? 0) + index + 1,
+        sortOrder: index + 1,
         created_at: now,
         updated_at: now
       })
@@ -857,5 +1233,432 @@ export const copyDocs = (params: { docIds: number[]; workspaceId: number }): voi
         updated_at: now
       })
     })
+
+    touchWorkspaceAndProject(db, workspaceId, now)
+  })
+}
+
+// 산출물 목록 조회
+export const getDeliverableList = (params: { projectId: number }): Record<string, unknown>[] => {
+  const query = `
+    SELECT
+      id,
+      project_id,
+      title,
+      created_at,
+      updated_at
+    FROM t_deliverable
+    WHERE project_id = @projectId
+    ORDER BY updated_at DESC, id DESC
+  `
+
+  return selectList(query, params)
+}
+
+// 산출물 생성
+export const createDeliverable = (params: {
+  projectId: number
+  title: string
+  sourceDeliverableId?: number
+}): number => {
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+
+  const result = transaction((db) => {
+    const insertResult = db
+      .prepare(
+        `
+        INSERT INTO t_deliverable (
+          project_id,
+          title,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          @projectId,
+          @title,
+          @created_at,
+          @updated_at
+        )
+      `
+      )
+      .run({
+        projectId: params.projectId,
+        title: params.title,
+        created_at: now,
+        updated_at: now
+      })
+
+    const newDeliverableId = Number(insertResult.lastInsertRowid)
+    const sourceDeliverableId = Number(params.sourceDeliverableId ?? 0)
+
+    if (sourceDeliverableId) {
+      const sourceSections = db
+        .prepare(
+          `
+            SELECT id, parent_id, name, sort_order
+            FROM t_section
+            WHERE deliverable_id = @sourceDeliverableId
+            ORDER BY parent_id IS NOT NULL ASC, sort_order ASC, id ASC
+          `
+        )
+        .all({ sourceDeliverableId }) as Array<{
+        id: number
+        parent_id: number | null
+        name: string
+        sort_order: number
+      }>
+
+      const insertSection = db.prepare(
+        `
+          INSERT INTO t_section (
+            deliverable_id,
+            parent_id,
+            name,
+            sort_order,
+            created_at,
+            updated_at
+          )
+          VALUES (
+            @deliverableId,
+            @parentId,
+            @name,
+            @sortOrder,
+            @created_at,
+            @updated_at
+          )
+        `
+      )
+
+      const insertSectionDoc = db.prepare(
+        `
+          INSERT INTO t_section_doc (
+            section_id,
+            doc_id,
+            sort_order,
+            created_at
+          )
+          VALUES (
+            @sectionId,
+            @docId,
+            @sortOrder,
+            @created_at
+          )
+        `
+      )
+
+      const sectionIdMap = new Map<number, number>()
+      const insertCopiedSections = (
+        parentId: number | null,
+        copiedParentId: number | null
+      ): void => {
+        sourceSections
+          .filter((section) => section.parent_id === parentId)
+          .forEach((section) => {
+            const sectionResult = insertSection.run({
+              deliverableId: newDeliverableId,
+              parentId: copiedParentId,
+              name: section.name,
+              sortOrder: section.sort_order,
+              created_at: now,
+              updated_at: now
+            })
+            const copiedSectionId = Number(sectionResult.lastInsertRowid)
+
+            sectionIdMap.set(section.id, copiedSectionId)
+            insertCopiedSections(section.id, copiedSectionId)
+          })
+      }
+
+      insertCopiedSections(null, null)
+
+      const sourceSectionDocs = db
+        .prepare(
+          `
+            SELECT sd.section_id, sd.doc_id, sd.sort_order
+            FROM t_section_doc sd
+            JOIN t_section s ON s.id = sd.section_id
+            WHERE s.deliverable_id = @sourceDeliverableId
+            ORDER BY sd.sort_order ASC, sd.id ASC
+          `
+        )
+        .all({ sourceDeliverableId }) as Array<{
+        section_id: number
+        doc_id: number
+        sort_order: number
+      }>
+
+      sourceSectionDocs.forEach((sectionDoc) => {
+        const copiedSectionId = sectionIdMap.get(sectionDoc.section_id)
+        if (!copiedSectionId) return
+
+        insertSectionDoc.run({
+          sectionId: copiedSectionId,
+          docId: sectionDoc.doc_id,
+          sortOrder: sectionDoc.sort_order,
+          created_at: now
+        })
+      })
+    }
+
+    touchProject(db, params.projectId, now)
+    return insertResult
+  })
+
+  return Number(result.lastInsertRowid)
+}
+
+// 산출물 제목 수정
+export const updateDeliverableTitle = (params: { id: number; title: string }): void => {
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+
+  transaction((db) => {
+    db.prepare(
+      `
+        UPDATE t_deliverable
+        SET title = @title,
+            updated_at = @updated_at
+        WHERE id = @id
+      `
+    ).run({
+      id: params.id,
+      title: params.title,
+      updated_at: now
+    })
+
+    const row = db
+      .prepare(
+        `
+          SELECT project_id
+          FROM t_deliverable
+          WHERE id = @id
+        `
+      )
+      .get({ id: params.id }) as { project_id: number } | undefined
+    if (row?.project_id) {
+      touchProject(db, row.project_id, now)
+    }
+  })
+}
+
+// 산출물 삭제
+export const deleteDeliverable = (id: number): void => {
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+
+  transaction((db) => {
+    const row = db
+      .prepare(
+        `
+          SELECT project_id
+          FROM t_deliverable
+          WHERE id = @id
+        `
+      )
+      .get({ id }) as { project_id: number } | undefined
+
+    db.prepare(
+      `
+        DELETE FROM t_deliverable
+        WHERE id = @id
+      `
+    ).run({ id })
+
+    if (row?.project_id) {
+      touchProject(db, row.project_id, now)
+    }
+  })
+}
+
+// 산출물 상세 조회
+export const getDeliverableDetail = (id: number): Record<string, unknown> | null => {
+  return selectOne(
+    `
+      SELECT
+        id,
+        project_id,
+        title,
+        created_at,
+        updated_at
+      FROM t_deliverable
+      WHERE id = @id
+    `,
+    { id }
+  )
+}
+
+// 산출물 카테고리/문서 배치 조회
+export const getDeliverableStructure = (params: {
+  deliverableId: number
+}): { sections: Record<string, unknown>[]; sectionDocs: Record<string, unknown>[] } => {
+  const sections = selectList(
+    `
+      SELECT
+        id,
+        deliverable_id,
+        parent_id,
+        name,
+        sort_order,
+        created_at,
+        updated_at
+      FROM t_section
+      WHERE deliverable_id = @deliverableId
+      ORDER BY sort_order ASC, id ASC
+    `,
+    params
+  )
+
+  const sectionDocs = selectList(
+    `
+      SELECT
+        sd.id,
+        sd.section_id,
+        sd.doc_id,
+        sd.sort_order,
+        sd.created_at,
+        d.workspace_id,
+        d.title,
+        d.description,
+        d.status,
+        d.doc_meta_json,
+        d.content_json,
+        d.annotation_json,
+        d.orgn_img_path,
+        d.draw_img_path,
+        d.updated_at
+      FROM t_section_doc sd
+      JOIN t_doc d ON d.id = sd.doc_id
+      JOIN t_section s ON s.id = sd.section_id
+      WHERE s.deliverable_id = @deliverableId
+      ORDER BY sd.sort_order ASC, sd.id ASC
+    `,
+    params
+  )
+
+  return { sections, sectionDocs }
+}
+
+const getOriginalDocId = (id: string): number => {
+  const originalId = id.split('-copy-')[0]
+  return Number(originalId)
+}
+
+// 산출물 카테고리/문서 배치 저장
+export const saveDeliverableStructure = (params: {
+  deliverableId: number
+  sections: SectionTreeInput[]
+}): void => {
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+
+  transaction((db) => {
+    db.prepare(
+      `
+        DELETE FROM t_section_doc
+        WHERE section_id IN (
+          SELECT id
+          FROM t_section
+          WHERE deliverable_id = @deliverableId
+        )
+      `
+    ).run({ deliverableId: params.deliverableId })
+
+    db.prepare(
+      `
+        DELETE FROM t_section
+        WHERE deliverable_id = @deliverableId
+      `
+    ).run({ deliverableId: params.deliverableId })
+
+    const insertSection = db.prepare(
+      `
+        INSERT INTO t_section (
+          deliverable_id,
+          parent_id,
+          name,
+          sort_order,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          @deliverableId,
+          @parentId,
+          @name,
+          @sortOrder,
+          @created_at,
+          @updated_at
+        )
+      `
+    )
+
+    const insertSectionDoc = db.prepare(
+      `
+        INSERT INTO t_section_doc (
+          section_id,
+          doc_id,
+          sort_order,
+          created_at
+        )
+        VALUES (
+          @sectionId,
+          @docId,
+          @sortOrder,
+          @created_at
+        )
+      `
+    )
+
+    const insertCategories = (sections: SectionTreeInput[], parentId: number | null): void => {
+      sections.forEach((section, sectionIndex) => {
+        const result = insertSection.run({
+          deliverableId: params.deliverableId,
+          parentId,
+          name: section.name,
+          sortOrder: sectionIndex + 1,
+          created_at: now,
+          updated_at: now
+        })
+        const sectionId = Number(result.lastInsertRowid)
+
+        section.docs.forEach((doc, docIndex) => {
+          if (doc.kind !== 'document') return
+
+          const docId = getOriginalDocId(doc.doc_id)
+          if (!docId) return
+
+          insertSectionDoc.run({
+            sectionId,
+            docId,
+            sortOrder: docIndex + 1,
+            created_at: now
+          })
+        })
+
+        insertCategories(section.children ?? [], sectionId)
+      })
+    }
+
+    insertCategories(params.sections, null)
+
+    db.prepare(
+      `
+        UPDATE t_deliverable
+        SET updated_at = @updated_at
+        WHERE id = @id
+      `
+    ).run({
+      id: params.deliverableId,
+      updated_at: now
+    })
+
+    const row = db
+      .prepare(
+        `
+          SELECT project_id
+          FROM t_deliverable
+          WHERE id = @id
+        `
+      )
+      .get({ id: params.deliverableId }) as { project_id: number } | undefined
+    if (row?.project_id) {
+      touchProject(db, row.project_id, now)
+    }
   })
 }

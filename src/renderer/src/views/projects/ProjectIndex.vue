@@ -3,11 +3,13 @@
     <!-- Hero Banner -->
     <div class="relative shrink-0">
       <img
+        v-if="projectThumbnail"
         class="h-48 w-full object-cover"
-        :src="projectThumbnail ?? 'https://placehold.co/1400x400/475569/94a3b8?text=thumbnail'"
+        :src="projectThumbnail"
         alt="project banner"
         loading="lazy"
       />
+      <DefaultThumbnail v-else :id="Number(route.params.id)" class="h-48 w-full" />
       <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-black/60" />
 
       <!-- Top Bar -->
@@ -81,25 +83,33 @@
               <div class="flex items-center justify-end">
                 <label class="input input-sm w-64">
                   <i-lucide-search class="h-3.5 w-3.5 opacity-45" />
-                  <input type="search" placeholder="워크스페이스 검색..." />
+                  <input
+                    v-model="workspaceSearchText"
+                    type="search"
+                    placeholder="워크스페이스 검색..."
+                  />
                 </label>
               </div>
 
               <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 <!-- Workspace Cards -->
                 <router-link
-                  v-for="ws in workspaces"
+                  v-for="ws in filteredWorkspaces"
                   :key="ws.id"
                   :to="`/workspace/${ws.id}`"
                   class="group block overflow-hidden rounded-xl border border-base-content/10 bg-base-100 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg"
                 >
                   <div class="relative h-44 overflow-hidden">
                     <img
-                      :src="
-                        ws.thumbnail ?? 'https://placehold.co/600x300/475569/94a3b8?text=WORKSPACE'
-                      "
+                      v-if="ws.thumbnail"
+                      :src="ws.thumbnail"
                       alt="workspace thumbnail"
                       class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                    <DefaultThumbnail
+                      v-else
+                      :id="ws.id"
+                      class="h-full w-full transition-transform duration-300 group-hover:scale-105"
                     />
                     <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
                     <div
@@ -197,13 +207,17 @@
                   <i-lucide-folder-kanban class="h-4 w-4 text-primary" />
                   <span class="text-sm font-semibold">산출물 목록</span>
                   <span class="badge badge-sm badge-ghost">
-                    {{ deliverables.length }}
+                    {{ filteredDeliverables.length }}
                   </span>
                 </div>
                 <div class="flex flex-wrap items-center justify-end gap-2">
                   <label class="input input-sm w-72">
                     <i-lucide-search class="h-3.5 w-3.5 opacity-45" />
-                    <input type="search" placeholder="산출물 검색..." />
+                    <input
+                      v-model="deliverableSearchText"
+                      type="search"
+                      placeholder="산출물 검색..."
+                    />
                   </label>
                   <button
                     type="button"
@@ -213,16 +227,12 @@
                     <i-lucide-plus class="h-4 w-4" />
                     산출물 추가
                   </button>
-                  <button type="button" class="btn btn-sm btn-outline gap-1.5">
-                    <i-lucide-archive class="h-4 w-4" />
-                    보관함
-                  </button>
                 </div>
               </div>
 
               <div class="space-y-2">
                 <div
-                  v-for="item in deliverables"
+                  v-for="item in filteredDeliverables"
                   :key="item.id"
                   class="flex cursor-pointer items-center gap-4 rounded-lg border border-primary/20 bg-base-100 px-4 py-3 transition hover:border-primary/35 hover:bg-primary/10"
                   @click="openDeliverableStructure(item.id)"
@@ -250,7 +260,7 @@
                     </div>
                     <div class="mt-1 flex items-center gap-2 text-xs text-base-content/45">
                       <i-lucide-calendar class="h-3 w-3" />
-                      <span>{{ item.date }}</span>
+                      <span>{{ item.updated_at }}</span>
                       <span
                         v-if="downloadStatusById[item.id] === 'downloading'"
                         class="badge badge-info badge-soft badge-xs gap-1"
@@ -281,7 +291,7 @@
                       class="tooltip tooltip-left btn btn-ghost btn-xs btn-square text-primary hover:bg-primary/10"
                       data-tip="다운로드"
                       :disabled="downloadStatusById[item.id] === 'downloading'"
-                      @click.stop="downloadDeliverable(item.id)"
+                      @click.stop="openDownloadMenu(item, $event)"
                     >
                       <span
                         v-if="downloadStatusById[item.id] === 'downloading'"
@@ -294,6 +304,7 @@
                       type="button"
                       class="tooltip tooltip-left btn btn-ghost btn-xs btn-square text-primary hover:bg-primary/10"
                       data-tip="다운로드 폴더 열기"
+                      @click.stop="openSavedDownloadFolder(item.id)"
                     >
                       <i-lucide-folder-open class="h-4 w-4" />
                     </button>
@@ -345,6 +356,38 @@
       </li>
     </ul>
 
+    <ul
+      v-if="downloadMenu.isOpen"
+      class="menu fixed z-[9999] w-44 rounded-xl border border-base-content/10 bg-base-100 p-1.5 shadow-xl"
+      :style="{
+        left: `${downloadMenu.x}px`,
+        top: `${downloadMenu.y}px`
+      }"
+      @click.stop
+      @contextmenu.prevent.stop
+    >
+      <li>
+        <button
+          type="button"
+          class="rounded-lg text-sm"
+          @click="downloadSelectedDeliverable('html')"
+        >
+          <i-lucide-file-archive class="h-4 w-4 opacity-60" />
+          HTML 다운로드
+        </button>
+      </li>
+      <li>
+        <button
+          type="button"
+          class="rounded-lg text-sm"
+          @click="downloadSelectedDeliverable('pdf')"
+        >
+          <i-lucide-file-down class="h-4 w-4 opacity-60" />
+          PDF 다운로드
+        </button>
+      </li>
+    </ul>
+
     <modal-confirm
       ref="modalConfirmRef"
       ok-text="예"
@@ -359,19 +402,25 @@
 </template>
 
 <script setup lang="ts">
-import type { WorkspacePayload } from './components/ModalNewWorkspace.vue'
 import type { Project, Workspace as DbWorkspace } from '@database/dto'
 import {
   createWorkspace,
   deleteProject,
   deleteWorkspace,
+  createDeliverable,
+  deleteDeliverable,
+  getDeliverables,
   getProjects,
   getWorkspaces,
+  updateDeliverableTitle,
   updateProject,
-  updateWorkspace
+  updateWorkspace,
+  type Deliverable
 } from '@/database'
-import { deliverableItems, type DummyDeliverableItem } from '@/assets/dummy/data'
+import type { DownloadFormat, ExportResult } from '@/types'
 import { formatDate } from '@/utils/datetime'
+import { buildManualExport } from '@/views/deliverables/templates/manualExport'
+import { renderManual, renderManualInline } from '@/views/deliverables/templates/manualTemplate'
 import { useRouter } from 'vue-router'
 
 interface Workspace {
@@ -383,30 +432,56 @@ interface Workspace {
   docCount: number
 }
 
+interface WorkspacePayload {
+  id?: number
+  name: string
+  thumbnail: string | null
+}
+
+interface DeliverableItem {
+  id: string
+  title: string
+  updated_at: string
+}
+
 const router = useRouter()
 
 const route = useRoute()
 
 let onConfirmCallback: (() => void) | null = null
-const modalConfirmRef = ref<InstanceType<typeof ModalConfirm> | null>(null)
+const modalConfirmRef = ref<ComponentRef<'ModalConfirm'> | null>(null)
 const modalEditProjectRef = ref<ComponentRef<'ModalNewProject'> | null>(null)
-const modalNewWorkspaceRef = ref<InstanceType<typeof ModalNewWorkspace> | null>(null)
+const modalNewWorkspaceRef = ref<ComponentRef<'ModalNewWorkspace'> | null>(null)
 const confirmMsgHtml = ref<string>('')
 const projectThumbnail = ref<string | null>(null)
 const workspaces = ref<Workspace[]>([])
 const curProject = ref<Project | null>(null)
 const activeProjectTab = ref(route.query.tab === 'deliverables' ? 'deliverables' : 'workspaces')
 const deletingWorkspace = ref<Workspace | null>(null)
-const deletingDeliverable = ref<DummyDeliverableItem | null>(null)
-const deliverables = ref<DummyDeliverableItem[]>(deliverableItems.map((item) => ({ ...item })))
+const deletingDeliverable = ref<DeliverableItem | null>(null)
+const deliverables = ref<DeliverableItem[]>([])
+const workspaceSearchText = ref('')
+const deliverableSearchText = ref('')
 const editingDeliverableId = ref<string | null>(null)
 const editingDeliverableTitle = ref('')
 const downloadStatusById = ref<Record<string, 'downloading' | 'done'>>({})
+const savedDownloadPathById = ref<Record<string, string>>({})
 const deliverableContextMenu = reactive<{
   isOpen: boolean
   x: number
   y: number
-  item: DummyDeliverableItem | null
+  item: DeliverableItem | null
+}>({
+  isOpen: false,
+  x: 0,
+  y: 0,
+  item: null
+})
+const downloadMenu = reactive<{
+  isOpen: boolean
+  x: number
+  y: number
+  item: DeliverableItem | null
 }>({
   isOpen: false,
   x: 0,
@@ -414,12 +489,14 @@ const deliverableContextMenu = reactive<{
   item: null
 })
 
+// 이미지 파일 경로를 화면 표시용 URL로 변환
 const toFileSrc = (imgPath: string, version?: string): string => {
   const normalizedPath = imgPath.replace(/\\/g, '/')
   const cacheKey = version ? `?v=${encodeURIComponent(version)}` : ''
   return `appimg:///${normalizedPath}${cacheKey}`
 }
 
+// DB 워크스페이스를 카드 UI 데이터로 변환
 const mapWorkspaceToCard = (workspace: DbWorkspace): Workspace => {
   return {
     id: workspace.id,
@@ -433,6 +510,32 @@ const mapWorkspaceToCard = (workspace: DbWorkspace): Workspace => {
   }
 }
 
+// DB 산출물을 목록 UI 데이터로 변환
+const mapDeliverableToItem = (deliverable: Deliverable): DeliverableItem => ({
+  id: String(deliverable.id),
+  title: deliverable.title,
+  updated_at: formatDate(new Date(deliverable.updated_at), 'YYYY년 MM월 DD일')
+})
+
+const getSearchKeyword = (value: string): string => value.trim().toLowerCase()
+
+const filteredWorkspaces = computed(() => {
+  const keyword = getSearchKeyword(workspaceSearchText.value)
+  if (!keyword) return workspaces.value
+
+  return workspaces.value.filter((workspace) => workspace.name.toLowerCase().includes(keyword))
+})
+
+const filteredDeliverables = computed(() => {
+  const keyword = getSearchKeyword(deliverableSearchText.value)
+  if (!keyword) return deliverables.value
+
+  return deliverables.value.filter((deliverable) =>
+    deliverable.title.toLowerCase().includes(keyword)
+  )
+})
+
+// 프로젝트 기본 정보 조회
 const loadProject = async (): Promise<void> => {
   const rows = await getProjects({
     id: route.params.id,
@@ -445,10 +548,23 @@ const loadProject = async (): Promise<void> => {
     : null
 }
 
+// 워크스페이스 목록 조회
 const loadWorkspaces = async (): Promise<void> => {
   const projectId = Number(route.params.id)
   const rows = await getWorkspaces({ project_id: projectId, limit: 50, offset: 0 })
   workspaces.value = rows.map(mapWorkspaceToCard)
+}
+
+// 산출물 목록 조회
+const loadDeliverables = async (): Promise<void> => {
+  const projectId = Number(route.params.id)
+  if (!projectId) {
+    deliverables.value = []
+    return
+  }
+
+  const rows = await getDeliverables({ projectId })
+  deliverables.value = rows.map(mapDeliverableToItem)
 }
 
 // 프로젝트 수정 모달
@@ -490,6 +606,7 @@ const onCreateWorkspace = (): void => {
   modalNewWorkspaceRef.value?.onOpen()
 }
 
+// 워크스페이스 수정 모달
 const openEditWorkspace = (workspace: Workspace): void => {
   modalNewWorkspaceRef.value?.onOpenEdit({
     id: workspace.id,
@@ -498,6 +615,7 @@ const openEditWorkspace = (workspace: Workspace): void => {
   })
 }
 
+// 워크스페이스 삭제 확인 모달
 const openDeleteWorkspace = (workspace: Workspace): void => {
   deletingWorkspace.value = workspace
   confirmMsgHtml.value = `
@@ -518,17 +636,7 @@ const openDeleteWorkspace = (workspace: Workspace): void => {
   modalConfirmRef.value?.onOpen()
 }
 
-const makeDeliverableId = (): string =>
-  `deliverable-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-
-const todayText = (): string => {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const date = String(now.getDate()).padStart(2, '0')
-  return `${year}년 ${month}월 ${date}일`
-}
-
+// 새 산출물 기본 제목 생성
 const getNextNumberedTitle = (baseTitle: string): string => {
   const titles = new Set(deliverables.value.map((item) => item.title))
   if (!titles.has(baseTitle)) return baseTitle
@@ -541,17 +649,21 @@ const getNextNumberedTitle = (baseTitle: string): string => {
   return `${baseTitle}${index}`
 }
 
-const addDeliverable = (): void => {
-  deliverables.value = [
-    {
-      id: makeDeliverableId(),
-      title: getNextNumberedTitle('새산출물'),
-      date: todayText()
-    },
-    ...deliverables.value
-  ]
+// 산출물 추가
+const addDeliverable = async (): Promise<void> => {
+  const projectId = Number(route.params.id)
+  if (!projectId) return
+
+  const id = await createDeliverable({
+    projectId,
+    title: getNextNumberedTitle('새산출물')
+  })
+  if (id === null) return
+
+  await loadDeliverables()
 }
 
+// 산출물 복사 제목 생성
 const getCopyTitle = (title: string): string => {
   const copyPattern = /_복사본(?:\d+)?$/
   const baseTitle = title.replace(copyPattern, '')
@@ -565,32 +677,36 @@ const getCopyTitle = (title: string): string => {
   return `${baseTitle}_복사본${copyIndex === 1 ? '' : copyIndex}`
 }
 
-const copyDeliverable = (id: string): void => {
+// 산출물 복사
+const copyDeliverable = async (id: string): Promise<void> => {
   const index = deliverables.value.findIndex((item) => item.id === id)
   const target = deliverables.value[index]
   if (!target) return
 
-  const copiedItem: DummyDeliverableItem = {
-    ...target,
-    id: makeDeliverableId(),
-    title: getCopyTitle(target.title)
-  }
+  const projectId = Number(route.params.id)
+  if (!projectId) return
 
-  deliverables.value = [
-    ...deliverables.value.slice(0, index + 1),
-    copiedItem,
-    ...deliverables.value.slice(index + 1)
-  ]
+  const copiedId = await createDeliverable({
+    projectId,
+    title: getCopyTitle(target.title),
+    sourceDeliverableId: Number(id)
+  })
+  if (copiedId === null) return
+
+  await loadDeliverables()
 }
 
+// 산출물 구조 구성 화면 이동
 const openDeliverableStructure = (id: string): void => {
   void router.push(`/projects/${route.params.id}/deliverables/${id}/structure`)
 }
 
+// 산출물 미리보기 화면 이동
 const openDeliverablePreview = (id: string): void => {
   void router.push(`/projects/${route.params.id}/deliverables/${id}/preview`)
 }
 
+// URL 쿼리에 맞춰 탭 상태 동기화
 watch(
   () => route.query.tab,
   (tab) => {
@@ -598,18 +714,22 @@ watch(
   }
 )
 
+// 산출물 우클릭 메뉴 닫기
 const closeDeliverableContextMenu = (): void => {
   deliverableContextMenu.isOpen = false
   deliverableContextMenu.item = null
 }
 
-const openDeliverableContextMenu = (item: DummyDeliverableItem, event: MouseEvent): void => {
+// 산출물 우클릭 메뉴 열기
+const openDeliverableContextMenu = (item: DeliverableItem, event: MouseEvent): void => {
+  closeDownloadMenu()
   deliverableContextMenu.item = item
   deliverableContextMenu.x = event.clientX
   deliverableContextMenu.y = event.clientY
   deliverableContextMenu.isOpen = true
 }
 
+// 우클릭 메뉴에서 산출물 이름 수정 시작
 const renameContextDeliverable = (): void => {
   const item = deliverableContextMenu.item
   closeDeliverableContextMenu()
@@ -618,6 +738,7 @@ const renameContextDeliverable = (): void => {
   renameDeliverable(item.id)
 }
 
+// 우클릭 메뉴에서 산출물 삭제 확인 열기
 const deleteContextDeliverable = (): void => {
   const item = deliverableContextMenu.item
   closeDeliverableContextMenu()
@@ -626,20 +747,125 @@ const deleteContextDeliverable = (): void => {
   openDeleteDeliverable(item)
 }
 
-const downloadDeliverable = (id: string): void => {
-  downloadStatusById.value = {
-    ...downloadStatusById.value,
-    [id]: 'downloading'
-  }
-
-  window.setTimeout(() => {
-    downloadStatusById.value = {
-      ...downloadStatusById.value,
-      [id]: 'done'
-    }
-  }, 1200)
+// 다운로드 형식 선택 메뉴 닫기
+const closeDownloadMenu = (): void => {
+  downloadMenu.isOpen = false
+  downloadMenu.item = null
 }
 
+// 다운로드 형식 선택 메뉴 열기
+const openDownloadMenu = (item: DeliverableItem, event: MouseEvent): void => {
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  closeDeliverableContextMenu()
+  downloadMenu.item = item
+  downloadMenu.x = rect.left
+  downloadMenu.y = rect.bottom + 6
+  downloadMenu.isOpen = true
+}
+
+// 산출물별 다운로드 상태 저장
+const setDownloadStatus = (id: string, status: 'downloading' | 'done' | undefined): void => {
+  if (!status) {
+    const nextStatusById = { ...downloadStatusById.value }
+    delete nextStatusById[id]
+    downloadStatusById.value = nextStatusById
+    return
+  }
+
+  downloadStatusById.value = {
+    ...downloadStatusById.value,
+    [id]: status
+  }
+}
+
+// 다운로드 저장 다이얼로그 호출 및 저장된 파일 경로 기록
+const downloadDeliverable = async (
+  deliverable: DeliverableItem,
+  format: DownloadFormat
+): Promise<void> => {
+  setDownloadStatus(deliverable.id, 'downloading')
+
+  try {
+    const data = await buildManualExport(Number(deliverable.id), {
+      includeImages: format === 'html'
+    })
+    if (!data) {
+      setDownloadStatus(deliverable.id, undefined)
+      return
+    }
+
+    const result = format === 'html' ? await saveManualHtml(data) : await saveManualPdf(data)
+
+    if (result.canceled || !result.filePath) {
+      setDownloadStatus(deliverable.id, undefined)
+      return
+    }
+
+    savedDownloadPathById.value = {
+      ...savedDownloadPathById.value,
+      [deliverable.id]: result.filePath
+    }
+    setDownloadStatus(deliverable.id, 'done')
+  } catch (error) {
+    console.error('Failed to download deliverable:', error)
+    setDownloadStatus(deliverable.id, undefined)
+  }
+}
+
+// 산출물 HTML ZIP 저장
+const saveManualHtml = async (
+  data: Awaited<ReturnType<typeof buildManualExport>>
+): Promise<ExportResult> => {
+  if (!data) throw new Error('Manual export data is empty.')
+
+  const bundle = renderManual(data.model)
+  const files = [
+    { path: 'index.html', content: bundle.html },
+    { path: 'assets/manual.css', content: bundle.css },
+    { path: 'assets/manual.js', content: bundle.js },
+    ...data.images.map((file) => ({
+      path: file.path,
+      content: file.content,
+      encoding: file.encoding
+    }))
+  ]
+
+  return (await window.api.invoke('export:manualHtmlZip', {
+    defaultFileName: data.fileName,
+    files
+  })) as ExportResult
+}
+
+// 산출물 PDF 저장
+const saveManualPdf = async (
+  data: Awaited<ReturnType<typeof buildManualExport>>
+): Promise<ExportResult> => {
+  if (!data) throw new Error('Manual export data is empty.')
+
+  return (await window.api.invoke('export:manualPdf', {
+    defaultFileName: data.fileName,
+    html: renderManualInline(data.model)
+  })) as ExportResult
+}
+
+// 선택한 산출물의 HTML/PDF 저장 메뉴 처리
+const downloadSelectedDeliverable = (format: DownloadFormat): void => {
+  const item = downloadMenu.item
+  closeDownloadMenu()
+  if (!item) return
+
+  void downloadDeliverable(item, format)
+}
+
+// 마지막 저장 파일 위치를 파일 탐색기에서 표시
+const openSavedDownloadFolder = (id: string): void => {
+  const filePath = savedDownloadPathById.value[id]
+  if (!filePath) return
+
+  void window.api.invoke('shell:showItemInFolder', filePath)
+}
+
+// 산출물 이름 수정 시작
 const renameDeliverable = (id: string): void => {
   const target = deliverables.value.find((item) => item.id === id)
   if (!target) return
@@ -653,7 +879,8 @@ const renameDeliverable = (id: string): void => {
   })
 }
 
-const confirmRenameDeliverable = (): void => {
+// 산출물 이름 수정 저장
+const confirmRenameDeliverable = async (): Promise<void> => {
   const targetId = editingDeliverableId.value
   if (!targetId) return
 
@@ -662,26 +889,40 @@ const confirmRenameDeliverable = (): void => {
   editingDeliverableTitle.value = ''
   if (!nextTitle) return
 
-  deliverables.value = deliverables.value.map((item) =>
-    item.id === targetId ? { ...item, title: nextTitle } : item
-  )
+  const isUpdated = await updateDeliverableTitle({
+    id: Number(targetId),
+    title: nextTitle
+  })
+  if (!isUpdated) return
+
+  await loadDeliverables()
 }
 
+// 산출물 이름 수정 취소
 const cancelRenameDeliverable = (): void => {
   editingDeliverableId.value = null
   editingDeliverableTitle.value = ''
 }
 
-const deleteDeliverable = (id: string): void => {
+// 산출물 삭제 처리
+const deleteDeliverableItem = async (id: string): Promise<void> => {
   if (editingDeliverableId.value === id) {
     cancelRenameDeliverable()
   }
-  const { [id]: _deletedStatus, ...nextStatusById } = downloadStatusById.value
+  const isDeleted = await deleteDeliverable(Number(id))
+  if (!isDeleted) return
+
+  const nextStatusById = { ...downloadStatusById.value }
+  const nextSavedPathById = { ...savedDownloadPathById.value }
+  delete nextStatusById[id]
+  delete nextSavedPathById[id]
   downloadStatusById.value = nextStatusById
-  deliverables.value = deliverables.value.filter((item) => item.id !== id)
+  savedDownloadPathById.value = nextSavedPathById
+  await loadDeliverables()
 }
 
-const openDeleteDeliverable = (item: DummyDeliverableItem): void => {
+// 산출물 삭제 확인 모달
+const openDeleteDeliverable = (item: DeliverableItem): void => {
   deletingDeliverable.value = item
   confirmMsgHtml.value = `
   <div class="text-center">
@@ -692,13 +933,15 @@ const openDeleteDeliverable = (item: DummyDeliverableItem): void => {
   onConfirmCallback = (): void => {
     if (!deletingDeliverable.value) return
 
-    deleteDeliverable(deletingDeliverable.value.id)
-    deletingDeliverable.value = null
+    void (async () => {
+      await deleteDeliverableItem(deletingDeliverable.value!.id)
+      deletingDeliverable.value = null
+    })()
   }
   modalConfirmRef.value?.onOpen()
 }
 
-//워크스페이스 생성
+// 워크스페이스 생성 또는 수정 저장
 const onSubmitWorkspace = (payload: WorkspacePayload): void => {
   void (async () => {
     const projectId = Number(route.params.id)
@@ -722,7 +965,7 @@ const onSubmitWorkspace = (payload: WorkspacePayload): void => {
   })()
 }
 
-//프로젝트 삭제 모달
+// 프로젝트 삭제 확인 모달
 const onDeleteProject = (): void => {
   confirmMsgHtml.value = `
   <div class="text-center">
@@ -741,15 +984,22 @@ const onDeleteProject = (): void => {
   modalConfirmRef.value?.onOpen()
 }
 
+// 화면 진입 시 프로젝트 상세 데이터 조회 및 전역 메뉴 닫기 이벤트 연결
 onMounted(() => {
   void loadProject()
   void loadWorkspaces()
+  void loadDeliverables()
   document.addEventListener('click', closeDeliverableContextMenu)
   document.addEventListener('contextmenu', closeDeliverableContextMenu)
+  document.addEventListener('click', closeDownloadMenu)
+  document.addEventListener('contextmenu', closeDownloadMenu)
 })
 
+// 화면 이탈 시 전역 이벤트 정리
 onUnmounted(() => {
   document.removeEventListener('click', closeDeliverableContextMenu)
   document.removeEventListener('contextmenu', closeDeliverableContextMenu)
+  document.removeEventListener('click', closeDownloadMenu)
+  document.removeEventListener('contextmenu', closeDownloadMenu)
 })
 </script>

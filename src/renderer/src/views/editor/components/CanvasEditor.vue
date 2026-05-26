@@ -358,22 +358,35 @@ const getImgBounds = (): { left: number; top: number; width: number; height: num
 const exportImageDataURL = (): string | null => {
   if (!canvas) return null
 
-  const bounds = getImgBounds()
-  if (!bounds) {
-    return canvas.toDataURL({
-      format: 'png',
-      multiplier: 1
-    })
-  }
+  const activeObj = canvas.getActiveObject() as CanvasObj | null
+  const selectedObjBeforeExport = selectedObj.value
+  const listSelectIdBeforeExport = listSelectId.value
+  setNumberRing(selectedObjBeforeExport, false)
+  canvas.discardActiveObject()
+  canvas.renderAll()
 
-  return canvas.toDataURL({
-    format: 'png',
-    left: bounds.left,
-    top: bounds.top,
-    width: bounds.width,
-    height: bounds.height,
-    multiplier: 1
-  })
+  const bounds = getImgBounds()
+  const dataUrl = !bounds
+    ? canvas.toDataURL({
+        format: 'png',
+        multiplier: 1
+      })
+    : canvas.toDataURL({
+        format: 'png',
+        left: bounds.left,
+        top: bounds.top,
+        width: bounds.width,
+        height: bounds.height,
+        multiplier: 1
+      })
+
+  if (activeObj) canvas.setActiveObject(activeObj)
+  listSelectId.value = listSelectIdBeforeExport
+  selectedObj.value = selectedObjBeforeExport
+  setNumberRing(selectedObj.value, Boolean(selectedObj.value))
+  canvas.requestRenderAll()
+
+  return dataUrl
 }
 
 // ─── Annotation Lookup / Metadata ───

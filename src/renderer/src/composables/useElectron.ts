@@ -1,4 +1,10 @@
-export function useElectron() {
+interface ElectronBridge {
+  invoke: <T = unknown>(channel: string, ...args: unknown[]) => Promise<T>
+  send: (channel: string, ...args: unknown[]) => void
+  on: (channel: string, listener: (...args: unknown[]) => void) => () => void
+}
+
+export function useElectron(): ElectronBridge {
   const invoke = async <T = unknown>(channel: string, ...args: unknown[]): Promise<T> => {
     return window.api.invoke(channel, ...args) as Promise<T>
   }

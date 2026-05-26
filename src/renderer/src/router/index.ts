@@ -1,6 +1,7 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import HomeView from '@/views/main/HomeView.vue'
 import CaptureIndex from '@/views/captures/CaptureIndex.vue'
+import VideoCaptureIndex from '@/views/captures/VideoCaptureIndex.vue'
 import WorkspaceDetail from '@/views/workspace/WorkspaceDetail.vue'
 import ProjectIndex from '@/views/projects/ProjectIndex.vue'
 import DeliverableStructure from '@/views/deliverables/DeliverableStructure.vue'
@@ -35,6 +36,11 @@ const router = createRouter({
       path: '/capture/:workspaceId',
       name: 'capture-index',
       component: CaptureIndex
+    },
+    {
+      path: '/capture/:workspaceId/video',
+      name: 'video-capture-index',
+      component: VideoCaptureIndex
     },
     {
       path: '/workspace/:id',

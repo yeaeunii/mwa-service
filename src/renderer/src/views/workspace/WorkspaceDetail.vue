@@ -1,9 +1,9 @@
 <template>
-  <div class="flex h-screen flex-col bg-base-200/70">
+  <div class="flex h-screen flex-col bg-base-200">
     <header
-      class="navbar relative z-[1100] border-b border-base-300 bg-base-100/90 px-4 shadow-sm backdrop-blur"
+      class="navbar relative z-[1100] shrink-0 border-b border-base-content/10 bg-base-100 px-4"
     >
-      <div class="mx-auto flex w-full max-w-[1920px] items-center justify-between">
+      <div class="flex flex-1 items-center gap-3">
         <div class="flex items-center gap-3">
           <button class="btn btn-ghost btn-sm btn-circle" @click="goBackToProject">
             <i-lucide-arrow-left class="h-4 w-4" />
@@ -12,22 +12,20 @@
             <button
               tabindex="0"
               type="button"
-              class="btn btn-ghost h-auto min-h-0 gap-2 rounded-xl px-2 py-1.5 normal-case"
+              class="flex h-auto min-h-0 items-center gap-3 rounded-md px-1 py-1 normal-case transition hover:bg-base-200/60"
             >
-              <div class="avatar placeholder">
-                <div
-                  class="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/15 text-primary"
-                >
-                  <i-lucide-briefcase class="h-4 w-4" />
-                </div>
+              <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/15">
+                <i-lucide-briefcase class="h-4 w-4 text-primary" />
               </div>
               <div class="min-w-0 text-left">
-                <div class="max-w-56 truncate text-sm font-bold leading-tight">
-                  {{ workspaceName || '워크스페이스' }}
+                <div class="text-sm font-bold leading-tight">워크스페이스</div>
+                <div class="max-w-44 truncate text-xs leading-tight text-base-content/45">
+                  {{ workspaceName || '현재 워크스페이스' }}
                 </div>
-                <div class="text-xs text-base-content/50">워크스페이스</div>
               </div>
-              <i-lucide-chevron-down class="h-4 w-4 text-base-content/40" />
+              <span class="flex h-5 w-5 items-center justify-center">
+                <i-lucide-chevron-down class="h-3.5 w-3.5 text-base-content/35" />
+              </span>
             </button>
             <ul
               tabindex="-1"
@@ -63,38 +61,60 @@
             </ul>
           </div>
         </div>
-        <button
-          type="button"
-          class="btn btn-sm gap-1.5"
-          :class="isEditMode ? 'btn-primary' : 'btn-outline btn-primary'"
-          @click="toggleEditMode"
-        >
-          <i-lucide-pencil class="h-4 w-4" />
-          {{ isEditMode ? '완료' : '편집모드' }}
-        </button>
       </div>
     </header>
 
-    <div class="mx-auto flex w-full max-w-[1920px] flex-1 gap-4 overflow-hidden p-4">
-      <aside class="card w-80 shrink-0 border border-base-300 bg-base-100 shadow-sm">
-        <div class="card-body gap-3 p-3">
-          <div class="flex items-center gap-2">
-            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/15">
-              <i-lucide-image class="h-4 w-4 text-primary" />
-            </div>
-            <span class="text-sm font-bold">스크린샷</span>
-            <span class="badge badge-ghost badge-sm">{{ screenshots.length }}</span>
+    <div class="flex min-h-0 flex-1 gap-5 overflow-hidden bg-base-200 px-3 pt-4 text-[#111827]">
+      <aside
+        class="flex w-[20%] shrink-0 flex-col overflow-hidden rounded-xl border border-base-300 bg-base-100/70 shadow-sm"
+      >
+        <div class="flex h-15 items-center justify-between border-b border-[#ece8eb] px-7">
+          <div class="flex min-w-0 items-center gap-2">
+            <h2 class="text-xl font-black leading-none tracking-tight">스크린샷</h2>
+            <span
+              class="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-black px-1.5 text-[10px] font-black leading-none text-white"
+            >
+              {{ screenshots.length }}
+            </span>
           </div>
-
-          <div class="grid grid-cols-2 gap-2">
+          <div class="dropdown dropdown-end">
             <button
               type="button"
-              class="tooltip tooltip-bottom btn btn-sm btn-outline gap-1.5"
-              data-tip="이미지 불러오기"
-              @click="openPicker"
+              tabindex="0"
+              class="tooltip tooltip-bottom flex h-8 w-8 items-center justify-center rounded-md bg-base text-white shadow-sm transition hover:bg-white"
+              data-tip="캡쳐 메뉴"
             >
-              <i-lucide-upload class="h-4 w-4" />
+              <i-lucide-list class="h-4 w-4 text-black" />
             </button>
+            <ul
+              tabindex="0"
+              class="menu dropdown-content z-30 mt-2 w-44 rounded-lg border border-base-300 bg-base-100 p-1 shadow-xl"
+            >
+              <li>
+                <button type="button" class="gap-2 text-xs font-semibold" @click="openPicker">
+                  <i-lucide-image-plus class="h-4 w-4" />
+                  이미지 불러오기
+                </button>
+              </li>
+              <li>
+                <router-link
+                  :to="{ name: 'capture-index', params: { workspaceId } }"
+                  class="gap-2 text-xs font-semibold"
+                >
+                  <i-lucide-camera class="h-4 w-4" />
+                  웹 화면 캡쳐
+                </router-link>
+              </li>
+              <li>
+                <router-link
+                  :to="{ name: 'video-capture-index', params: { workspaceId } }"
+                  class="gap-2 text-xs font-semibold"
+                >
+                  <i-lucide-video class="h-4 w-4" />
+                  동영상 캡쳐
+                </router-link>
+              </li>
+            </ul>
             <input
               ref="fileInputRef"
               type="file"
@@ -103,31 +123,26 @@
               multiple
               @change="importImages"
             />
-            <router-link
-              :to="{ name: 'capture-index', params: { workspaceId } }"
-              class="tooltip tooltip-bottom btn btn-sm btn-primary gap-1.5"
-              data-tip="웹 화면 캡쳐"
-            >
-              <i-lucide-camera class="h-4 w-4" />
-            </router-link>
           </div>
+        </div>
 
-          <label class="input input-sm input-bordered w-full">
-            <i-lucide-search class="h-3.5 w-3.5 opacity-40" />
+        <div class="flex min-h-0 flex-1 flex-col px-5 py-3">
+          <label class="input input-sm mx-auto h-8 w-[288px] rounded-md bg-white shadow-sm">
+            <i-lucide-search class="h-3.5 w-3.5 text-slate-500" />
             <input v-model="shotQuery" type="search" placeholder="스크린샷 검색..." />
           </label>
 
           <div
             ref="gridContainerRef"
-            class="relative flex-1 overflow-y-auto rounded-box border border-base-300 bg-base-100 p-1.5 select-none"
+            class="relative mt-3 min-h-0 flex-1 overflow-y-auto select-none"
             @mousedown="onMouseDown"
           >
-            <div class="grid grid-cols-2 gap-2">
+            <div class="grid grid-cols-[repeat(2,140px)] justify-center gap-x-2 gap-y-3">
               <div
                 v-for="shot in shotList"
                 :key="shot.id"
                 :data-shot-id="shot.id"
-                class="group cursor-pointer rounded-lg p-1.5 transition-colors"
+                class="group w-full max-w-[150px] cursor-pointer rounded-lg p-1.5 transition-colors"
                 :class="[
                   selectedIds.has(shot.id)
                     ? 'bg-primary/10 ring-2 ring-primary/40 ring-inset'
@@ -135,15 +150,18 @@
                 ]"
                 :draggable="selectedIds.has(shot.id)"
                 @click.stop="onClickItem(shot.id, $event)"
+                @contextmenu.prevent.stop="openShotContextMenu($event, shot)"
                 @dragstart="onDragStart(shot.id, $event)"
                 @dragend="onDragEnd"
               >
-                <div class="relative overflow-hidden rounded-lg">
+                <div
+                  class="relative overflow-hidden rounded-lg border border-base-content/20 bg-base-100 shadow-sm"
+                  :class="selectedIds.has(shot.id) ? 'border-primary/60' : ''"
+                >
                   <img
                     :src="shot.src"
                     alt="screenshot"
-                    class="pointer-events-none h-20 w-full rounded-lg border border-base-300 object-cover transition-transform duration-200 group-hover:scale-105"
-                    :class="selectedIds.has(shot.id) ? 'border-primary/50' : ''"
+                    class="pointer-events-none h-20 w-full object-cover transition-transform duration-200 group-hover:scale-105"
                   />
                   <div
                     class="absolute inset-0 flex items-center justify-center rounded-lg transition-colors"
@@ -162,8 +180,20 @@
                     </button>
                   </div>
                 </div>
+                <input
+                  v-if="editingShotId === shot.id"
+                  v-model="editingShotName"
+                  type="text"
+                  class="input input-primary input-xs mt-1.5 h-6 w-full px-1 text-center text-xs font-medium"
+                  @click.stop
+                  @mousedown.stop
+                  @blur="confirmEditShotName"
+                  @keydown.enter.prevent="confirmEditShotName"
+                  @keydown.esc.prevent="cancelEditShotName"
+                />
                 <div
-                  class="mt-1.5 truncate px-0.5 text-center text-xs font-medium"
+                  v-else
+                  class="mt-1.5 truncate px-0.5 text-center text-xs font-medium leading-tight"
                   :class="selectedIds.has(shot.id) ? 'text-primary' : 'text-base-content/70'"
                 >
                   {{ shot.name }}
@@ -181,7 +211,7 @@
       </aside>
 
       <main
-        class="relative flex flex-1 flex-col overflow-hidden rounded-box border border-base-300 bg-base-100 shadow-sm transition-colors duration-150"
+        class="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-base-200 px-3 transition-colors duration-150"
         :class="isOverDropZone ? 'bg-primary/5' : ''"
         @dragover.prevent="onDragOver"
         @dragleave="onDragLeave"
@@ -189,7 +219,7 @@
       >
         <div
           v-if="isOverDropZone"
-          class="pointer-events-none absolute inset-x-6 bottom-6 top-24 z-30 flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-primary/50 bg-primary/5"
+          class="pointer-events-none absolute inset-x-6 bottom-6 top-24 z-30 flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-primary/50 bg-primary/5"
         >
           <div class="flex h-14 w-14 items-center justify-center rounded-full bg-primary/15">
             <i-lucide-file-plus class="h-7 w-7 text-primary" />
@@ -200,87 +230,87 @@
           </span>
         </div>
 
-        <div class="border-b border-base-300 bg-base-100 px-6 py-4">
-          <div class="flex flex-wrap items-center justify-between gap-4">
-            <div class="flex items-center gap-2">
-              <i-lucide-file-text class="h-4 w-4 text-primary" />
-              <span class="text-sm font-bold">매뉴얼 문서</span>
+        <div class="pb-6 pt-3">
+          <div
+            class="flex flex-wrap items-start justify-between gap-4 border-b border-base-content/10 pb-3"
+          >
+            <div class="min-w-0">
+              <h1 class="truncate text-2xl font-black leading-tight tracking-tight">매뉴얼 문서</h1>
             </div>
+            <button
+              type="button"
+              class="btn btn-sm h-8 min-h-0 rounded-md border-0 bg-black px-5 text-xs font-black text-white hover:bg-neutral-800"
+              @click="toggleEditMode"
+            >
+              <i-lucide-pencil class="h-4 w-4" />
+              {{ isEditMode ? '완료' : '편집 모드' }}
+            </button>
           </div>
 
-          <div v-if="!isEditMode" class="mt-3 flex flex-wrap items-center justify-end gap-2">
+          <div v-if="!isEditMode" class="mt-2 flex flex-wrap items-center justify-between gap-3">
             <div
-              class="flex items-center gap-1 rounded-full border border-base-300 bg-base-100 p-1"
+              class="flex h-8 items-center gap-1 rounded-md bg-[#e8e5e8] p-1 text-[11px] font-black text-slate-500"
             >
               <button
                 type="button"
-                class="rounded-full px-3 py-1.5 text-sm font-semibold transition-colors"
-                :class="
-                  docFilter === 'all'
-                    ? 'bg-warning/10 text-warning shadow-sm'
-                    : 'text-base-content/55 hover:text-base-content'
-                "
+                class="h-6 rounded px-2.5 transition-colors"
+                :class="docFilter === 'all' ? 'bg-white text-black shadow-sm' : 'hover:text-black'"
                 @click="docFilter = 'all'"
               >
                 전체
-                <span class="text-xs tabular-nums">{{ docTotal }}</span>
+                <span class="tabular-nums">{{ docTotal }}</span>
               </button>
               <button
                 type="button"
-                class="rounded-full px-3 py-1.5 text-sm font-semibold transition-colors"
+                class="h-6 rounded px-2.5 transition-colors"
                 :class="
-                  docFilter === 'doing'
-                    ? 'bg-warning/10 text-warning shadow-sm'
-                    : 'text-base-content/55 hover:text-base-content'
+                  docFilter === 'doing' ? 'bg-white text-black shadow-sm' : 'hover:text-black'
                 "
                 @click="docFilter = 'doing'"
               >
                 작업중
-                <span class="text-xs tabular-nums">{{ doingCount }}</span>
+                <span class="tabular-nums">{{ doingCount }}</span>
               </button>
               <button
                 type="button"
-                class="rounded-full px-3 py-1.5 text-sm font-semibold transition-colors"
-                :class="
-                  docFilter === 'done'
-                    ? 'bg-warning/10 text-warning shadow-sm'
-                    : 'text-base-content/55 hover:text-base-content'
-                "
+                class="h-6 rounded px-2.5 transition-colors"
+                :class="docFilter === 'done' ? 'bg-white text-black shadow-sm' : 'hover:text-black'"
                 @click="docFilter = 'done'"
               >
                 작업완료
-                <span class="text-xs tabular-nums">{{ doneCount }}</span>
+                <span class="tabular-nums">{{ doneCount }}</span>
               </button>
             </div>
 
-            <label class="input input-sm input-bordered w-72">
-              <i-lucide-search class="h-3.5 w-3.5 opacity-40" />
+            <label class="input input-sm h-8 w-72 rounded-md border-[#d8d7dd] bg-white shadow-sm">
+              <i-lucide-search class="h-3.5 w-3.5 text-slate-500" />
               <input v-model="docQuery" type="search" placeholder="문서 검색..." />
             </label>
           </div>
         </div>
 
-        <div
-          v-if="isEditMode"
-          class="flex items-center justify-end border-b border-base-300 bg-base-100 px-6 py-2"
-        >
-          <button type="button" class="btn btn-sm btn-outline btn-primary" @click="toggleAllDocs">
+        <div v-if="isEditMode" class="flex items-center justify-end pb-3">
+          <button
+            type="button"
+            class="btn btn-sm h-8 min-h-0 rounded-md border-[#d8d7dd] bg-white"
+            @click="toggleAllDocs"
+          >
             {{ allDocsSelected ? '전체 해제' : '전체 선택' }}
           </button>
         </div>
 
-        <div class="relative flex-1 overflow-y-auto p-6">
+        <div class="relative flex-1 overflow-y-auto pb-8">
           <div
             v-show="docList.length > 0"
             ref="docGridRef"
-            class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            class="grid grid-cols-[repeat(auto-fill,280px)] justify-start gap-3"
           >
             <component
               :is="isEditMode ? 'div' : 'router-link'"
               v-for="(doc, index) in docList"
               :key="doc.id"
               :to="!isEditMode ? `/workspace/${workspaceId}/documents/${doc.id}` : undefined"
-              class="doc-card group card overflow-hidden border border-base-300 bg-base-100 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+              class="doc-card group overflow-hidden rounded-lg border border-[#d8d7dd] bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-black/25 hover:shadow-md"
               :class="[
                 isEditMode ? 'cursor-move' : 'cursor-pointer',
                 docIds.has(doc.id) ? 'border-2 border-primary shadow-lg shadow-primary/20' : ''
@@ -288,50 +318,64 @@
               @click="clickDocCard(doc.id, $event)"
               @contextmenu="openDocMenu(doc, $event)"
             >
-              <figure class="relative overflow-hidden">
+              <figure class="relative overflow-hidden bg-slate-100">
                 <div
-                  class="absolute left-3 top-3 z-20 flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-xs font-black tabular-nums shadow-md ring-2 ring-white/90 backdrop-blur bg-primary/20"
+                  class="absolute left-2 top-2 z-20 flex h-5 min-w-5 items-center justify-center rounded bg-black px-1.5 text-[10px] font-black tabular-nums text-white shadow-sm"
                 >
                   {{ index + 1 }}
                 </div>
                 <img
                   :src="doc.thumbnail"
                   alt="thumbnail"
-                  class="h-36 w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  class="h-[170px] w-full object-cover transition-transform duration-300 group-hover:scale-105"
                 />
                 <div
                   class="absolute inset-0 transition-colors duration-150"
                   :class="
                     docIds.has(doc.id)
-                      ? 'bg-black/35'
+                      ? 'bg-primary/20'
                       : 'bg-gradient-to-t from-black/25 to-transparent'
                   "
                 />
               </figure>
-              <div class="card-body gap-2 p-3">
-                <div class="flex items-center justify-between gap-2">
-                  <h3 class="line-clamp-1 font-bold leading-tight">{{ doc.title }}</h3>
-                  <div class="badge badge-sm shrink-0" :class="docStatusClass(doc)">
+              <div class="min-w-0 space-y-1.5 px-3 py-2">
+                <div class="flex min-w-0 items-center justify-between gap-2">
+                  <h3 class="min-w-0 flex-1 truncate text-sm font-black leading-tight text-black">
+                    {{ getDocTitle(doc) }}
+                  </h3>
+                  <div
+                    class="badge badge-xs shrink-0 border-0 font-black"
+                    :class="docStatusClass(doc)"
+                  >
                     {{ docStatusText(doc) }}
                   </div>
                 </div>
-                <p class="h-10 text-xs leading-relaxed text-base-content/55 line-clamp-2">
-                  {{ doc.description }}
+                <p class="truncate text-xs leading-relaxed text-slate-500">
+                  {{ getDocDescription(doc) }}
                 </p>
               </div>
-              <div class="flex items-center justify-between border-t border-base-300 p-3">
-                <div class="flex items-center gap-1 text-xs text-base-content/45">
+              <div class="flex items-center justify-between border-t border-[#d8d7dd] px-3 py-2">
+                <div class="flex items-center gap-1 text-[10px] font-bold text-slate-500">
                   <i-lucide-clock class="h-3 w-3" />
-                  {{ doc.updatedAt }}
+                  {{ getDocUpdatedAtText(doc) }}
                 </div>
-                <div class="badge badge-ghost badge-sm">기능 {{ doc.functionCount }}개</div>
+                <div
+                  class="rounded border px-2 py-1 text-[10px] font-black"
+                  :class="
+                    doc.functionCount > 0
+                      ? 'border-primary/10 bg-primary/10 text-primary'
+                      : 'border-[#d8d7dd] bg-[#f1f1f4] text-slate-600'
+                  "
+                >
+                  {{ doc.functionCount }} {{ doc.functionCount <= 1 ? 'Step' : 'Steps' }}
+                </div>
               </div>
             </component>
           </div>
 
           <div
             v-if="docList.length === 0"
-            class="flex h-full flex-col items-center justify-center gap-3 text-base-content/35"
+            class="flex h-full flex-col items-center justify-center gap-3 text-slate-400"
           >
             <i-lucide-file-x class="h-12 w-12" />
             <span class="text-sm font-medium">
@@ -346,7 +390,7 @@
       </main>
     </div>
 
-    <WorkspaceModalCaptureImages
+    <ModalCaptureImages
       ref="shotModalRef"
       :capture-image-items="screenshots"
       :selected-image-ids="selectedShotIds"
@@ -360,6 +404,14 @@
         <div class="text-center">
           <h3 class="mb-2 text-lg font-bold">선택한 문서 {{ deleteDocIds.length }}개를</h3>
           <p class="text-sm text-gray-500">정말 삭제하시겠습니까?</p>
+        </div>
+      </template>
+    </ModalConfirm>
+    <ModalConfirm ref="shotDeleteConfirmRef" ok-text="삭제" @on-confirm="confirmDeleteShot">
+      <template #message>
+        <div class="text-center">
+          <h3 class="mb-2 text-lg font-bold">{{ deletingShot?.name }}</h3>
+          <p class="text-sm text-gray-500">스크린샷을 삭제하시겠습니까?</p>
         </div>
       </template>
     </ModalConfirm>
@@ -480,6 +532,33 @@
       </div>
     </div>
 
+    <div
+      v-if="shotMenu.visible"
+      class="fixed z-[1000] w-40 rounded-box border border-base-300 bg-base-100 p-1.5 shadow-xl"
+      :style="{ left: `${shotMenu.x}px`, top: `${shotMenu.y}px` }"
+      @click.stop
+      @contextmenu.prevent.stop
+    >
+      <div class="flex flex-col gap-1">
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm w-full justify-start"
+          @click="editContextShot"
+        >
+          <i-lucide-pencil class="h-4 w-4 opacity-60" />
+          수정
+        </button>
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm w-full justify-start text-error hover:bg-error/10"
+          @click="deleteContextShot"
+        >
+          <i-lucide-trash-2 class="h-4 w-4 opacity-60" />
+          삭제
+        </button>
+      </div>
+    </div>
+
     <!-- Custom Drag Ghost (hidden, used for setDragImage) -->
     <div
       ref="dragGhostRef"
@@ -510,7 +589,6 @@ import {
   updateCaptureName,
   updateDocSortOrders
 } from '@/database'
-import WorkspaceModalCaptureImages from './components/ModalCaptureImages.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -535,7 +613,17 @@ interface Screenshot {
 }
 
 const screenshots = ref<Screenshot[]>([])
-const shotModalRef = ref<InstanceType<typeof WorkspaceModalCaptureImages> | null>(null)
+const shotModalRef = ref<ComponentRef<'ModalCaptureImages'> | null>(null)
+const shotDeleteConfirmRef = ref<ComponentRef<'ModalConfirm'> | null>(null)
+const {
+  contextMenu: shotMenu,
+  selectedItem: selectedShotMenuItem,
+  openContextMenu: openShotMenu,
+  closeContextMenu: closeShotMenu
+} = useContextMenu<Screenshot>()
+const deletingShot = ref<Screenshot | null>(null)
+const editingShotId = ref<number | null>(null)
+const editingShotName = ref('')
 
 const readFileUrl = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -604,6 +692,53 @@ const goWorkspace = async (nextId: number, event?: MouseEvent): Promise<void> =>
 
 const openShotModal = (imageId: number): void => {
   shotModalRef.value?.onOpen(imageId)
+}
+
+const openShotContextMenu = (event: MouseEvent, shot: Screenshot): void => {
+  openShotMenu(event, shot)
+}
+
+const editContextShot = (): void => {
+  const shot = selectedShotMenuItem.value
+  closeShotMenu()
+  if (!shot) return
+
+  editingShotId.value = shot.id
+  editingShotName.value = shot.name
+}
+
+const deleteContextShot = (): void => {
+  const shot = selectedShotMenuItem.value
+  closeShotMenu()
+  if (!shot) return
+
+  deletingShot.value = shot
+  shotDeleteConfirmRef.value?.onOpen()
+}
+
+const confirmDeleteShot = (): void => {
+  const shot = deletingShot.value
+  deletingShot.value = null
+  if (!shot) return
+
+  void removeShot(shot.id)
+}
+
+const cancelEditShotName = (): void => {
+  editingShotId.value = null
+  editingShotName.value = ''
+}
+
+const confirmEditShotName = async (): Promise<void> => {
+  const id = editingShotId.value
+  if (id === null) return
+
+  const name = editingShotName.value.trim()
+  const target = screenshots.value.find((item) => item.id === id)
+  cancelEditShotName()
+  if (!target || !name || name === target.name) return
+
+  await renameShot({ id, name })
 }
 
 const openPicker = (): void => {
@@ -708,7 +843,15 @@ interface Document {
   sortOrder: number
 }
 
+const EMPTY_DOC_TITLE = '제목 없는 문서'
+const EMPTY_DOC_DESCRIPTION = '문서 설명을 아직 작성하지 않았습니다.'
+const ONE_MINUTE_MS = 60 * 1000
+const ONE_HOUR_MS = 60 * ONE_MINUTE_MS
+const ONE_DAY_MS = 24 * 60 * 60 * 1000
+
 const documents = ref<Document[]>([])
+const nowTime = ref(Date.now())
+let relativeTimeTimer: ReturnType<typeof setInterval> | null = null
 const modalConfirmRef = ref<ComponentRef<'ModalConfirm'> | null>(null)
 const actionModalRef = ref<ComponentRef<'ModalBase'> | null>(null)
 const {
@@ -741,12 +884,33 @@ const targetWorkspaceLabel = computed(() => {
   return '워크스페이스 선택'
 })
 
+const getDocTitle = (doc: Document): string => doc.title.trim() || EMPTY_DOC_TITLE
+
+const getDocDescription = (doc: Document): string => doc.description.trim() || EMPTY_DOC_DESCRIPTION
+
+const getDocUpdatedAtText = (doc: Document): string => {
+  if (!doc.updatedTime) return doc.updatedAt
+
+  const diff = nowTime.value - doc.updatedTime
+  if (diff >= 0 && diff < ONE_DAY_MS) {
+    if (diff < ONE_MINUTE_MS) return '방금 전'
+    if (diff < ONE_HOUR_MS) return `${Math.floor(diff / ONE_MINUTE_MS)}분 전`
+    return `${Math.floor(diff / ONE_HOUR_MS)}시간 전`
+  }
+
+  return doc.updatedAt
+}
+
+const updateRelativeNow = (): void => {
+  nowTime.value = Date.now()
+}
+
 const fmtDocDate = (dateText: string): string => {
   const date = new Date(dateText)
   if (Number.isNaN(date.getTime())) return dateText
 
   const pad = (n: number): string => String(n).padStart(2, '0')
-  return `${pad(date.getMonth() + 1)}.${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
 const docTime = (dateText: string): number => {
@@ -799,6 +963,7 @@ const loadDocs = async (): Promise<void> => {
       sortOrder: doc.sort_order
     }
   })
+  updateRelativeNow()
 }
 
 const toggleEditMode = (): void => {
@@ -981,7 +1146,7 @@ const createDocsFromShots = async (droppedIds: number[]): Promise<void> => {
   const dateStr = `${pad(now.getMonth() + 1)}.${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`
 
   for (const [index, shot] of droppedShots.entries()) {
-    const description = `${shot.name}에 대한 매뉴얼 문서입니다.`
+    const description = `${shot.name}에 대한 화면 설명입니다.`
     const sortOrder = documents.value.length + index + 1
     const createdDoc = await createDoc({
       workspaceId: Number(workspaceId.value),
@@ -1123,6 +1288,15 @@ watch(workspaceId, () => {
 
 onMounted(() => {
   console.log('workspaceId:', workspaceId.value)
+  updateRelativeNow()
+  relativeTimeTimer = setInterval(updateRelativeNow, 60_000)
   loadPage()
+})
+
+onUnmounted(() => {
+  if (!relativeTimeTimer) return
+
+  clearInterval(relativeTimeTimer)
+  relativeTimeTimer = null
 })
 </script>

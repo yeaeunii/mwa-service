@@ -44,3 +44,59 @@ export interface Doc {
   created_at: string
   updated_at: string
 }
+
+export interface Deliverable {
+  id: number
+  project_id: number
+  title: string
+  created_at: string
+  updated_at: string
+}
+
+export interface DeliverableSection {
+  id: number
+  deliverable_id: number
+  parent_id: number | null
+  name: string
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface DeliverableSectionDoc {
+  id: number
+  section_id: number
+  doc_id: number
+  sort_order: number
+  created_at: string
+  workspace_id: number
+  title: string
+  description: string
+  status: string
+  doc_meta_json: string
+  content_json: string
+  annotation_json: string
+  orgn_img_path: string
+  draw_img_path: string
+  updated_at: string
+}
+
+export interface DeliverableStructureResponse {
+  sections: DeliverableSection[]
+  sectionDocs: DeliverableSectionDoc[]
+}
+
+export interface SectionDocInput {
+  doc_id: string
+  doc_title: string
+  kind: 'workspace' | 'document'
+  meta: string
+  status?: string
+}
+
+export interface SectionTreeInput {
+  id: string
+  name: string
+  docs: SectionDocInput[]
+  children: SectionTreeInput[]
+}

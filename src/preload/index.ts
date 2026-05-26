@@ -7,7 +7,10 @@ import * as DAO from '../database/dao'
 const INVOKE_CHANNELS = [
   'dialog:openFile',
   'shell:openExternal',
+  'shell:showItemInFolder',
   'app:getVersion',
+  'export:manualHtmlZip',
+  'export:manualPdf',
   'dao:call',
   'shortcut:register',
   'shortcut:unregister'
