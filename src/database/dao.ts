@@ -4,8 +4,11 @@ import { copyFileSync, existsSync, mkdirSync, unlinkSync, writeFileSync } from '
 import { writeFile } from 'fs/promises'
 import path from 'path'
 import { selectList, selectOne, runQuery, transaction } from './conn'
-import { Doc, Project, Workspace, type SectionTreeInput } from './dto'
+import { Doc, Project, Workspace, type ProjectExportData, type SectionTreeInput } from './dto'
 import dayjs from 'dayjs'
+import { randomBytes } from 'crypto'
+
+const makeHash = (): string => randomBytes(4).toString('hex')
 
 const saveThumbnail = (
   target: 'project' | 'workspace',
@@ -20,7 +23,7 @@ const saveThumbnail = (
   const thumbnailsDir = path.join(app.getPath('userData'), 'FILE', 'Thumbnails')
   mkdirSync(thumbnailsDir, { recursive: true })
 
-  const thumbnailName = `thumbnail_${target}_${id}.png`
+  const thumbnailName = `thumbnail_${target}_${makeHash()}_${id}.png`
   const thumbnailAbsPath = path.join(thumbnailsDir, thumbnailName)
   const thumbnailPath = path.join('FILE', 'Thumbnails', thumbnailName).replace(/\\/g, '/')
 
@@ -122,6 +125,104 @@ export const getProjectList = (params?: Record<string, unknown>): Project[] => {
   `
 
   return selectList<Project>(query, queryParams) as Project[]
+}
+
+export const getProjectExportData = (id: string | number): ProjectExportData | null => {
+  return transaction((db) => {
+    const project = db
+      .prepare(
+        `
+          SELECT *
+          FROM t_project
+          WHERE id = @id
+        `
+      )
+      .get({ id }) as Record<string, unknown> | undefined
+
+    if (!project) return null
+
+    const workspaces = db
+      .prepare(
+        `
+          SELECT *
+          FROM t_workspace
+          WHERE project_id = @id
+          ORDER BY id
+        `
+      )
+      .all({ id }) as Record<string, unknown>[]
+
+    const captures = db
+      .prepare(
+        `
+          SELECT c.*
+          FROM t_capture c
+          JOIN t_workspace w ON w.id = c.workspace_id
+          WHERE w.project_id = @id
+          ORDER BY c.id
+        `
+      )
+      .all({ id }) as Record<string, unknown>[]
+
+    const docs = db
+      .prepare(
+        `
+          SELECT d.*
+          FROM t_doc d
+          JOIN t_workspace w ON w.id = d.workspace_id
+          WHERE w.project_id = @id
+          ORDER BY d.workspace_id, d.sort_order, d.id
+        `
+      )
+      .all({ id }) as Record<string, unknown>[]
+
+    const deliverables = db
+      .prepare(
+        `
+          SELECT *
+          FROM t_deliverable
+          WHERE project_id = @id
+          ORDER BY id
+        `
+      )
+      .all({ id }) as Record<string, unknown>[]
+
+    const sections = db
+      .prepare(
+        `
+          SELECT s.*
+          FROM t_section s
+          JOIN t_deliverable d ON d.id = s.deliverable_id
+          WHERE d.project_id = @id
+          ORDER BY s.deliverable_id, s.parent_id, s.sort_order, s.id
+        `
+      )
+      .all({ id }) as Record<string, unknown>[]
+
+    const sectionDocs = db
+      .prepare(
+        `
+          SELECT sd.*
+          FROM t_section_doc sd
+          JOIN t_section s ON s.id = sd.section_id
+          JOIN t_deliverable d ON d.id = s.deliverable_id
+          WHERE d.project_id = @id
+          ORDER BY sd.section_id, sd.sort_order, sd.id
+        `
+      )
+      .all({ id }) as Record<string, unknown>[]
+
+    return {
+      exported_at: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+      project,
+      workspaces,
+      captures,
+      docs,
+      deliverables,
+      sections,
+      section_docs: sectionDocs
+    }
+  })
 }
 // 프로젝트 생성
 export const createProject = (project: Record<string, unknown>): number => {
@@ -270,14 +371,15 @@ export const deleteProject = (id: string | number): void => {
     const workspaces = db
       .prepare(
         `
-          SELECT thumbnail_path
+          SELECT thumbnail_path, video_path
           FROM t_workspace
           WHERE project_id = @id
         `
       )
-      .all({ id }) as Array<{ thumbnail_path: string | null }>
+      .all({ id }) as Array<{ thumbnail_path: string | null; video_path: string | null }>
     workspaces.forEach((workspace) => {
       if (workspace.thumbnail_path) filePaths.push(workspace.thumbnail_path)
+      if (workspace.video_path) filePaths.push(workspace.video_path)
     })
 
     const captures = db
@@ -355,6 +457,8 @@ export const getWorkspaceList = (params?: Record<string, unknown>): Workspace[] 
       project_id,
       name,
       latest_src_url,
+      video_path,
+      video_origin_name,
       thumbnail_path,
       created_at,
       updated_at
@@ -484,6 +588,37 @@ export const updateWorkspace = (workspace: Record<string, unknown>): void => {
   })
 }
 
+export const updateWorkspaceVideo = (workspace: Record<string, unknown>): void => {
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  const query = `
+    UPDATE t_workspace
+    SET video_path = @videoPath,
+        video_origin_name = @videoOriginName,
+        updated_at = @updated_at
+    WHERE id = @id
+  `
+
+  transaction((db) => {
+    db.prepare(query).run({
+      id: workspace.id,
+      videoPath: workspace.videoPath ?? '',
+      videoOriginName: workspace.videoOriginName ?? '',
+      updated_at: now
+    })
+    db.prepare(
+      `
+        UPDATE t_project
+        SET updated_at = @updated_at
+        WHERE id = (
+          SELECT project_id
+          FROM t_workspace
+          WHERE id = @id
+        )
+      `
+    ).run({ id: workspace.id, updated_at: now })
+  })
+}
+
 // 워크스페이스 삭제
 export const deleteWorkspace = (id: string | number): void => {
   const filePaths: string[] = []
@@ -494,14 +629,17 @@ export const deleteWorkspace = (id: string | number): void => {
     const workspace = db
       .prepare(
         `
-          SELECT project_id, thumbnail_path
+          SELECT project_id, thumbnail_path, video_path
           FROM t_workspace
           WHERE id = @id
         `
       )
-      .get({ id }) as { project_id: number; thumbnail_path: string | null } | undefined
+      .get({ id }) as
+      | { project_id: number; thumbnail_path: string | null; video_path: string | null }
+      | undefined
     projectId = workspace?.project_id ?? null
     if (workspace?.thumbnail_path) filePaths.push(workspace.thumbnail_path)
+    if (workspace?.video_path) filePaths.push(workspace.video_path)
 
     const captures = db
       .prepare(
@@ -567,6 +705,8 @@ export const getWorkspaceDetail = (id: string | number): Record<string, unknown>
       w.name,
       w.project_id,
       w.latest_src_url,
+      w.video_path,
+      w.video_origin_name,
       w.thumbnail_path,
       p.name as project_name
     FROM t_workspace w
@@ -585,13 +725,18 @@ export const getCaptureList = (params: Record<string, unknown>): Record<string, 
       workspace_id,
       name,
       img_path,
+      source_type,
       created_at
     FROM t_capture
     WHERE workspace_id = @workspaceId
+      AND (@sourceType IS NULL OR source_type = @sourceType)
     ORDER BY id DESC
   `
 
-  return selectList(query, params)
+  return selectList(query, {
+    sourceType: null,
+    ...params
+  })
 }
 
 //캡쳐이미지 local & DB 저장
@@ -602,16 +747,18 @@ export const createCaptureWithImage = async (
   const name = String(capture.name ?? '')
   const dataUrl = String(capture.dataUrl ?? '')
   const currentUrl = String(capture.currentUrl ?? '')
+  const sourceType = capture.sourceType === 'video' ? 'video' : 'web'
   const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
 
   const insertQuery = `
-    INSERT INTO t_capture (workspace_id, name, img_path, created_at)
-    VALUES (@workspaceId, @name, @imgPath, @created_at)
+    INSERT INTO t_capture (workspace_id, name, img_path, source_type, created_at)
+    VALUES (@workspaceId, @name, @imgPath, @sourceType, @created_at)
   `
   const insertResult = runQuery(insertQuery, {
     workspaceId,
     name,
     imgPath: null,
+    sourceType,
     created_at: now
   })
   const captureId = Number(insertResult.lastInsertRowid)
@@ -621,7 +768,7 @@ export const createCaptureWithImage = async (
     mkdirSync(capturesDir, { recursive: true })
   }
 
-  const imgName = `captures_${captureId}.png`
+  const imgName = `captures_${makeHash()}_${captureId}.png`
   const imgLocalPath = path.join(capturesDir, imgName)
   const imgPath = path.join('FILE', 'CAPTURES', imgName).replace(/\\/g, '/')
   const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, '')
@@ -639,18 +786,20 @@ export const createCaptureWithImage = async (
     }
   )
   transaction((db) => {
-    db.prepare(
-      `
-        UPDATE t_workspace
-        SET latest_src_url = @latest_src_url,
-            updated_at = @updated_at
-        WHERE id = @id
-      `
-    ).run({
-      id: workspaceId,
-      latest_src_url: currentUrl,
-      updated_at: now
-    })
+    if (sourceType === 'web') {
+      db.prepare(
+        `
+          UPDATE t_workspace
+          SET latest_src_url = @latest_src_url,
+              updated_at = @updated_at
+          WHERE id = @id
+        `
+      ).run({
+        id: workspaceId,
+        latest_src_url: currentUrl,
+        updated_at: now
+      })
+    }
     touchWorkspaceAndProject(db, workspaceId, now)
   })
 
@@ -767,7 +916,7 @@ export const createDoc = (doc: Record<string, unknown>): { id: number; orgnImgPa
     created_at: now,
     updated_at: now,
     ...doc
-  }
+  } as Record<string, unknown>
 
   const result = runQuery(query, payload)
   const docId = Number(result.lastInsertRowid)
@@ -792,7 +941,7 @@ export const createDoc = (doc: Record<string, unknown>): { id: number; orgnImgPa
         mkdirSync(docsDir, { recursive: true })
       }
 
-      const docImgName = `orgnImg_${docId}.png`
+      const docImgName = `orgnImg_${makeHash()}_${docId}.png`
       const docImgAbsPath = path.join(docsDir, docImgName)
       const docImgPath = path.join('FILE', 'DOCS', docImgName).replace(/\\/g, '/')
 
@@ -930,7 +1079,7 @@ const saveDrawImage = async (docId: number, drawDataUrl: string): Promise<string
   const docsDir = path.join(app.getPath('userData'), 'FILE', 'DOCS')
   mkdirSync(docsDir, { recursive: true })
 
-  const drawImgName = `drawImg_${docId}.png`
+  const drawImgName = `drawImg_${makeHash()}_${docId}.png`
   const drawImgAbsPath = path.join(docsDir, drawImgName)
   await writeFile(drawImgAbsPath, Buffer.from(base64Data, 'base64'))
 
@@ -1070,7 +1219,7 @@ const copyDocFile = (docId: number, imgPath: string, prefix: 'orgnImg' | 'drawIm
     mkdirSync(docsDir, { recursive: true })
   }
 
-  const copiedName = `${prefix}_${docId}.png`
+  const copiedName = `${prefix}_${makeHash()}_${docId}.png`
   const copiedAbsPath = path.join(docsDir, copiedName)
   const copiedPath = path.join('FILE', 'DOCS', copiedName).replace(/\\/g, '/')
 

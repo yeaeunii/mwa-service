@@ -15,6 +15,8 @@ export interface Workspace {
   project_id: number
   name: string
   latest_src_url: string
+  video_path: string
+  video_origin_name: string
   thumbnail_path: string
   created_at: string
   updated_at: string
@@ -25,6 +27,7 @@ export interface Capture {
   workspace_id: number
   name: string
   img_path: string
+  source_type: 'web' | 'video'
   created_at: string
 }
 
@@ -84,6 +87,17 @@ export interface DeliverableSectionDoc {
 export interface DeliverableStructureResponse {
   sections: DeliverableSection[]
   sectionDocs: DeliverableSectionDoc[]
+}
+
+export interface ProjectExportData {
+  exported_at: string
+  project: Record<string, unknown>
+  workspaces: Record<string, unknown>[]
+  captures: Record<string, unknown>[]
+  docs: Record<string, unknown>[]
+  deliverables: Record<string, unknown>[]
+  sections: Record<string, unknown>[]
+  section_docs: Record<string, unknown>[]
 }
 
 export interface SectionDocInput {

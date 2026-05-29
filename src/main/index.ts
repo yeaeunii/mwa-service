@@ -15,16 +15,56 @@ import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
 import { initDatabase, closeDatabase } from '../database/conn'
 import * as DAO from '../database/dao'
+import type { ProjectExportData } from '../database/dto'
+import ffmpegStaticPath from 'ffmpeg-static'
 import path from 'path'
 import { pathToFileURL } from 'url'
-import { existsSync, mkdirSync } from 'fs'
-import { writeFile } from 'fs/promises'
+import { createReadStream, existsSync, mkdirSync, statSync } from 'fs'
+import { readdir, readFile, unlink, writeFile } from 'fs/promises'
+import { execFile } from 'child_process'
+import { createRequire } from 'module'
+import { Readable } from 'stream'
+import { randomBytes } from 'crypto'
 
 const IMG_SCHEME = 'appimg'
+const require = createRequire(import.meta.url)
+
+const VIDEO_EXTENSIONS = new Set(['.mp4', '.m4v', '.webm', '.mov'])
+
+const resolveFfmpegPath = (): string => {
+  const candidatePaths = [
+    typeof ffmpegStaticPath === 'string' ? ffmpegStaticPath : '',
+    (() => {
+      try {
+        return require('ffmpeg-static') as string
+      } catch {
+        return ''
+      }
+    })(),
+    path.join(
+      process.cwd(),
+      'node_modules',
+      'ffmpeg-static',
+      process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
+    )
+  ]
+
+  return candidatePaths.find((candidatePath) => candidatePath && existsSync(candidatePath)) ?? 'ffmpeg'
+}
 
 interface ManualExportPayload {
   defaultFileName: string
   html: string
+}
+
+interface FfmpegExtractFramePayload {
+  videoPath: string
+  second: number
+}
+
+interface FfmpegCreatePreviewPayload {
+  videoPath: string
+  workspaceId?: string | number
 }
 
 interface ManualExportFile {
@@ -41,6 +81,11 @@ interface ManualHtmlZipExportPayload {
 interface ExportResult {
   canceled: boolean
   filePath?: string
+}
+
+interface ProjectExportPayload {
+  projectId: string | number
+  defaultFileName?: string
 }
 
 const getCrc32Table = (): number[] => {
@@ -128,6 +173,72 @@ const createZipBuffer = (files: { name: string; content: Buffer }[]): Buffer => 
   return Buffer.concat([...localParts, centralDirectory, endRecord])
 }
 
+const getSafeExportFileName = (fileName: string): string => {
+  const safeName = fileName
+    .replace(/[<>:"/\\|?*]/g, '_')
+    .split('')
+    .filter((char) => char.charCodeAt(0) >= 32)
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return safeName || 'project-export'
+}
+
+const getStoredAssetPath = (filePath: unknown): string | null => {
+  if (typeof filePath !== 'string' || !filePath) return null
+
+  const normalizedPath = filePath.replace(/\\/g, '/').replace(/^\/+/, '')
+  if (!normalizedPath.startsWith('FILE/')) return null
+  if (normalizedPath.split('/').some((segment) => segment === '..')) return null
+
+  return normalizedPath
+}
+
+const collectProjectAssetPaths = (data: ProjectExportData): string[] => {
+  const paths = new Set<string>()
+  const addPath = (filePath: unknown): void => {
+    const normalizedPath = getStoredAssetPath(filePath)
+    if (normalizedPath) paths.add(normalizedPath)
+  }
+
+  addPath(data.project.thumbnail_path)
+  data.workspaces.forEach((workspace) => {
+    addPath(workspace.thumbnail_path)
+    addPath(workspace.video_path)
+  })
+  data.captures.forEach((capture) => {
+    addPath(capture.img_path)
+  })
+  data.docs.forEach((doc) => {
+    addPath(doc.orgn_img_path)
+    addPath(doc.draw_img_path)
+  })
+
+  return Array.from(paths)
+}
+
+const buildProjectExportZip = async (data: ProjectExportData): Promise<Buffer> => {
+  const files: { name: string; content: Buffer }[] = [
+    {
+      name: 'data.json',
+      content: Buffer.from(JSON.stringify(data, null, 2), 'utf-8')
+    }
+  ]
+
+  for (const assetPath of collectProjectAssetPaths(data)) {
+    const absPath = path.join(app.getPath('userData'), assetPath)
+    if (!existsSync(absPath)) continue
+
+    files.push({
+      name: path.posix.join('assets', assetPath),
+      content: await readFile(absPath)
+    })
+  }
+
+  return createZipBuffer(files)
+}
+
 //Light 테마 고정
 nativeTheme.themeSource = 'light'
 
@@ -138,7 +249,8 @@ protocol.registerSchemesAsPrivileged([
       standard: true,
       secure: true,
       supportFetchAPI: true,
-      bypassCSP: true
+      bypassCSP: true,
+      stream: true
     }
   }
 ])
@@ -224,6 +336,7 @@ app.whenReady().then(() => {
       capturesDir: string
       docsDir: string
       thumbnailsDir: string
+      videoDir: string
     } => {
       const userDataDir = app.getPath('userData')
       const fileRootDir = path.join(userDataDir, 'FILE')
@@ -233,22 +346,51 @@ app.whenReady().then(() => {
         fileRootDir,
         capturesDir: path.join(fileRootDir, 'CAPTURES'),
         docsDir: path.join(fileRootDir, 'DOCS'),
-        thumbnailsDir: path.join(fileRootDir, 'Thumbnails')
+        thumbnailsDir: path.join(fileRootDir, 'Thumbnails'),
+        videoDir: path.join(fileRootDir, 'VIDEO')
       }
     }
 
     
   //local 폴더 생성
   const ensureFileStorageDirs = (): void => {
-    const { fileRootDir, capturesDir, docsDir, thumbnailsDir } = getFileStoragePaths()
+    const { fileRootDir, capturesDir, docsDir, thumbnailsDir, videoDir } =
+      getFileStoragePaths()
   
-    for (const dir of [fileRootDir, capturesDir, docsDir, thumbnailsDir]) {
+    for (const dir of [fileRootDir, capturesDir, docsDir, thumbnailsDir, videoDir]) {
       if (!existsSync(dir)) {
         mkdirSync(dir, { recursive: true })
       }
     }
   }
-  
+
+  const makeHash = (): string => randomBytes(4).toString('hex')
+
+  const resolveAppFilePath = (filePath: string): string => {
+    const normalizedPath = filePath.replace(/\\/g, '/').replace(/^\/+/, '')
+    if (path.isAbsolute(filePath)) return filePath
+    if (!normalizedPath.startsWith('FILE/')) return filePath
+
+    return path.join(app.getPath('userData'), normalizedPath)
+  }
+
+  const removeOldWorkspaceVideos = async (
+    videoDir: string,
+    workspaceId: string,
+    keepPath: string
+  ): Promise<void> => {
+    if (!workspaceId || !existsSync(videoDir)) return
+
+    const files = await readdir(videoDir)
+    await Promise.all(
+      files
+        .filter((file) => file.startsWith('video_') && file.endsWith(`_${workspaceId}.mp4`))
+        .map((file) => path.join(videoDir, file))
+        .filter((filePath) => path.resolve(filePath) !== path.resolve(keepPath))
+        .map((filePath) => unlink(filePath).catch(() => undefined))
+    )
+  }
+
   ensureFileStorageDirs()
 
 
@@ -282,6 +424,40 @@ app.whenReady().then(() => {
         return new Response('Not Found', { status: 404 })
       }
 
+      const extension = path.extname(absPath).toLowerCase()
+      if (VIDEO_EXTENSIONS.has(extension)) {
+        const fileSize = statSync(absPath).size
+        const range = request.headers.get('range')
+        const contentType = extension === '.webm' ? 'video/webm' : 'video/mp4'
+
+        if (range) {
+          const match = /^bytes=(\d+)-(\d*)$/.exec(range)
+          const start = match ? Number(match[1]) : 0
+          const end = match?.[2] ? Number(match[2]) : fileSize - 1
+          const chunkSize = end - start + 1
+          const stream = createReadStream(absPath, { start, end })
+
+          return new Response(Readable.toWeb(stream) as ReadableStream, {
+            status: 206,
+            headers: {
+              'Content-Type': contentType,
+              'Content-Length': String(chunkSize),
+              'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+              'Accept-Ranges': 'bytes'
+            }
+          })
+        }
+
+        const stream = createReadStream(absPath)
+        return new Response(Readable.toWeb(stream) as ReadableStream, {
+          headers: {
+            'Content-Type': contentType,
+            'Content-Length': String(fileSize),
+            'Accept-Ranges': 'bytes'
+          }
+        })
+      }
+
       return net.fetch(pathToFileURL(absPath).toString())
     } catch (error) {
       console.error('Failed to handle protocol:', error)
@@ -297,16 +473,146 @@ app.whenReady().then(() => {
   })
 
   // IPC handlers
-  ipcMain.handle('dialog:openFile', async () => {
-    const result = await dialog.showOpenDialog({
-      properties: ['openFile'],
-      filters: [
-        { name: 'All Files', extensions: ['*'] },
-        { name: 'Images', extensions: ['jpg', 'png', 'gif'] }
-      ]
-    })
-    return result
-  })
+  ipcMain.handle(
+    'dialog:openFile',
+    async (
+      _,
+      options?: {
+        filters?: Electron.FileFilter[]
+        properties?: Array<'openFile' | 'openDirectory' | 'multiSelections'>
+      }
+    ) => {
+      const result = await dialog.showOpenDialog({
+        properties: options?.properties ?? ['openFile'],
+        filters: options?.filters ?? [
+          { name: 'All Files', extensions: ['*'] },
+          { name: 'Images', extensions: ['jpg', 'png', 'gif'] }
+        ]
+      })
+      return result
+    }
+  )
+
+  ipcMain.handle(
+    'ffmpeg:extractFrame',
+    async (
+      _,
+      payload: FfmpegExtractFramePayload
+    ): Promise<{ dataUrl: string | null; error?: string }> => {
+      const videoPath = resolveAppFilePath(payload.videoPath)
+      const second = Number.isFinite(payload.second) ? Math.max(0, payload.second) : 0
+      if (!videoPath || !existsSync(videoPath)) {
+        return { dataUrl: null, error: '동영상 파일 경로를 찾을 수 없습니다.' }
+      }
+
+      const outputPath = path.join(app.getPath('temp'), `miso-video-frame-${Date.now()}.png`)
+      const ffmpegPath = resolveFfmpegPath()
+
+      try {
+        await new Promise<void>((resolve, reject) => {
+          execFile(
+            ffmpegPath,
+            ['-y', '-i', videoPath, '-ss', String(second), '-frames:v', '1', outputPath],
+            { windowsHide: true, timeout: 30000 },
+            (error) => {
+              if (error) {
+                reject(error)
+                return
+              }
+              resolve()
+            }
+          )
+        })
+
+        const frameBuffer = await readFile(outputPath)
+        return { dataUrl: `data:image/png;base64,${frameBuffer.toString('base64')}` }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        const isMissingFfmpeg = /ENOENT|not recognized|spawn ffmpeg/i.test(message)
+
+        return {
+          dataUrl: null,
+          error: isMissingFfmpeg
+            ? `ffmpeg를 찾을 수 없습니다. 확인한 경로: ${ffmpegPath}`
+            : `ffmpeg 프레임 추출에 실패했습니다. ${message}`
+        }
+      } finally {
+        if (existsSync(outputPath)) {
+          await unlink(outputPath).catch(() => undefined)
+        }
+      }
+    }
+  )
+
+  ipcMain.handle(
+    'ffmpeg:createPreview',
+    async (
+      _,
+      payload: FfmpegCreatePreviewPayload
+    ): Promise<{ previewPath: string | null; error?: string }> => {
+      const videoPath = payload.videoPath
+      if (!videoPath || !existsSync(videoPath)) {
+        return { previewPath: null, error: '동영상 파일 경로를 찾을 수 없습니다.' }
+      }
+
+      const ffmpegPath = resolveFfmpegPath()
+      const { videoDir } = getFileStoragePaths()
+      const workspaceId = String(payload.workspaceId ?? '').replace(/[^\w-]/g, '')
+      const previewFileName = workspaceId
+        ? `video_${makeHash()}_${workspaceId}.mp4`
+        : `video_${makeHash()}.mp4`
+      const outputPath = path.join(videoDir, previewFileName)
+      const previewPath = path.join('FILE', 'VIDEO', previewFileName).replace(/\\/g, '/')
+
+      try {
+        await new Promise<void>((resolve, reject) => {
+          execFile(
+            ffmpegPath,
+            [
+              '-y',
+              '-i',
+              videoPath,
+              '-c:v',
+              'libx264',
+              '-preset',
+              'veryfast',
+              '-crf',
+              '23',
+              '-pix_fmt',
+              'yuv420p',
+              '-c:a',
+              'aac',
+              '-movflags',
+              '+faststart',
+              outputPath
+            ],
+            { windowsHide: true, timeout: 120000 },
+            (error) => {
+              if (error) {
+                reject(error)
+                return
+              }
+              resolve()
+            }
+          )
+        })
+
+        await removeOldWorkspaceVideos(videoDir, workspaceId, outputPath)
+
+        return { previewPath }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        const isMissingFfmpeg = /ENOENT|not recognized|spawn ffmpeg/i.test(message)
+
+        return {
+          previewPath: null,
+          error: isMissingFfmpeg
+            ? `ffmpeg를 찾을 수 없습니다. 확인한 경로: ${ffmpegPath}`
+            : `동영상 미리보기 변환에 실패했습니다. ${message}`
+        }
+      }
+    }
+  )
 
   ipcMain.handle('shell:openExternal', async (_, url: string) => {
     await shell.openExternal(url)
@@ -319,6 +625,38 @@ app.whenReady().then(() => {
   ipcMain.handle('app:getVersion', () => {
     return app.getVersion()
   })
+
+  ipcMain.handle(
+    'export:project',
+    async (event, payload: ProjectExportPayload): Promise<ExportResult> => {
+      const exportData = DAO.getProjectExportData(payload.projectId)
+      if (!exportData) {
+        throw new Error('프로젝트를 찾을 수 없습니다.')
+      }
+
+      const ownerWindow = BrowserWindow.fromWebContents(event.sender) ?? undefined
+      const projectName =
+        typeof exportData.project.name === 'string' && exportData.project.name
+          ? exportData.project.name
+          : 'project-export'
+      const defaultFileName = getSafeExportFileName(payload.defaultFileName || projectName)
+      const options = {
+        title: '프로젝트 내보내기',
+        defaultPath: `${defaultFileName}.zip`,
+        filters: [{ name: '프로젝트 내보내기 파일', extensions: ['zip'] }]
+      }
+      const result = ownerWindow
+        ? await dialog.showSaveDialog(ownerWindow, options)
+        : await dialog.showSaveDialog(options)
+
+      if (result.canceled || !result.filePath) return { canceled: true }
+
+      const zipBuffer = await buildProjectExportZip(exportData)
+      await writeFile(result.filePath, zipBuffer)
+
+      return { canceled: false, filePath: result.filePath }
+    }
+  )
 
   ipcMain.handle(
     'export:manualHtmlZip',

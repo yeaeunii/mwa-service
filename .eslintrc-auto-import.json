@@ -1,6 +1,8 @@
 {
   "globals": {
+    "ANNOTATION_SHORTCUTS": true,
     "AnnotationItem": true,
+    "CAPTURE_SHORTCUTS": true,
     "CanvasAnnotation": true,
     "Capture": true,
     "CaptureImage": true,
@@ -30,6 +32,7 @@
     "Project": true,
     "PropType": true,
     "Ref": true,
+    "SHORTCUT_CHANNELS": true,
     "SectionDocInput": true,
     "SectionTreeInput": true,
     "ShallowRef": true,
@@ -42,6 +45,7 @@
     "UseDragSourceReturn": true,
     "UseDropZoneOptions": true,
     "UseDropZoneReturn": true,
+    "VIDEO_PLAYER_SHORTCUTS": true,
     "VNode": true,
     "Workspace": true,
     "WorkspaceDetail": true,
@@ -137,6 +141,7 @@
     "updateProject": true,
     "updateProjectStatus": true,
     "updateWorkspace": true,
+    "updateWorkspaceVideo": true,
     "useAttrs": true,
     "useContextMenu": true,
     "useCounterStore": true,

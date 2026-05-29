@@ -27,6 +27,8 @@ CREATE TABLE "t_workspace" (
   "project_id" INTEGER,
   "name" TEXT,
   "latest_src_url" TEXT,
+  "video_path" TEXT,
+  "video_origin_name" TEXT,
   "thumbnail_path" TEXT,
   "created_at" TEXT,
   "updated_at" TEXT,
@@ -38,6 +40,7 @@ CREATE TABLE "t_capture" (
   "workspace_id" INTEGER,
   "name" TEXT,
   "img_path" TEXT,
+  "source_type" TEXT DEFAULT 'web',
   "created_at" TEXT,
   FOREIGN KEY ("workspace_id") REFERENCES "t_workspace" ("id") ON DELETE CASCADE
 );

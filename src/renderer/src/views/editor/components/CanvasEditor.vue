@@ -953,29 +953,29 @@ const onKeyDown = (event: KeyboardEvent): void => {
   if (isEditableTarget) return
 
   const key = event.key.toLowerCase()
-  if (key === 'delete') {
+  if (key === ANNOTATION_SHORTCUTS.DELETE) {
     event.preventDefault()
     removeSelected()
     return
   }
 
   const moveStep = event.shiftKey ? 10 : 1
-  if (key === 'arrowleft') {
+  if (key === ANNOTATION_SHORTCUTS.ARROW_LEFT) {
     event.preventDefault()
     moveSelectedByKeyboard(-moveStep, 0)
     return
   }
-  if (key === 'arrowright') {
+  if (key === ANNOTATION_SHORTCUTS.ARROW_RIGHT) {
     event.preventDefault()
     moveSelectedByKeyboard(moveStep, 0)
     return
   }
-  if (key === 'arrowup') {
+  if (key === ANNOTATION_SHORTCUTS.ARROW_UP) {
     event.preventDefault()
     moveSelectedByKeyboard(0, -moveStep)
     return
   }
-  if (key === 'arrowdown') {
+  if (key === ANNOTATION_SHORTCUTS.ARROW_DOWN) {
     event.preventDefault()
     moveSelectedByKeyboard(0, moveStep)
     return
@@ -983,12 +983,12 @@ const onKeyDown = (event: KeyboardEvent): void => {
 
   if (!event.ctrlKey) return
 
-  if (key === 'c') {
+  if (key === ANNOTATION_SHORTCUTS.COPY) {
     copySelectedAnnotation()
     return
   }
 
-  if (key === 'v') {
+  if (key === ANNOTATION_SHORTCUTS.PASTE) {
     event.preventDefault()
     pasteCopiedAnnotation()
   }

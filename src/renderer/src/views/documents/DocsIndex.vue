@@ -87,95 +87,172 @@
             >
               <div class="w-full px-4 md:px-6">
                 <div class="rounded-xl border border-base-content/10 bg-base-100 shadow-sm">
-                  <!-- Form Header -->
-                  <div class="space-y-4 border-b border-base-content/5 p-5">
-                    <label class="block w-full">
-                      <div class="mb-1.5 text-sm font-semibold">제목</div>
-                      <input
-                        v-model="doc.title"
-                        type="text"
-                        placeholder="제목을 입력해주세요"
-                        class="input input-lg h-12 w-full bg-base-200/50 text-2xl font-black leading-tight"
-                        @input="scheduleAutoSave(doc)"
-                      />
-                    </label>
-                    <label class="block w-full">
-                      <div class="mb-1.5 text-sm font-semibold">진입경로</div>
-                      <label class="input input-md w-full bg-base-200/50">
-                        <i-lucide-folder-open class="h-3 w-3 text-base-content/50" />
+                  <template v-if="isDoneDoc(doc)">
+                    <div class="space-y-5 p-5">
+                      <div>
+                        <div class="flex items-center gap-2">
+                          <h1 class="min-w-0 flex-1 break-words text-2xl font-black leading-tight">
+                            {{ getDocTitle(doc) }}
+                          </h1>
+                        </div>
+                        <div class="mt-4 flex items-center gap-2 text-xs font-medium text-base-content/60">
+                          <i-lucide-folder-open class="h-3.5 w-3.5 text-primary" />
+                          <span class="font-bold">경로 :</span>
+                          <span>{{ doc.entryPath || '입력된 화면 경로가 없습니다' }}</span>
+                        </div>
+                      </div>
+
+                      <section class="rounded-md border border-blue-200 bg-blue-50 p-4">
+                        <h2 class="mb-2 text-sm font-black text-blue-900">화면 개요</h2>
+                        <p class="whitespace-pre-line text-sm leading-6 text-slate-700">
+                          {{ getDocDescription(doc) }}
+                        </p>
+                      </section>
+
+                      <section>
+                        <div class="mb-3 flex items-center gap-2 text-base font-black">
+                          <i-lucide-check class="h-4 w-4 text-primary" />
+                          <span>화면구성</span>
+                        </div>
+                        <div class="overflow-hidden border border-base-content/20 bg-white">
+                          <img
+                            :src="doc.thumbnail"
+                            class="max-h-[420px] w-full object-contain"
+                            style="max-height: 420px"
+                          />
+                        </div>
+                      </section>
+
+                      <section>
+                        <div class="mb-3 flex items-center gap-2 text-base font-black">
+                          <i-lucide-check class="h-4 w-4 text-primary" />
+                          <span>주요 기능 명세</span>
+                        </div>
+                        <div class="overflow-hidden border border-base-content/20">
+                          <table class="table table-sm w-full">
+                            <thead class="bg-[#eef2f7] text-[#1f3554]">
+                              <tr>
+                                <th class="w-16 border border-slate-300 px-3 py-2 text-center">번호</th>
+                                <th class="border border-slate-300 px-3 py-2 text-center">상세 설명</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr v-for="item in doc.functionItems" :key="item.annotationId">
+                                <td class="border border-slate-300 px-3 py-3 text-center align-top">
+                                  <span
+                                    class="inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-xs font-black text-white"
+                                    :style="{ backgroundColor: getNumberColor(doc) }"
+                                  >
+                                    {{ item.number }}
+                                  </span>
+                                </td>
+                                <td class="border border-slate-300 px-3 py-3 text-sm">
+                                  {{ item.text || '작성된 기능 설명이 없습니다' }}
+                                </td>
+                              </tr>
+                              <tr v-if="doc.functionItems.length === 0">
+                                <td colspan="2" class="py-5 text-center text-sm text-base-content/40">
+                                 작성된 기능 설명이 없습니다
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </section>
+                    </div>
+                  </template>
+
+                  <template v-else>
+                    <!-- Form Header -->
+                    <div class="space-y-4 border-b border-base-content/5 p-5">
+                      <label class="block w-full">
+                        <div class="mb-1.5 text-sm font-semibold">제목</div>
                         <input
-                          v-model="doc.entryPath"
+                          v-model="doc.title"
                           type="text"
-                          placeholder="진입경로 ex) 메인>로그인화면"
+                          placeholder="제목을 입력해주세요"
+                          class="input input-lg h-12 w-full bg-base-200/50 text-2xl font-black leading-tight"
                           @input="scheduleAutoSave(doc)"
                         />
                       </label>
-                    </label>
-                    <label class="block w-full">
-                      <div class="mb-1.5 text-sm font-semibold">화면 설명</div>
-                      <textarea
-                        v-model.trim="doc.description"
-                        rows="2"
-                        placeholder="화면 설명을 입력해주세요"
-                        class="textarea textarea-md w-full resize-none bg-base-200/50"
-                        @input="scheduleAutoSave(doc)"
-                      ></textarea>
-                    </label>
-                  </div>
-
-                  <!-- Screenshot -->
-                  <div class="border-b border-base-content/5 px-5 py-3">
-                    <span class="text-sm font-semibold">화면 구성</span>
-                  </div>
-                  <div class="group relative bg-base-200">
-                    <img
-                      :src="doc.thumbnail"
-                      class="max-h-[420px] w-full object-contain"
-                      style="max-height: 420px"
-                    />
-                    <div
-                      class="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors duration-200 group-hover:bg-black/40"
-                    >
-                      <router-link
-                        :to="`/documents/${doc.id}/annotation`"
-                        class="btn btn-circle btn-lg border-none bg-white/90 text-base-content shadow-lg opacity-0 transition-all duration-200 hover:bg-white group-hover:opacity-100"
-                      >
-                        <i-lucide-pencil class="h-5 w-5" />
-                      </router-link>
+                      <label class="block w-full">
+                        <div class="mb-1.5 text-sm font-semibold">화면경로</div>
+                        <label class="input input-md w-full bg-base-200/50">
+                          <i-lucide-folder-open class="h-3 w-3 text-base-content/50" />
+                          <input
+                            v-model="doc.entryPath"
+                            type="text"
+                            placeholder="화면경로 ex) 메인>로그인화면"
+                            @input="scheduleAutoSave(doc)"
+                          />
+                        </label>
+                      </label>
+                      <label class="block w-full">
+                        <div class="mb-1.5 text-sm font-semibold">화면 설명</div>
+                        <textarea
+                          v-model.trim="doc.description"
+                          rows="2"
+                          placeholder="화면 설명을 입력해주세요"
+                          class="textarea textarea-md w-full resize-none bg-base-200/50"
+                          @input="scheduleAutoSave(doc)"
+                        ></textarea>
+                      </label>
                     </div>
-                  </div>
 
-                  <!-- Step List -->
-                  <div class="p-5">
-                    <div class="mb-3 flex items-center gap-2">
-                      <span class="text-sm font-semibold">기능 설명</span>
-                      <span class="badge badge-sm badge-ghost">{{ doc.functionItems.length }}</span>
+                    <!-- Screenshot -->
+                    <div class="border-b border-base-content/5 px-5 py-3">
+                      <span class="text-sm font-semibold">화면 구성</span>
                     </div>
-                    <ol class="space-y-2">
-                      <li
-                        v-for="item in doc.functionItems"
-                        :key="item.annotationId"
-                        class="flex items-start gap-3 rounded-lg border border-base-content/5 bg-base-200/50 p-3 transition-colors hover:bg-base-200"
+                    <div class="group relative bg-base-200">
+                      <img
+                        :src="doc.thumbnail"
+                        class="max-h-[420px] w-full object-contain"
+                        style="max-height: 420px"
+                      />
+                      <div
+                        class="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors duration-200 group-hover:bg-black/40"
                       >
-                        <div
-                          class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-white"
+                        <router-link
+                          :to="`/documents/${doc.id}/annotation`"
+                          class="btn btn-circle btn-lg border-none bg-white/90 text-base-content shadow-lg opacity-0 transition-all duration-200 hover:bg-white group-hover:opacity-100"
                         >
-                          {{ item.number }}
-                        </div>
-                        <div class="flex-1 pt-0.5">
-                          <div class="text-sm font-medium">
-                            {{ item.text || '기능 설명이 없습니다' }}
-                          </div>
-                        </div>
-                      </li>
-                    </ol>
-                    <div
-                      v-if="doc.functionItems.length === 0"
-                      class="rounded-lg border border-dashed border-base-content/10 bg-base-200/30 p-4 text-center text-sm text-base-content/40"
-                    >
-                      저장된 기능 설명이 없습니다
+                          <i-lucide-pencil class="h-5 w-5" />
+                        </router-link>
+                      </div>
                     </div>
-                  </div>
+
+                    <!-- Step List -->
+                    <div class="p-5">
+                      <div class="mb-3 flex items-center gap-2">
+                        <span class="text-sm font-semibold">기능 설명</span>
+                        <span class="badge badge-sm badge-ghost">{{ doc.functionItems.length }}</span>
+                      </div>
+                      <ol class="space-y-2">
+                        <li
+                          v-for="item in doc.functionItems"
+                          :key="item.annotationId"
+                          class="flex items-start gap-3 rounded-lg border border-base-content/5 bg-base-200/50 p-3 transition-colors hover:bg-base-200"
+                        >
+                          <div
+                            class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-white"
+                          >
+                            {{ item.number }}
+                          </div>
+                          <div class="flex-1 pt-0.5">
+                            <div class="text-sm font-medium">
+                              {{ item.text || '기능 설명이 없습니다' }}
+                            </div>
+                          </div>
+                        </li>
+                      </ol>
+                      <div
+                        v-if="doc.functionItems.length === 0"
+                        class="rounded-lg border border-dashed border-base-content/10 bg-base-200/30 p-4 text-center text-sm text-base-content/40"
+                      >
+                       작성된 기능 설명이 없습니다
+                      </div>
+                    </div>
+                  </template>
                 </div>
               </div>
             </div>
@@ -312,6 +389,7 @@ type Doc = {
   status: string
   entryPath: string
   docMetaJson: string
+  annotationJson: string
   functionItems: FunctionContentItem[]
   thumbnail: string
   createdAt: string
@@ -378,6 +456,23 @@ const docStatusClass = (doc: Doc): string =>
     : 'border-info/20 bg-info/10 text-info'
 const getDocTitle = (doc: Doc): string => doc.title.trim() || EMPTY_DOC_TITLE
 const getDocDescription = (doc: Doc): string => doc.description.trim() || EMPTY_DOC_DESCRIPTION
+const getNumberColor = (doc: Doc): string => {
+  try {
+    const parsed = JSON.parse(doc.annotationJson || '[]')
+    if (!Array.isArray(parsed)) return '#f87171'
+
+    const colorCounts = new Map<string, number>()
+    parsed.forEach((item) => {
+      if (item?.toolType !== 'number' || typeof item?.color !== 'string') return
+
+      colorCounts.set(item.color, (colorCounts.get(item.color) ?? 0) + 1)
+    })
+
+    return [...colorCounts.entries()].sort((left, right) => right[1] - left[1])[0]?.[0] ?? '#f87171'
+  } catch {
+    return '#f87171'
+  }
+}
 const getDocOrder = (doc: Doc): number => {
   const index = docs.value.findIndex((item) => item.id === doc.id)
   return index === -1 ? 0 : index + 1
@@ -541,6 +636,7 @@ const loadDocs = async (): Promise<void> => {
       status: doc.status === '작업완료' ? '작업완료' : '작업중',
       entryPath: String(docMeta.entry_path ?? ''),
       docMetaJson: doc.doc_meta_json,
+      annotationJson: doc.annotation_json,
       functionItems: parseFunctionItems(doc.content_json),
       thumbnail: thumbnailPath
         ? toFileSrc(thumbnailPath, thumbnailVersion)

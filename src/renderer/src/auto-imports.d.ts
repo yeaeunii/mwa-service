@@ -6,7 +6,11 @@
 // biome-ignore lint: disable
 export {}
 declare global {
+  const ANNOTATION_SHORTCUTS: typeof import('./constants/shortcuts').ANNOTATION_SHORTCUTS
+  const CAPTURE_SHORTCUTS: typeof import('./constants/shortcuts').CAPTURE_SHORTCUTS
   const EffectScope: typeof import('vue').EffectScope
+  const SHORTCUT_CHANNELS: typeof import('./constants/shortcuts').SHORTCUT_CHANNELS
+  const VIDEO_PLAYER_SHORTCUTS: typeof import('./constants/shortcuts').VIDEO_PLAYER_SHORTCUTS
   const acceptHMRUpdate: typeof import('pinia').acceptHMRUpdate
   const computed: typeof import('vue').computed
   const copyDocs: typeof import('./database/index').copyDocs
@@ -103,6 +107,7 @@ declare global {
   const updateProject: typeof import('./database/index').updateProject
   const updateProjectStatus: typeof import('./database/index').updateProjectStatus
   const updateWorkspace: typeof import('./database/index').updateWorkspace
+  const updateWorkspaceVideo: typeof import('./database/index').updateWorkspaceVideo
   const useAttrs: typeof import('vue').useAttrs
   const useContextMenu: typeof import('./composables/useContextMenu').useContextMenu
   const useCounterStore: typeof import('./stores/counter').useCounterStore
@@ -149,7 +154,11 @@ import { UnwrapRef } from 'vue'
 declare module 'vue' {
   interface GlobalComponents {}
   interface ComponentCustomProperties {
+    readonly ANNOTATION_SHORTCUTS: UnwrapRef<typeof import('./constants/shortcuts')['ANNOTATION_SHORTCUTS']>
+    readonly CAPTURE_SHORTCUTS: UnwrapRef<typeof import('./constants/shortcuts')['CAPTURE_SHORTCUTS']>
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
+    readonly SHORTCUT_CHANNELS: UnwrapRef<typeof import('./constants/shortcuts')['SHORTCUT_CHANNELS']>
+    readonly VIDEO_PLAYER_SHORTCUTS: UnwrapRef<typeof import('./constants/shortcuts')['VIDEO_PLAYER_SHORTCUTS']>
     readonly acceptHMRUpdate: UnwrapRef<typeof import('pinia')['acceptHMRUpdate']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
     readonly copyDocs: UnwrapRef<typeof import('./database/index')['copyDocs']>
@@ -241,6 +250,7 @@ declare module 'vue' {
     readonly updateProject: UnwrapRef<typeof import('./database/index')['updateProject']>
     readonly updateProjectStatus: UnwrapRef<typeof import('./database/index')['updateProjectStatus']>
     readonly updateWorkspace: UnwrapRef<typeof import('./database/index')['updateWorkspace']>
+    readonly updateWorkspaceVideo: UnwrapRef<typeof import('./database/index')['updateWorkspaceVideo']>
     readonly useAttrs: UnwrapRef<typeof import('vue')['useAttrs']>
     readonly useContextMenu: UnwrapRef<typeof import('./composables/useContextMenu')['useContextMenu']>
     readonly useCounterStore: UnwrapRef<typeof import('./stores/counter')['useCounterStore']>

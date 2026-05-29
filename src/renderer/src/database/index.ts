@@ -71,6 +71,18 @@ export const updateWorkspace = async (workspace: Record<string, unknown>): Promi
   }
 }
 
+export const updateWorkspaceVideo = async (workspace: {
+  id: string | number
+  videoPath: string
+  videoOriginName: string
+}): Promise<void> => {
+  try {
+    await window.api.invoke('dao:call', 'updateWorkspaceVideo', workspace)
+  } catch (error) {
+    console.error(error)
+  }
+}
+
 export const updateProject = async (project: Record<string, unknown>): Promise<void> => {
   try {
     await window.api.invoke('dao:call', 'updateProject', project)
@@ -115,7 +127,10 @@ export const getWorkspaceDetail = async (id: string): Promise<WorkspaceDetail | 
   }
 }
 
-export const getCaptureList = async (params: { workspaceId: number }): Promise<Capture[]> => {
+export const getCaptureList = async (params: {
+  workspaceId: number
+  sourceType?: 'web' | 'video'
+}): Promise<Capture[]> => {
   try {
     return (await window.api.invoke('dao:call', 'getCaptureList', params)) as Capture[]
   } catch (error) {
@@ -129,6 +144,7 @@ export const createCaptureWithImage = async (capture: {
   name: string
   dataUrl: string
   currentUrl: string
+  sourceType?: 'web' | 'video'
 }): Promise<{ id: number; imgPath: string } | null> => {
   try {
     return (await window.api.invoke('dao:call', 'createCaptureWithImage', capture)) as {

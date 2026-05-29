@@ -392,7 +392,7 @@
       ref="modalConfirmRef"
       ok-text="예"
       cancel-text="아니오"
-      @on-confirm="onConfirmCallback?.()"
+      @on-confirm="runConfirmCallback"
     >
       <template #message>
         <div v-dompurify-html="confirmMsgHtml"></div>
@@ -448,11 +448,15 @@ const router = useRouter()
 
 const route = useRoute()
 
-let onConfirmCallback: (() => void) | null = null
+const onConfirmCallback = ref<(() => void) | null>(null)
 const modalConfirmRef = ref<ComponentRef<'ModalConfirm'> | null>(null)
 const modalEditProjectRef = ref<ComponentRef<'ModalNewProject'> | null>(null)
 const modalNewWorkspaceRef = ref<ComponentRef<'ModalNewWorkspace'> | null>(null)
 const confirmMsgHtml = ref<string>('')
+
+const runConfirmCallback = (): void => {
+  onConfirmCallback.value?.()
+}
 const projectThumbnail = ref<string | null>(null)
 const workspaces = ref<Workspace[]>([])
 const curProject = ref<Project | null>(null)
@@ -624,7 +628,7 @@ const openDeleteWorkspace = (workspace: Workspace): void => {
     <p class="text-sm text-gray-500">워크스페이스를 정말 삭제하시겠습니까?</p>
   </div>
   `
-  onConfirmCallback = (): void => {
+  onConfirmCallback.value = (): void => {
     if (!deletingWorkspace.value) return
 
     void (async () => {
@@ -930,7 +934,7 @@ const openDeleteDeliverable = (item: DeliverableItem): void => {
     <p class="text-sm text-gray-500">산출물을 정말 삭제하시겠습니까?</p>
   </div>
   `
-  onConfirmCallback = (): void => {
+  onConfirmCallback.value = (): void => {
     if (!deletingDeliverable.value) return
 
     void (async () => {
@@ -973,7 +977,7 @@ const onDeleteProject = (): void => {
     <p class="text-sm text-gray-500">프로젝트를 삭제하시겠습니까?</p>
   </div>
   `
-  onConfirmCallback = (): void => {
+  onConfirmCallback.value = (): void => {
     if (!curProject.value) return
 
     void (async () => {

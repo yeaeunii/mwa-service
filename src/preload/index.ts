@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
 import * as DAO from '../database/dao'
@@ -9,6 +9,9 @@ const INVOKE_CHANNELS = [
   'shell:openExternal',
   'shell:showItemInFolder',
   'app:getVersion',
+  'ffmpeg:createPreview',
+  'ffmpeg:extractFrame',
+  'export:project',
   'export:manualHtmlZip',
   'export:manualPdf',
   'dao:call',
@@ -20,7 +23,12 @@ const INVOKE_CHANNELS = [
 const SEND_CHANNELS: string[] = []
 
 // Listener channels
-const ON_CHANNELS = ['update:available', 'update:downloaded', 'shortcut:captureWebview']
+const ON_CHANNELS = [
+  'update:available',
+  'update:downloaded',
+  'shortcut:captureWebview',
+  'shortcut:captureVideo'
+]
 
 const systemInfo = {
   platform: process.platform,
@@ -32,6 +40,7 @@ const systemInfo = {
 // Custom APIs for renderer
 const api = {
   getSystemInfo: () => systemInfo,
+  getPathForFile: (file: File) => webUtils.getPathForFile(file),
   invoke: (channel: string, ...args: unknown[]) => {
     if (INVOKE_CHANNELS.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args)

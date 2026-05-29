@@ -66,21 +66,30 @@
       <!-- Webview -->
     </div>
     <div class="w-100 h-[100vh] bg-base-100 flex-shrink-0 p-3 flex flex-col overflow-hidden">
-      <div class="breadcrumbs mb-3">
-        <ul>
-          <li>
-            <a>
-              <i-lucide-layout-dashboard />
-              {{ workspaceInfo?.project_name || 'Project명' }}
-            </a>
-          </li>
-          <li>
-            <a>
-              <i-lucide-folder />
-              {{ workspaceInfo?.name || 'Workspace명' }}
-            </a>
-          </li>
-        </ul>
+      <div class="mb-4 flex items-center gap-2">
+        <div class="flex min-w-0 items-center gap-1.5">
+          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-violet-100">
+            <i-lucide-folder-kanban class="h-4 w-4 text-violet-600" />
+          </div>
+          <div class="min-w-0">
+            <div class="truncate text-xs font-black text-slate-950">프로젝트</div>
+            <div class="truncate text-[11px] font-semibold text-slate-400">
+              {{ workspaceInfo?.project_name}}
+            </div>
+          </div>
+        </div>
+        <i-lucide-chevron-right class="h-4 w-4 shrink-0 text-slate-300" />
+        <div class="flex min-w-0 items-center gap-1.5">
+          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-violet-100">
+            <i-lucide-briefcase class="h-4 w-4 text-violet-600" />
+          </div>
+          <div class="min-w-0">
+            <div class="truncate text-xs font-black text-slate-950">워크스페이스</div>
+            <div class="truncate text-[11px] font-semibold text-slate-400">
+              {{ workspaceInfo?.name}}
+            </div>
+          </div>
+        </div>
       </div>
       <div class="overflow-y-auto w-full p-3 bg-slate-50 rounded-md flex-1">
         <!-- 캡쳐 이미지 목록 -->
@@ -145,7 +154,6 @@ interface WebviewElement extends HTMLElement {
   canGoBack: () => boolean
   canGoForward: () => boolean
   capturePage: () => Promise<{ toDataURL: () => string }>
-  addEventListener: (event: string, listener: (event: WebviewNavigationEvent) => void) => void
 }
 
 interface WebviewNavigationEvent {
@@ -154,7 +162,6 @@ interface WebviewNavigationEvent {
 }
 
 const START_PAGE_URL = 'https://www.google.com'
-const CAPTURE_SHORTCUT_KEY = 'CommandOrControl+Shift+S'
 
 const webviewRef = ref<WebviewElement | null>(null)
 const router = useRouter()
@@ -186,6 +193,8 @@ const loadWorkspaceInfo = async (): Promise<void> => {
   workspaceInfo.value = await getWorkspaceDetail(workspaceId.value)
 
   const initialUrl = workspaceInfo.value?.latest_src_url || START_PAGE_URL
+  // const latestUrl = workspaceInfo.value?.latest_src_url ?? ''
+  // const initialUrl = /^https?:\/\//i.test(latestUrl) ? latestUrl : START_PAGE_URL
   urlInput.value = initialUrl
   currentUrl.value = initialUrl
   webviewSrc.value = initialUrl
@@ -245,11 +254,12 @@ const initWebview = (): void => {
     canGoForward.value = webview.canGoForward()
   })
 
-  const syncCurrentUrl = (e: WebviewNavigationEvent): void => {
-    if (e.isMainFrame === false || !e.url) return
+  const syncCurrentUrl = (e: Event): void => {
+    const event = e as WebviewNavigationEvent
+    if (event.isMainFrame === false || !event.url) return
 
-    urlInput.value = e.url
-    currentUrl.value = e.url
+    urlInput.value = event.url
+    currentUrl.value = event.url
     canGoBack.value = webview.canGoBack()
     canGoForward.value = webview.canGoForward()
   }
@@ -277,7 +287,8 @@ const loadCaptureList = async (): Promise<void> => {
   if (!workspaceId.value) return
 
   const list = await getCaptureList({
-    workspaceId: Number(workspaceId.value)
+    workspaceId: Number(workspaceId.value),
+    sourceType: 'web'
   })
 
   captureImages.value = list.map((item) => ({
@@ -344,7 +355,8 @@ const onCaptureNameConfirm = async (name: string): Promise<void> => {
     workspaceId: String(workspaceId.value),
     name: nextName,
     dataUrl: imageDataURL,
-    currentUrl: currentUrl.value
+    currentUrl: currentUrl.value,
+    sourceType: 'web'
   })
   if (!saved) return
 
@@ -362,8 +374,12 @@ onMounted(async () => {
   await nextTick()
   initWebview()
   await loadCaptureList()
-  window.api.invoke('shortcut:register', CAPTURE_SHORTCUT_KEY, 'shortcut:captureWebview')
-  webviewCaptureListener = window.api.on('shortcut:captureWebview', onCaptureWebview)
+  window.api.invoke(
+    'shortcut:register',
+    CAPTURE_SHORTCUTS.WEB_CAPTURE,
+    SHORTCUT_CHANNELS.CAPTURE_WEBVIEW
+  )
+  webviewCaptureListener = window.api.on(SHORTCUT_CHANNELS.CAPTURE_WEBVIEW, onCaptureWebview)
 })
 
 // 화면 이탈 시 타이머와 단축키 리스너 정리
@@ -374,6 +390,6 @@ onUnmounted(() => {
   }
   webviewCaptureListener?.()
   webviewCaptureListener = null
-  window.api.invoke('shortcut:unregister', CAPTURE_SHORTCUT_KEY)
+  window.api.invoke('shortcut:unregister', CAPTURE_SHORTCUTS.WEB_CAPTURE)
 })
 </script>
