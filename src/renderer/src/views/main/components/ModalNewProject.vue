@@ -2,7 +2,7 @@
   <ModalBase
     ref="modalRef"
     width="w-full max-w-[28rem] rounded-2xl bg-white p-0 text-slate-900 shadow-2xl"
-    :closeOnBackdrop="false"
+    :close-on-backdrop="false"
   >
     <template #header>
       <div class="flex items-start justify-between gap-4 border-b border-slate-200 px-6 pt-6 pb-5">
@@ -105,8 +105,12 @@
           v-model="projectUrl"
           type="url"
           class="input input-bordered h-12 w-full rounded-xl border-slate-200 bg-slate-50 text-slate-800 shadow-none outline-none focus:border-blue-400 focus:outline-none"
+          :class="{ 'border-error focus:border-error': !isProjectUrlValid }"
           placeholder="https://service.example.com"
         />
+        <span v-if="!isProjectUrlValid" class="text-xs leading-relaxed text-error">
+          http:// 또는 https://로 시작하는 올바른 URL을 입력하세요.
+        </span>
         <span class="text-xs leading-relaxed text-slate-400">
           프로젝트를 열었을 때 가장 먼저 진입할 화면 주소를 입력하세요.
         </span>
@@ -125,7 +129,7 @@
         <button
           type="button"
           class="btn btn-primary min-w-32 rounded-xl border-0 px-5 shadow-none disabled:bg-slate-200 disabled:text-slate-400"
-          :disabled="projectName.trim().length === 0"
+          :disabled="projectName.trim().length === 0 || !isProjectUrlValid"
           @click="onSubmit"
         >
           {{ editingProjectId ? '변경사항 저장' : '프로젝트 생성' }}
@@ -134,7 +138,6 @@
     </template>
   </ModalBase>
 </template>
-
 
 <script setup lang="ts">
 const emits = defineEmits<{
@@ -150,6 +153,21 @@ const projectDescription = ref('')
 const projectUrl = ref('')
 const projectThumbnail = ref<string | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
+
+const isValidProjectUrl = (url: string): boolean => {
+  const trimmedUrl = url.trim()
+
+  if (!trimmedUrl) return true
+
+  try {
+    const parsedUrl = new URL(trimmedUrl)
+    return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+const isProjectUrlValid = computed(() => isValidProjectUrl(projectUrl.value))
 
 const onOpen = (): void => {
   editingProjectId.value = null
@@ -180,6 +198,8 @@ const onClose = (): void => {
 }
 
 const onSubmit = (): void => {
+  if (!isProjectUrlValid.value) return
+
   emits('onSubmit', {
     id: editingProjectId.value ?? undefined,
     name: projectName.value.trim(),

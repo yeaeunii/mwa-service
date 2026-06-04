@@ -1,242 +1,195 @@
 <template>
-  <div class="min-h-screen bg-[#f7f8fb] text-base-content">
-    <header class="sticky top-0 z-30 border-b border-base-content/10 bg-base-100/95 backdrop-blur">
-      <div class="mx-auto flex h-16 max-w-7xl items-center gap-4 px-6 md:px-10">
+  <div class="flex h-screen flex-col overflow-hidden bg-base-100 text-base-content">
+    <header class="z-30 shrink-0 border-b border-base-content/10 bg-base-100/95 backdrop-blur">
+      <div class="flex h-16 max-w-7xl items-center gap-4 px-6 md:px-10">
         <div class="flex min-w-0 items-center gap-3">
-          <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/20 text-primary/70 shadow-sm">
+          <div
+            class="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/20 text-primary/70 shadow-sm"
+          >
             <i-lucide-panels-top-left class="h-5 w-5" />
           </div>
           <div class="min-w-0">
             <h1 class="truncate text-lg font-black tracking-tight">MWA</h1>
-            <!-- <p class="truncate text-xs text-base-content/45">매뉴얼 프로젝트를 생성하고 관리하세요</p> -->
           </div>
         </div>
-
-        <button
-          type="button"
-          class="btn btn-sm ml-auto border-0 bg-emerald-500 text-white hover:bg-emerald-600">
-          <i-lucide-folder-input class="h-4 w-4" />
-          불러오기
-        </button>
       </div>
     </header>
 
-    <div class="mx-auto flex max-w-7xl flex-col gap-5 px-6 pb-6 pt-15 md:px-10">
-      <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
+    <div
+      class="mx-auto bg-base-100 flex w-full max-w-7xl shrink-0 flex-col gap-5 px-6 pb-6 pt-6 md:px-10"
+    >
+      <!-- Filters -->
+      <div class="flex items-center gap-2">
         <button
-          type="button"
-          class="flex items-center justify-between rounded-lg border bg-base-100 p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+          v-for="filter in PROJECT_FILTERS"
+          :key="filter"
+          class="btn btn-sm rounded-full border-0 px-5 font-semibold shadow-none transition-all"
           :class="
-            selectedProjectFilter === '전체'
-              ? 'border-sky-300 bg-sky-50 text-sky-700'
-              : 'border-base-content/10 hover:border-sky-200'
+            selectedProjectFilter === filter
+              ? 'bg-primary text-primary-content hover:bg-primary/90'
+              : 'bg-slate-100 text-base-content/60 hover:bg-base-300/50'
           "
-          @click.stop="selectedProjectFilter = '전체'"
+          @click.stop="selectedProjectFilter = filter"
         >
-          <div>
-            <div class="text-xs font-semibold text-base-content/55">전체 프로젝트</div>
-            <div class="mt-1 text-3xl font-black">
-              {{ formatCount(projectCounts.total) }}<span class="ml-0.5 text-base font-bold">개</span>
-            </div>
-          </div>
-          <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100 text-sky-500">
-            <i-lucide-folder-kanban class="h-5 w-5" />
-          </div>
-        </button>
-
-        <button
-          type="button"
-          class="flex items-center justify-between rounded-lg border bg-base-100 p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
-          :class="
-            selectedProjectFilter === '진행중'
-              ? 'border-fuchsia-300 bg-fuchsia-50 text-fuchsia-700'
-              : 'border-base-content/10 hover:border-fuchsia-200'
-          "
-          @click.stop="selectedProjectFilter = '진행중'"
-        >
-          <div>
-            <div class="text-xs font-semibold text-base-content/55">진행중</div>
-            <div class="mt-1 text-3xl font-black">
-              {{ formatCount(projectCounts.inProgress) }}<span class="ml-0.5 text-base font-bold">개</span>
-            </div>
-          </div>
-          <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-fuchsia-100 text-fuchsia-500">
-            <i-lucide-loader-circle class="h-5 w-5" />
-          </div>
-        </button>
-
-        <button
-          type="button"
-          class="flex items-center justify-between rounded-lg border bg-base-100 p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
-          :class="
-            selectedProjectFilter === '완료'
-              ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-              : 'border-base-content/10 hover:border-emerald-200'
-          "
-          @click.stop="selectedProjectFilter = '완료'"
-        >
-          <div>
-            <div class="text-xs font-semibold text-base-content/55">완료됨</div>
-            <div class="mt-1 text-3xl font-black">
-              {{ formatCount(projectCounts.done) }}<span class="ml-0.5 text-base font-bold">개</span>
-            </div>
-          </div>
-          <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-500">
-            <i-lucide-circle-check class="h-5 w-5" />
-          </div>
+          {{ filter }}
         </button>
       </div>
-
-
-
     </div>
 
-    <section class="border-y border-base-content/10 bg-base-100">
-      <div class="mx-auto max-w-7xl px-6 py-6 md:px-10">
-
-      <div class="flex flex-col gap-3 border-b border-base-content/10 pb-5 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h2 class="text-base font-bold">최근 프로젝트</h2>
+    <section class="min-h-0 flex-1 border-y border-base-content/10 bg-base-100">
+      <div class="mx-auto flex h-full min-h-0 max-w-7xl flex-col px-6 py-6 md:px-10">
+        <div class="flex flex-col gap-3 border-b border-base-content/10 pb-5">
+          <div>
+            <h1 class="text-3xl font-black tracking-tight">내 프로젝트</h1>
+            <div class="mt-1.5 flex items-center justify-between gap-3">
+              <p class="text-sm text-base-content/50">
+                매뉴얼 프로젝트를 확인하고 관리하세요.
+              </p>
+              <button
+                type="button"
+                :disabled="isImportingProject"
+                class="inline-flex h-5 shrink-0 items-center gap-1.5 bg-transparent px-1 text-xs font-bold text-base-content/55 transition-colors hover:text-emerald-600 hover:underline disabled:pointer-events-none disabled:opacity-50"
+                @click.stop="importProject"
+              >
+                <span v-if="isImportingProject" class="loading loading-spinner loading-xs" />
+                <i-lucide-folder-input v-else class="h-4 w-4" />
+                불러오기
+              </button>
+            </div>
+          </div>
         </div>
-        <div class="flex w-full flex-col gap-2 sm:flex-row md:w-auto">
-          <label
-            class="input input-sm flex w-full items-center gap-2 border-base-content/10 bg-base-100 shadow-none sm:w-72"
+
+        <div class="min-h-0 flex-1 overflow-y-auto">
+          <!-- Project Grid -->
+          <section
+            v-if="selectedProjectFilter === '전체' || filteredProjects.length > 0"
+            class="grid grid-cols-1 content-start gap-5 pb-6 pt-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
           >
-            <i-lucide-search class="h-4 w-4 text-base-content/35" />
-            <input v-model="searchText" type="search" class="grow" placeholder="프로젝트 검색" />
-          </label>
-          <button
-            type="button"
-            class="btn btn-sm border-0 bg-indigo-500 text-white hover:bg-indigo-600"
-            @click.stop="modalCreateProjectRef?.onOpen()">
-            <i-lucide-plus class="h-4 w-4" />
-            새 프로젝트
-          </button>
-        </div>
-      </div>
-
-      <!-- Project Grid -->
-      <section class="grid grid-cols-1 gap-5 pt-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        <!-- Project Card -->
-        <div
-          v-for="project in filteredProjects"
-          :key="project.id"
-          class="group cursor-pointer overflow-hidden rounded-xl border border-base-content/10 bg-base-100 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-primary/30"
-          @click="router.push({ name: 'projects-index', params: { id: project.id } })"
-        >
-          <!-- Thumbnail -->
-          <div class="relative overflow-hidden">
-            <img
-              v-if="project.thumbnail"
-              :src="project.thumbnail"
-              alt="project thumbnail"
-              class="h-44 w-full object-cover transition-transform duration-300 group-hover:scale-105"
-            />
-            <DefaultThumbnail
-              v-else
-              :id="Number(project.id)"
-              class="h-44 w-full transition-transform duration-300 group-hover:scale-105"
-            />
-            <div
-              class="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
-            />
-            <span
-              class="badge badge-sm absolute right-2.5 top-2.5 z-10 font-bold shadow-sm"
-              :class="
-                project.status === '완료'
-                  ? 'border-emerald-200 bg-emerald-500 text-white'
-                  : 'border-fuchsia-200 bg-fuchsia-500 text-white'
-              "
+            <button
+              v-if="selectedProjectFilter === '전체'"
+              type="button"
+              class="flex min-h-[320px] flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-base-content/15 bg-base-100/50 transition-all duration-200 hover:border-primary/40 hover:bg-primary/5"
+              @click.stop="modalCreateProjectRef?.onOpen()"
             >
-              {{ project.status }}
-            </span>
-          </div>
+              <div
+                class="flex h-12 w-12 items-center justify-center rounded-full bg-base-content/10"
+              >
+                <i-lucide-plus class="h-5 w-5 text-base-content/40" />
+              </div>
+              <span class="text-sm font-bold text-base-content/40">새 프로젝트</span>
+            </button>
+            <!-- Project Card -->
+            <div
+              v-for="project in filteredProjects"
+              :key="project.id"
+              class="group cursor-pointer overflow-hidden rounded-xl border border-base-content/10 bg-base-100 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-primary/30"
+              @click="router.push({ name: 'projects-index', params: { id: project.id } })"
+              @contextmenu.prevent.stop="openProjectContextMenu(project, $event)"
+            >
+              <!-- Thumbnail -->
+              <div class="relative overflow-hidden">
+                <img
+                  v-if="project.thumbnail"
+                  :src="project.thumbnail"
+                  alt="project thumbnail"
+                  class="h-44 w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+                <DefaultThumbnail
+                  v-else
+                  :id="Number(project.id)"
+                  :label="project.title"
+                  class="h-44 w-full transition-transform duration-300 group-hover:scale-105"
+                />
+                <div
+                  v-if="project.thumbnail"
+                  class="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
+                />
+                <span
+                  class="badge badge-sm absolute right-2.5 top-2.5 z-10 font-bold shadow-sm"
+                  :class="
+                    project.status === '완료'
+                      ? 'border-emerald-200 bg-emerald-500 text-white'
+                      : 'border-fuchsia-200 bg-fuchsia-500 text-white'
+                  "
+                >
+                  {{ project.status }}
+                </span>
+              </div>
 
-          <!-- Info -->
-          <div class="p-4">
-            <div class="mb-1.5 flex items-start gap-2">
-              <h3 class="min-w-0 flex-1 text-base font-bold leading-tight line-clamp-1">
-                {{ project.title }}
-              </h3>
-              <div class="dropdown dropdown-end shrink-0" @click.stop.prevent @mousedown.stop>
-                <button
-                  tabindex="0"
-                  type="button"
-                  class="btn btn-xs btn-circle border-none bg-base-200 text-base-content/60 shadow-none hover:bg-base-300"
-                  @click.stop.prevent
-                >
-                  <i-lucide-more-vertical class="h-3.5 w-3.5" />
-                </button>
-                <ul
-                  tabindex="0"
-                  class="dropdown-content menu z-20 w-36 rounded-xl border border-base-content/10 bg-base-100 p-1.5 shadow-lg"
-                  @click.stop.prevent
-                >
-                  <li>
-                    <button
-                      type="button"
-                      class="rounded-lg text-sm"
-                      @click.stop.prevent="openEditProject(project)"
-                    >
-                      <i-lucide-pencil class="h-4 w-4 opacity-60" />
-                      수정
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      type="button"
-                      class="rounded-lg text-sm"
-                      :disabled="exportingProjectId === project.id"
-                      @click.stop.prevent="openExportProject(project)"
-                    >
-                      <span
-                        v-if="exportingProjectId === project.id"
-                        class="loading loading-spinner loading-xs opacity-60"
-                      />
-                      <i-lucide-download v-else class="h-4 w-4 opacity-60" />
-                      내보내기
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      type="button"
-                      class="rounded-lg text-sm text-error"
-                      @click.stop.prevent="openDeleteProject(project)"
-                    >
-                      <i-lucide-trash-2 class="h-4 w-4 opacity-60" />
-                      삭제
-                    </button>
-                  </li>
-                </ul>
+              <!-- Info -->
+              <div class="p-4">
+                <div class="mb-1.5 flex items-start gap-2">
+                  <h3 class="min-w-0 flex-1 text-base font-bold leading-tight line-clamp-1">
+                    <template v-if="project.thumbnail">{{ project.title }}</template>
+                    <span v-else aria-hidden="true">&nbsp;</span>
+                  </h3>
+                </div>
+                <p class="mb-4 h-10 text-xs leading-relaxed text-base-content/45 line-clamp-2">
+                  {{ project.description || EMPTY_DESCRIPTION }}
+                </p>
+                <div class="flex items-center justify-between border-t border-base-content/5 pt-3">
+                  <div class="flex items-center gap-1 text-xs text-base-content/40">
+                    <i-lucide-clock class="h-3 w-3" />
+                    {{ project.createdAt }}
+                  </div>
+                </div>
               </div>
             </div>
-            <p class="mb-4 h-10 text-xs leading-relaxed text-base-content/45 line-clamp-2">
-              {{ project.description || EMPTY_DESCRIPTION }}
+          </section>
+
+          <!-- Empty State -->
+          <div
+            v-if="filteredProjects.length === 0 && projects.length > 0"
+            class="flex min-h-full flex-col items-center justify-center gap-3 py-10 text-base-content/30"
+          >
+            <i-lucide-search-x class="h-12 w-12" />
+            <p class="text-sm font-medium">
+              '{{ selectedProjectFilter }}' 필터에 해당하는 프로젝트가 없습니다.
             </p>
-            <div class="flex items-center justify-between border-t border-base-content/5 pt-3">
-              <div class="flex items-center gap-1 text-xs text-base-content/40">
-                <i-lucide-clock class="h-3 w-3" />
-                {{ project.updatedAt }}
-              </div>
-            </div>
           </div>
         </div>
-      </section>
-
-      <!-- Empty State -->
-      <div
-        v-if="filteredProjects.length === 0 && projects.length > 0"
-        class="flex flex-col items-center gap-3 py-20 text-base-content/30"
-      >
-        <i-lucide-search-x class="h-12 w-12" />
-        <p class="text-sm font-medium">
-          '{{ selectedProjectFilter }}' 필터에 해당하는 프로젝트가 없습니다.
-        </p>
-      </div>
       </div>
     </section>
 
     <ModalNewProject ref="modalCreateProjectRef" @on-submit="onSubmitProject" />
+    <ul
+      v-if="projectContextMenu.visible"
+      class="menu fixed z-[9999] w-40 rounded-xl border border-base-content/10 bg-base-100 p-1.5 shadow-xl"
+      :style="{
+        left: `${projectContextMenu.x}px`,
+        top: `${projectContextMenu.y}px`
+      }"
+      @click.stop
+      @contextmenu.prevent.stop
+    >
+      <li>
+        <button type="button" class="rounded-lg text-sm" @click="editContextProject">
+          <i-lucide-pencil class="h-4 w-4 opacity-60" />
+          수정
+        </button>
+      </li>
+      <li>
+        <button
+          type="button"
+          class="rounded-lg text-sm"
+          :disabled="exportingProjectId === selectedProjectContextItem?.id"
+          @click="exportContextProject"
+        >
+          <span
+            v-if="exportingProjectId === selectedProjectContextItem?.id"
+            class="loading loading-spinner loading-xs opacity-60"
+          />
+          <i-lucide-download v-else class="h-4 w-4 opacity-60" />
+          내보내기
+        </button>
+      </li>
+      <li>
+        <button type="button" class="rounded-lg text-sm text-error" @click="deleteContextProject">
+          <i-lucide-trash-2 class="h-4 w-4 opacity-60" />
+          삭제
+        </button>
+      </li>
+    </ul>
     <ModalConfirm ref="modalConfirmRef" ok-text="삭제" @on-confirm="onConfirmDeleteProject">
       <template #message>
         <div class="text-center">
@@ -245,6 +198,24 @@
         </div>
       </template>
     </ModalConfirm>
+    <ModalBase ref="projectResultModalRef" width="w-80">
+      <div class="py-3 text-center text-sm font-semibold">{{ projectResultMessage }}</div>
+      <template #footer="{ close }">
+        <button
+          v-if="projectResultPath"
+          type="button"
+          class="btn btn-sm gap-1.5"
+          @click="openProjectResultFolder"
+        >
+          <i-lucide-folder-open class="h-4 w-4" />
+          폴더 열기
+        </button>
+        <button type="button" class="btn btn-sm" @click="close">
+          <i-lucide-check class="h-4 w-4" />
+          확인
+        </button>
+      </template>
+    </ModalBase>
   </div>
 </template>
 
@@ -253,14 +224,16 @@ import type { Project } from '@database/dto'
 import { createProject, deleteProject, getProjects, updateProject } from '@/database'
 import { formatDate } from '@/utils/datetime'
 import type { ExportResult } from '@/types'
+import { useContextMenu } from '@renderer/composables/useContextMenu'
 
 type ProjectFilter = '전체' | '진행중' | '완료'
+const PROJECT_FILTERS: ProjectFilter[] = ['전체', '진행중', '완료']
 
 interface ProjectCard {
   id: string
   title: string
-  updatedAt: string
-  updatedTime: number
+  createdAt: string
+  createdTime: number
   progress: string
   description: string
   rawDescription: string
@@ -270,14 +243,23 @@ interface ProjectCard {
 }
 
 const EMPTY_DESCRIPTION = '프로젝트 설명을 아직 작성하지 않았습니다.'
-const countFormatter = new Intl.NumberFormat('ko-KR')
 const selectedProjectFilter = ref<ProjectFilter>('전체')
 const searchText = ref('')
 const router = useRouter()
 const modalCreateProjectRef = ref<ComponentRef<'ModalNewProject'> | null>(null)
 const modalConfirmRef = ref<ComponentRef<'ModalConfirm'> | null>(null)
+const projectResultModalRef = ref<ComponentRef<'ModalBase'> | null>(null)
 const deletingProject = ref<ProjectCard | null>(null)
 const exportingProjectId = ref<string | null>(null)
+const isImportingProject = ref(false)
+const projectResultMessage = ref('')
+const projectResultPath = ref('')
+const {
+  contextMenu: projectContextMenu,
+  selectedItem: selectedProjectContextItem,
+  openContextMenu: openProjectMenu,
+  closeContextMenu: closeProjectMenu
+} = useContextMenu<ProjectCard>({ closeOnWindowContextMenu: true })
 
 const projects = ref<ProjectCard[]>([])
 
@@ -297,8 +279,8 @@ const mapProjectToCard = (project: Project): ProjectCard => {
   return {
     id: String(project.id),
     title: project.name,
-    updatedAt: formatDate(new Date(project.updated_at), 'YYYY.MM.DD HH:mm'),
-    updatedTime: new Date(project.updated_at).getTime(),
+    createdAt: formatDate(new Date(project.created_at), 'YYYY.MM.DD HH:mm'),
+    createdTime: new Date(project.created_at).getTime(),
     progress: '-',
     description: project.description ?? '',
     rawDescription: project.description ?? '',
@@ -321,20 +303,8 @@ const loadProjects = async (): Promise<void> => {
   console.log('loaded rows:', rows)
   projects.value = rows
     .map(mapProjectToCard)
-    .sort((left, right) => right.updatedTime - left.updatedTime)
+    .sort((left, right) => right.createdTime - left.createdTime)
 }
-
-const formatCount = (count: number): string => countFormatter.format(count)
-
-const projectCounts = computed(() => {
-  const done = projects.value.filter((project) => project.status === '완료').length
-
-  return {
-    total: projects.value.length,
-    inProgress: projects.value.length - done,
-    done
-  }
-})
 
 const filteredProjects = computed(() => {
   const keyword = searchText.value.trim().toLowerCase()
@@ -366,9 +336,50 @@ const openEditProject = (project: ProjectCard): void => {
   })
 }
 
+const openProjectContextMenu = (project: ProjectCard, event: MouseEvent): void => {
+  openProjectMenu(event, project)
+}
+
+const editContextProject = (): void => {
+  const project = selectedProjectContextItem.value
+  closeProjectMenu()
+  if (!project) return
+
+  openEditProject(project)
+}
+
+const exportContextProject = (): void => {
+  const project = selectedProjectContextItem.value
+  closeProjectMenu()
+  if (!project) return
+
+  void openExportProject(project)
+}
+
+const deleteContextProject = (): void => {
+  const project = selectedProjectContextItem.value
+  closeProjectMenu()
+  if (!project) return
+
+  openDeleteProject(project)
+}
+
 const openDeleteProject = (project: ProjectCard): void => {
   deletingProject.value = project
   modalConfirmRef.value?.onOpen()
+}
+
+const showProjectResultModal = (message: string, filePath = ''): void => {
+  projectResultMessage.value = message
+  projectResultPath.value = filePath
+  projectResultModalRef.value?.onOpen()
+}
+
+const openProjectResultFolder = (): void => {
+  if (!projectResultPath.value) return
+
+  void window.api.invoke('shell:showItemInFolder', projectResultPath.value)
+  projectResultModalRef.value?.onClose()
 }
 
 const openExportProject = async (project: ProjectCard): Promise<void> => {
@@ -382,13 +393,35 @@ const openExportProject = async (project: ProjectCard): Promise<void> => {
     })) as ExportResult
 
     if (!result.canceled && result.filePath) {
-      window.alert('프로젝트 내보내기가 완료되었습니다.')
+      showProjectResultModal('프로젝트 내보내기가 완료되었습니다.', result.filePath)
     }
   } catch (error) {
     console.error('Failed to export project:', error)
-    window.alert('프로젝트 내보내기에 실패했습니다.')
+    showProjectResultModal('프로젝트 내보내기에 실패했습니다.')
   } finally {
     exportingProjectId.value = null
+  }
+}
+
+const importProject = async (): Promise<void> => {
+  if (isImportingProject.value) return
+
+  isImportingProject.value = true
+  try {
+    const result = (await window.api.invoke('import:project')) as {
+      canceled: boolean
+      projectId?: number
+    }
+
+    if (!result.canceled) {
+      await loadProjects()
+      showProjectResultModal('프로젝트 불러오기가 완료되었습니다.')
+    }
+  } catch (error) {
+    console.error('Failed to import project:', error)
+    showProjectResultModal('프로젝트 불러오기에 실패했습니다.')
+  } finally {
+    isImportingProject.value = false
   }
 }
 

@@ -5,7 +5,7 @@ export type CaptureImage = {
   imgPath?: string
 }
 
-export type ToolMode = 'number' | 'strokebox' | 'filled-box' | 'mosaic' | null
+export type ToolMode = 'number' | 'strokebox' | 'filled-box' | 'dashed-box' | 'mosaic' | null
 
 export type CanvasAnnotation = {
   id: string

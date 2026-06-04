@@ -88,6 +88,11 @@ interface ProjectExportPayload {
   defaultFileName?: string
 }
 
+interface ProjectImportResult {
+  canceled: boolean
+  projectId?: number
+}
+
 const getCrc32Table = (): number[] => {
   const table: number[] = []
 
@@ -171,6 +176,77 @@ const createZipBuffer = (files: { name: string; content: Buffer }[]): Buffer => 
   endRecord.writeUInt16LE(0, 20)
 
   return Buffer.concat([...localParts, centralDirectory, endRecord])
+}
+
+const readStoredZipEntries = (zipBuffer: Buffer): Record<string, Buffer> => {
+  const entries: Record<string, Buffer> = {}
+  let offset = 0
+
+  while (offset + 30 <= zipBuffer.length) {
+    const signature = zipBuffer.readUInt32LE(offset)
+    if (signature === 0x02014b50 || signature === 0x06054b50) break
+    if (signature !== 0x04034b50) {
+      throw new Error('지원하지 않는 프로젝트 파일 형식입니다.')
+    }
+
+    const compressionMethod = zipBuffer.readUInt16LE(offset + 8)
+    const compressedSize = zipBuffer.readUInt32LE(offset + 18)
+    const fileNameLength = zipBuffer.readUInt16LE(offset + 26)
+    const extraLength = zipBuffer.readUInt16LE(offset + 28)
+    const fileNameStart = offset + 30
+    const fileNameEnd = fileNameStart + fileNameLength
+    const contentStart = fileNameEnd + extraLength
+    const contentEnd = contentStart + compressedSize
+
+    if (compressionMethod !== 0 || contentEnd > zipBuffer.length) {
+      throw new Error('지원하지 않는 프로젝트 파일 형식입니다.')
+    }
+
+    const entryName = zipBuffer.subarray(fileNameStart, fileNameEnd).toString('utf-8')
+    if (entryName && !entryName.endsWith('/')) {
+      entries[entryName] = zipBuffer.subarray(contentStart, contentEnd)
+    }
+
+    offset = contentEnd
+  }
+
+  return entries
+}
+
+const readProjectImportBundle = (zipBuffer: Buffer): {
+  data: ProjectExportData
+  assets: Record<string, Buffer>
+} => {
+  const entries = readStoredZipEntries(zipBuffer)
+  const dataEntry = entries['data.json']
+  if (!dataEntry) {
+    throw new Error('프로젝트 데이터 파일을 찾을 수 없습니다.')
+  }
+
+  const data = JSON.parse(dataEntry.toString('utf-8')) as ProjectExportData
+  if (
+    !data.project ||
+    !Array.isArray(data.workspaces) ||
+    !Array.isArray(data.captures) ||
+    !Array.isArray(data.docs) ||
+    !Array.isArray(data.deliverables) ||
+    !Array.isArray(data.sections) ||
+    !Array.isArray(data.section_docs)
+  ) {
+    throw new Error('프로젝트 데이터 형식이 올바르지 않습니다.')
+  }
+
+  const assets: Record<string, Buffer> = {}
+  Object.entries(entries).forEach(([entryName, content]) => {
+    const normalizedName = entryName.replace(/\\/g, '/').replace(/^\/+/, '')
+    if (!normalizedName.startsWith('assets/FILE/')) return
+
+    const storedPath = normalizedName.replace(/^assets\//, '')
+    if (storedPath.split('/').some((segment) => segment === '..')) return
+    assets[storedPath] = content
+  })
+
+  return { data, assets }
 }
 
 const getSafeExportFileName = (fileName: string): string => {
@@ -657,6 +733,26 @@ app.whenReady().then(() => {
       return { canceled: false, filePath: result.filePath }
     }
   )
+
+  ipcMain.handle('import:project', async (event): Promise<ProjectImportResult> => {
+    const ownerWindow = BrowserWindow.fromWebContents(event.sender) ?? undefined
+    const options = {
+      title: '프로젝트 불러오기',
+      properties: ['openFile'] as Array<'openFile'>,
+      filters: [{ name: '프로젝트 내보내기 파일', extensions: ['zip'] }]
+    }
+    const result = ownerWindow
+      ? await dialog.showOpenDialog(ownerWindow, options)
+      : await dialog.showOpenDialog(options)
+
+    if (result.canceled || !result.filePaths[0]) return { canceled: true }
+
+    const zipBuffer = await readFile(result.filePaths[0])
+    const bundle = readProjectImportBundle(zipBuffer)
+    const projectId = DAO.importProjectExportData(bundle.data, bundle.assets)
+
+    return { canceled: false, projectId }
+  })
 
   ipcMain.handle(
     'export:manualHtmlZip',

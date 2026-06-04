@@ -1,7 +1,9 @@
 <template>
   <div class="flex h-screen gap-3 overflow-hidden bg-slate-100 p-3 text-slate-950">
     <main class="flex min-w-0 flex-1 flex-col overflow-hidden rounded-md bg-white shadow-sm">
-      <header class="flex h-13 items-center justify-between border-b border-slate-300 bg-slate-200 px-3">
+      <header
+        class="flex h-13 items-center justify-between border-b border-slate-300 bg-slate-200 px-3"
+      >
         <span class="min-w-0 truncate text-sm font-semibold text-slate-700">
           {{ videoName }}
         </span>
@@ -39,6 +41,19 @@
             @pause="isPlaying = false"
             @play="isPlaying = true"
             @timeupdate="syncVideoTime"
+          />
+          <video
+            v-if="videoSrc"
+            ref="previewVideoRef"
+            :src="videoSrc"
+            class="hidden"
+            muted
+            preload="metadata"
+          />
+          <canvas ref="previewCanvasRef" class="hidden" />
+          <div
+            v-if="isCaptureFlashing"
+            class="pointer-events-none absolute inset-0 z-20 bg-white/80"
           />
           <div
             v-if="videoError"
@@ -83,12 +98,38 @@
             </button>
           </div>
 
-          <div class="absolute left-20 right-64 top-10">
-            <div class="relative mb-3">
+          <div class="absolute left-20 right-10 top-10">
+            <div
+              ref="timelineRef"
+              class="relative mb-3"
+              @pointermove="onTimelinePreviewMove"
+              @pointerleave="hideTimelinePreview"
+            >
+              <div
+                v-if="isTimelinePreviewVisible"
+                class="pointer-events-none absolute -top-36 z-20 w-60 -translate-x-1/2 rounded-lg border border-white/20 bg-black p-1 shadow-xl"
+                :style="{ left: `${timelinePreviewLeft}px` }"
+              >
+                <div class="aspect-video overflow-hidden rounded-md bg-slate-900">
+                  <img
+                    v-if="timelinePreviewSrc"
+                    :src="timelinePreviewSrc"
+                    alt="timeline preview"
+                    class="h-full w-full object-cover"
+                  />
+                  <div v-else class="flex h-full items-center justify-center text-xs text-white/50">
+                    미리보기 준비 중
+                  </div>
+                </div>
+                <div class="px-1 py-1 text-center text-xs font-black text-white">
+                  {{ formatTime(timelinePreviewTime) }}
+                </div>
+              </div>
               <div
                 class="pointer-events-none absolute -top-7 rounded-md bg-neutral px-3 py-1 text-sm font-black text-white"
-                :style="{ left: markerLeft }">
-                {{ formatTime(curTime) }}.<span class="text-[13px] font-normal">{{ String(curFrame).padStart(2, '0') }}f</span>
+                :style="{ left: markerLeft }"
+              >
+                {{ formatTime(curTime) }}
               </div>
               <input
                 v-model.number="seekTime"
@@ -105,10 +146,6 @@
               <span class="font-bold text-info">{{ formatTime(curTime) }}</span>
               <span class="text-slate-400">/</span>
               <span class="font-normal text-slate-700">{{ formatTime(duration) }}</span>
-              <span class="text-bold text-sm">|</span>
-              <span class="inline-flex items-baseline font-bold text-info">{{ curFrame }}f</span>
-              <span class="text-slate-400">/</span>
-              <span class="inline-flex items-baseline font-normal text-slate-600">{{ totalFrame }}f</span>
             </div>
           </div>
 
@@ -125,44 +162,6 @@
               </div>
             </button>
           </div>
-
-          <div class="absolute right-5 top-18 w-52 space-y-2 rounded-md border border-slate-200 bg-info/5 p-3 shadow-sm">
-            <div class="join grid grid-cols-2">
-              <button
-                type="button"
-                class="btn join-item btn-xs"
-                :class="jumpMode === 'time' ? 'btn-neutral' : 'btn-white'"
-                @click="jumpMode = 'time'"
-              >
-                시간
-              </button> 
-              <button
-                type="button"
-                class="btn join-item btn-xs"
-                :class="jumpMode === 'frame' ? 'btn-neutral' : 'btn-white'"
-                @click="jumpMode = 'frame'"
-              >
-                프레임
-              </button>
-            </div>
-            <label class="form-control">
-              <input
-                v-model="jumpValue"
-                type="number"
-                class="input input-sm input-bordered bg-white"
-                :step="jumpMode === 'time' ? 0.1 : 1"
-                :placeholder="jumpMode === 'time' ? '예) 12.5' : '예) 450'"
-                @keydown.enter.prevent="goToInputPosition"
-              />
-            </label>
-            <button
-              type="button"
-              class="btn btn-neutral btn-sm mt-2 w-full"
-              @click="goToInputPosition"
-            >
-              이동
-            </button>
-          </div>
         </div>
       </section>
     </main>
@@ -176,7 +175,7 @@
           <div class="min-w-0">
             <div class="truncate text-xs font-black text-slate-950">프로젝트</div>
             <div class="truncate text-[11px] font-semibold text-slate-400">
-              {{ workspaceInfo?.project_name}}
+              {{ workspaceInfo?.project_name }}
             </div>
           </div>
         </div>
@@ -188,7 +187,7 @@
           <div class="min-w-0">
             <div class="truncate text-xs font-black text-slate-950">워크스페이스</div>
             <div class="truncate text-[11px] font-semibold text-slate-400">
-              {{ workspaceInfo?.name}}
+              {{ workspaceInfo?.name }}
             </div>
           </div>
         </div>
@@ -253,9 +252,15 @@ const router = useRouter()
 const route = useRoute()
 const workspaceId = computed(() => String(route.params.workspaceId ?? ''))
 const videoRef = ref<HTMLVideoElement | null>(null)
+const previewVideoRef = ref<HTMLVideoElement | null>(null)
+const previewCanvasRef = ref<HTMLCanvasElement | null>(null)
+const timelineRef = ref<HTMLDivElement | null>(null)
 const modalCaptureNameRef = ref<ComponentRef<'ModalCaptureName'> | null>(null)
 const modalConfirmRef = ref<ComponentRef<'ModalConfirm'> | null>(null)
 let videoCaptureListener: (() => void) | null = null
+let captureFlashTimer: ReturnType<typeof setTimeout> | null = null
+let timelinePreviewTimer: ReturnType<typeof setTimeout> | null = null
+let timelinePreviewToken = 0
 
 // 화면 상태
 const workspaceInfo = ref<WorkspaceDetail | null>(null)
@@ -271,19 +276,104 @@ const isPlaying = ref(false)
 const curTime = ref(0)
 const seekTime = ref(0)
 const duration = ref(0)
-const frameRate = ref(30)
-const jumpMode = ref<'time' | 'frame'>('time')
-const jumpValue = ref('')
+const isCaptureFlashing = ref(false)
+const isTimelinePreviewVisible = ref(false)
+const timelinePreviewSrc = ref('')
+const timelinePreviewTime = ref(0)
+const timelinePreviewLeft = ref(0)
 
-// 시간/프레임 표시값
-const curFrame = computed(() => Math.round(curTime.value * frameRate.value))
-const totalFrame = computed(() => Math.round(duration.value * frameRate.value))
 const markerLeft = computed(() => {
   if (!duration.value) return '0%'
 
   const ratio = Math.min(Math.max(curTime.value / duration.value, 0), 1)
   return `calc(${ratio * 100}% - 2.5rem)`
 })
+
+const getTimelineTimeByPointer = (
+  event: PointerEvent
+): { time: number; left: number; renderLeft: number } | null => {
+  const timeline = timelineRef.value
+  if (!timeline || !duration.value) return null
+
+  const rect = timeline.getBoundingClientRect()
+  if (rect.width <= 0) return null
+
+  const left = Math.min(Math.max(event.clientX - rect.left, 0), rect.width)
+  const ratio = left / rect.width
+  const time = Math.min(Math.max(duration.value * ratio, 0), duration.value)
+  const renderLeft = Math.min(Math.max(left, 120), Math.max(rect.width - 120, 120))
+
+  return { time, left, renderLeft }
+}
+
+const drawTimelinePreviewFrame = (): void => {
+  const video = previewVideoRef.value
+  const canvas = previewCanvasRef.value
+  if (!video || !canvas || !isTimelinePreviewVisible.value) return
+  if (video.readyState < 2 || video.videoWidth <= 0 || video.videoHeight <= 0) return
+
+  const width = 240
+  const height = Math.max(1, Math.round(width * (video.videoHeight / video.videoWidth)))
+  canvas.width = width
+  canvas.height = height
+
+  const context = canvas.getContext('2d')
+  if (!context) return
+
+  try {
+    context.drawImage(video, 0, 0, width, height)
+    timelinePreviewSrc.value = canvas.toDataURL('image/jpeg', 0.72)
+  } catch (error) {
+    console.error('Failed to render timeline preview:', error)
+  }
+}
+
+const requestTimelinePreviewFrame = (time: number): void => {
+  const video = previewVideoRef.value
+  if (!video) return
+
+  const token = (timelinePreviewToken += 1)
+  const clampedTime = Math.min(Math.max(time, 0), duration.value || time)
+
+  const drawWhenReady = (): void => {
+    if (token !== timelinePreviewToken) return
+    drawTimelinePreviewFrame()
+  }
+
+  if (video.readyState >= 2 && Math.abs(video.currentTime - clampedTime) < 0.05) {
+    drawWhenReady()
+    return
+  }
+
+  video.addEventListener('seeked', drawWhenReady, { once: true })
+  video.currentTime = clampedTime
+}
+
+const onTimelinePreviewMove = (event: PointerEvent): void => {
+  if (!videoSrc.value) return
+
+  const preview = getTimelineTimeByPointer(event)
+  if (!preview) return
+
+  isTimelinePreviewVisible.value = true
+  timelinePreviewTime.value = preview.time
+  timelinePreviewLeft.value = preview.renderLeft
+
+  if (timelinePreviewTimer) return
+
+  timelinePreviewTimer = setTimeout(() => {
+    timelinePreviewTimer = null
+    requestTimelinePreviewFrame(timelinePreviewTime.value)
+  }, 100)
+}
+
+const hideTimelinePreview = (): void => {
+  isTimelinePreviewVisible.value = false
+  if (timelinePreviewTimer) {
+    clearTimeout(timelinePreviewTimer)
+    timelinePreviewTimer = null
+  }
+}
 
 // 워크스페이스 정보를 불러옴
 const loadWorkspaceInfo = async (): Promise<void> => {
@@ -361,7 +451,8 @@ const loadVideoFile = async (filePath: string): Promise<void> => {
   curTime.value = 0
   seekTime.value = 0
   duration.value = 0
-  jumpValue.value = ''
+  hideTimelinePreview()
+  timelinePreviewSrc.value = ''
 
   const result = (await window.api.invoke('ffmpeg:createPreview', {
     videoPath: filePath,
@@ -451,11 +542,6 @@ const seekBySeconds = (deltaSecond: number): void => {
   void seekVideoTo(curTime.value + deltaSecond)
 }
 
-// 현재 위치에서 지정 프레임만큼 이동함
-const seekByFrames = (deltaFrame: number): void => {
-  seekBySeconds(deltaFrame / frameRate.value)
-}
-
 // 재생/일시정지를 전환함
 const togglePlayback = async (): Promise<void> => {
   const video = videoRef.value
@@ -467,17 +553,6 @@ const togglePlayback = async (): Promise<void> => {
   }
 
   video.pause()
-}
-
-// 입력한 초/프레임 위치로 이동함
-const goToInputPosition = (): void => {
-  const inputValue = Number.parseFloat(jumpValue.value)
-  if (!Number.isFinite(inputValue)) return
-
-  const targetSecond = jumpMode.value === 'time' ? inputValue : inputValue / frameRate.value
-
-  seekTime.value = targetSecond
-  void seekVideoTo(targetSecond)
 }
 
 // 비디오 플레이어 단축키를 처리함
@@ -500,13 +575,13 @@ const onVideoShortcut = (event: KeyboardEvent): void => {
 
   if (key === VIDEO_PLAYER_SHORTCUTS.NEXT_FRAME) {
     event.preventDefault()
-    event.ctrlKey ? seekBySeconds(1) : seekByFrames(1)
+    seekBySeconds(1)
     return
   }
 
   if (key === VIDEO_PLAYER_SHORTCUTS.PREV_FRAME) {
     event.preventDefault()
-    event.ctrlKey ? seekBySeconds(-1) : seekByFrames(-1)
+    seekBySeconds(-1)
   }
 }
 
@@ -520,6 +595,19 @@ const captureCurrentScene = async (): Promise<void> => {
 const onVideoCaptureShortcut = (): void => {
   if (!videoSrc.value) return
   void captureCurrentScene()
+}
+
+// 캡쳐 완료 피드백을 짧게 표시함
+const showCaptureFlash = (): void => {
+  if (captureFlashTimer) {
+    clearTimeout(captureFlashTimer)
+  }
+
+  isCaptureFlashing.value = true
+  captureFlashTimer = setTimeout(() => {
+    isCaptureFlashing.value = false
+    captureFlashTimer = null
+  }, 120)
 }
 
 // 캡쳐 이름 수정 모달을 엶
@@ -600,14 +688,11 @@ const saveFrame = async (): Promise<void> => {
     src: result.dataUrl,
     imgPath: saved.imgPath
   })
+  showCaptureFlash()
 }
 
 // 현재 시점 기준 캡쳐 이름을 만듦
-const makeName = (): string => {
-  const sourceName = videoName.value.replace(/\.[^/.]+$/, '') || '동영상'
-
-  return `${sourceName} ${formatTime(curTime.value)}`
-}
+const makeName = (): string => formatTime(curTime.value)
 
 // 웹 캡쳐 시작 URL이 깨지지 않도록 기존 http URL만 보존함
 const keepUrl = (): string => {
@@ -616,15 +701,16 @@ const keepUrl = (): string => {
   return /^https?:\/\//i.test(latestUrl) ? latestUrl : ''
 }
 
-// 초를 MM:SS로 표시함
+// 초를 HH:MM:SS로 표시함
 const formatTime = (seconds: number): string => {
-  if (!Number.isFinite(seconds)) return '00:00'
+  if (!Number.isFinite(seconds)) return '00:00:00'
 
   const totalSeconds = Math.max(0, Math.floor(seconds))
-  const minutes = Math.floor(totalSeconds / 60)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
   const restSeconds = totalSeconds % 60
 
-  return `${String(minutes).padStart(2, '0')}:${String(restSeconds).padStart(2, '0')}`
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(restSeconds).padStart(2, '0')}`
 }
 
 // appimg 프로토콜 URL로 변환함
@@ -654,6 +740,11 @@ onUnmounted(() => {
   window.removeEventListener('keydown', onVideoShortcut)
   videoCaptureListener?.()
   videoCaptureListener = null
+  if (captureFlashTimer) {
+    clearTimeout(captureFlashTimer)
+    captureFlashTimer = null
+  }
+  hideTimelinePreview()
   window.api.invoke('shortcut:unregister', CAPTURE_SHORTCUTS.VIDEO_CAPTURE)
   if (videoSrc.value.startsWith('blob:')) URL.revokeObjectURL(videoSrc.value)
 })

@@ -1,5 +1,20 @@
 <template>
   <ModalBase ref="modalRef" title="문서 미리보기" width="max-w-[920px] w-[920px]">
+    <template #header>
+      <div class="flex items-center justify-between gap-4">
+        <h3 class="text-lg font-bold">문서 미리보기</h3>
+        <button
+          type="button"
+          class="btn btn-primary btn-sm gap-1.5"
+          :disabled="!currentDoc"
+          @click="goDocumentEdit"
+        >
+          <i-lucide-pencil class="h-4 w-4" />
+          문서 편집 바로가기
+        </button>
+      </div>
+    </template>
+
     <div class="max-h-[78vh] overflow-y-auto bg-base-200 p-5">
       <article
         class="mx-auto flex min-h-[920px] w-[720px] flex-col bg-white px-7 py-6 text-[#1f3554] shadow-sm"
@@ -71,8 +86,10 @@
                     {{ item.number }}
                   </span>
                 </td>
-                <td class="border border-slate-300 px-3 py-3 text-center align-top">
-                  <p class="leading-5 text-slate-600">{{ item.description }}</p>
+                <td class="break-all border border-slate-300 px-3 py-3 text-center align-top">
+                  <p class="whitespace-normal break-all leading-5 text-slate-600">
+                    {{ item.description }}
+                  </p>
                 </td>
               </tr>
             </tbody>
@@ -82,18 +99,13 @@
         <footer class="mt-auto pt-7"></footer>
       </article>
     </div>
-
-    <template #footer="{ close }">
-      <div class="-mx-6 flex w-[calc(100%+3rem)] justify-end border-t border-slate-300 px-6 pt-4">
-        <button type="button" class="btn btn-sm" @click="close">닫기</button>
-      </div>
-    </template>
   </ModalBase>
 </template>
 
 <script setup lang="ts">
 import { getDocList, getWorkspaces } from '@/database'
 import type { Doc, SectionDocInput, Workspace } from '@database/dto'
+import { useRoute, useRouter } from 'vue-router'
 
 interface FunctionDescription {
   number: number
@@ -104,6 +116,8 @@ const modalRef = ref<ComponentRef<'ModalBase'> | null>(null)
 const currentDoc = ref<Doc | null>(null)
 const currentWorkspace = ref<Workspace | null>(null)
 const parentWorkspaceName = ref('')
+const route = useRoute()
+const router = useRouter()
 
 const getOriginalDocId = (docId: string): number => Number(docId.split('-copy-')[0])
 
@@ -182,6 +196,25 @@ const imageSrc = computed(() => {
 
 const functionItems = computed(() => parseContentItems(currentDoc.value?.content_json ?? '[]'))
 const numberColor = computed(() => getNumberColor(currentDoc.value?.annotation_json ?? '[]'))
+
+const goDocumentEdit = (): void => {
+  const doc = currentDoc.value
+  if (!doc) return
+
+  modalRef.value?.onClose()
+  void router.push({
+    name: 'docs-index',
+    params: {
+      id: String(doc.workspace_id),
+      docId: String(doc.id)
+    },
+    query: {
+      from: 'deliverable-structure',
+      projectId: String(route.params.id),
+      deliverableId: String(route.params.deliverableId)
+    }
+  })
+}
 
 const onOpen = async (item: SectionDocInput, workspaceName = ''): Promise<void> => {
   currentDoc.value = null

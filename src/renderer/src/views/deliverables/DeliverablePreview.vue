@@ -5,13 +5,60 @@
       class="flex h-16 shrink-0 items-center gap-3 border-b border-base-300 bg-base-100 px-6"
     >
       <button type="button" class="btn btn-ghost btn-sm btn-square" @click="goProject">
-        <i-lucide-arrow-left class="h-4 w-4" />
+        <i-lucide-x class="h-4 w-4" />
       </button>
-      <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-        <i-lucide-file-text class="h-4 w-4" />
+      <div
+        class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
+      >
+        <i-lucide-folder-kanban class="h-5 w-5" />
       </div>
-      <div class="min-w-0">
-        <div class="truncate text-sm font-bold">산출물 미리보기</div>
+      <div class="min-w-0 flex-1">
+        <div class="truncate text-sm font-bold text-base-content/80">{{ deliverableTitle }}</div>
+      </div>
+      <div class="flex shrink-0 items-center gap-2">
+        <div class="dropdown dropdown-end">
+          <button
+            type="button"
+            tabindex="0"
+            class="tooltip tooltip-left btn btn-ghost btn-sm btn-square text-primary hover:bg-primary/10"
+            data-tip="내보내기"
+          >
+            <i-lucide-download class="h-4 w-4" />
+          </button>
+          <ul
+            tabindex="0"
+            class="dropdown-content menu z-[9999] w-44 rounded-xl border border-base-content/10 bg-base-100 p-1.5 shadow-xl"
+          >
+            <li>
+              <button
+                type="button"
+                class="rounded-lg text-sm"
+                @click="downloadSelectedFormat('html')"
+              >
+                <i-lucide-file-archive class="h-4 w-4 opacity-60" />
+                HTML 내보내기
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                class="rounded-lg text-sm"
+                @click="downloadSelectedFormat('pdf')"
+              >
+                <i-lucide-file-down class="h-4 w-4 opacity-60" />
+                PDF 내보내기
+              </button>
+            </li>
+          </ul>
+        </div>
+        <button
+          type="button"
+          class="tooltip tooltip-left btn btn-ghost btn-sm btn-square"
+          data-tip="전체화면"
+          @click="toggleFullscreenPreview"
+        >
+          <i-lucide-expand class="h-4 w-4" />
+        </button>
       </div>
     </div>
 
@@ -20,7 +67,7 @@
         class="relative flex shrink-0 flex-col border-r border-base-300 bg-base-100"
         :style="{ width: `${sidebarWidth}px` }"
       >
-        <div class="border-b border-base-300 px-5 py-4">
+        <div v-if="isFullscreenPreview" class="border-b border-base-300 px-5 py-4">
           <div class="flex items-center gap-2">
             <div
               class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary"
@@ -31,13 +78,6 @@
               <div class="truncate text-sm font-bold">{{ deliverableTitle }}</div>
             </div>
           </div>
-        </div>
-
-        <div v-if="!isFullscreenPreview" class="border-b border-base-300 p-4">
-          <button type="button" class="btn btn-primary btn-sm w-full gap-1.5" @click="goStructure">
-            <i-lucide-settings class="h-4 w-4" />
-            산출물 구조 편집
-          </button>
         </div>
 
         <div class="min-h-0 flex-1 overflow-y-auto px-3 py-4">
@@ -89,30 +129,6 @@
       </aside>
 
       <main class="flex min-w-0 flex-1 flex-col">
-        <header
-          v-if="!isFullscreenPreview"
-          class="flex h-14 shrink-0 items-center justify-between border-b border-base-300 bg-base-100 px-6"
-        >
-          <div class="ml-auto flex shrink-0 items-center gap-2">
-            <button type="button" class="btn btn-outline btn-sm gap-1.5" @click="downloadHtmlZip">
-              <i-lucide-file-archive class="h-4 w-4" />
-              HTML 다운로드
-            </button>
-            <button type="button" class="btn btn-outline btn-sm gap-1.5" @click="downloadPdf">
-              <i-lucide-file-down class="h-4 w-4" />
-              PDF 다운로드
-            </button>
-            <button
-              type="button"
-              class="btn btn-neutral btn-sm gap-1.5"
-              @click="toggleFullscreenPreview"
-            >
-              <i-lucide-expand class="h-4 w-4" />
-              전체화면
-            </button>
-          </div>
-        </header>
-
         <div
           ref="previewScrollerRef"
           class="min-h-0 flex-1 overflow-y-auto bg-base-200 p-8"
@@ -215,8 +231,10 @@
                         {{ item.number }}
                       </span>
                     </td>
-                    <td class="border border-slate-300 px-3 py-3 text-center align-top">
-                      <p class="leading-5 text-slate-600">{{ item.description }}</p>
+                    <td class="break-all border border-slate-300 px-3 py-3 text-center align-top">
+                      <p class="whitespace-normal break-all leading-5 text-slate-600">
+                        {{ item.description }}
+                      </p>
                     </td>
                   </tr>
                 </tbody>
@@ -236,7 +254,19 @@
       </main>
     </div>
 
-    <ModalAlert ref="modalAlertRef" />
+    <ModalBase ref="downloadCompleteModalRef" width="w-80">
+      <div class="py-3 text-center text-sm font-semibold">{{ downloadCompleteMessage }}</div>
+      <template #footer="{ close }">
+        <button class="btn btn-smgap-1.5" @click="openSavedDownloadFolder">
+          <i-lucide-folder-open class="h-4 w-4" />
+          폴더 열기
+        </button>
+        <button class="btn btn-sm" @click="close">
+          <i-lucide-check class="h-4 w-4" />
+          확인
+        </button>
+      </template>
+    </ModalBase>
   </div>
 </template>
 
@@ -277,6 +307,8 @@ interface PreviewSection extends Omit<SectionTreeInput, 'docs' | 'children'> {
   children: PreviewSection[]
 }
 
+type DownloadFormat = 'html' | 'pdf'
+
 interface PreviewEntry {
   item: PreviewDoc
   phase: string
@@ -300,13 +332,15 @@ type PreviewOutlineRow =
 const route = useRoute()
 const router = useRouter()
 const previewScrollerRef = ref<HTMLElement | null>(null)
-const modalAlertRef = ref<ComponentRef<'ModalAlert'> | null>(null)
+const downloadCompleteModalRef = ref<ComponentRef<'ModalBase'> | null>(null)
 const deliverable = ref<Deliverable | null>(null)
 const project = ref<Project | null>(null)
 const categories = ref<PreviewSection[]>([])
 const selectedItemId = ref('')
 const openedCategoryIds = ref(new Set<string>())
 const isFullscreenPreview = ref(false)
+const downloadCompleteMessage = ref('')
+const savedDownloadPath = ref('')
 
 const sidebarWidth = ref(288)
 const sidebarResizeMinWidth = 240
@@ -602,7 +636,30 @@ const toggleFullscreenPreview = (): void => {
   isFullscreenPreview.value = !isFullscreenPreview.value
 }
 
-// HTML ZIP 다운로드
+const downloadSelectedFormat = (format: DownloadFormat): void => {
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+  if (format === 'html') {
+    void downloadHtmlZip()
+    return
+  }
+
+  void downloadPdf()
+}
+
+const showDownloadComplete = (message: string, filePath: string): void => {
+  downloadCompleteMessage.value = message
+  savedDownloadPath.value = filePath
+  downloadCompleteModalRef.value?.onOpen()
+}
+
+const openSavedDownloadFolder = (): void => {
+  if (!savedDownloadPath.value) return
+
+  void window.api.invoke('shell:showItemInFolder', savedDownloadPath.value)
+  downloadCompleteModalRef.value?.onClose()
+}
+
+// HTML ZIP 내보내기
 const downloadHtmlZip = async (): Promise<void> => {
   const data = await buildManualExport(Number(route.params.deliverableId), { includeImages: true })
   if (!data) return
@@ -624,12 +681,12 @@ const downloadHtmlZip = async (): Promise<void> => {
     files
   })) as ExportResult
 
-  if (!result.canceled) {
-    modalAlertRef.value?.onOpen(`HTML 파일을 저장했습니다.\n${result.filePath}`)
+  if (!result.canceled && result.filePath) {
+    showDownloadComplete('산출물 내보내기가 완료되었습니다.', result.filePath)
   }
 }
 
-// PDF 다운로드
+// PDF 내보내기
 const downloadPdf = async (): Promise<void> => {
   const data = await buildManualExport(Number(route.params.deliverableId))
   if (!data) return
@@ -640,8 +697,8 @@ const downloadPdf = async (): Promise<void> => {
     html
   })) as ExportResult
 
-  if (!result.canceled) {
-    modalAlertRef.value?.onOpen(`PDF 파일을 저장했습니다.\n${result.filePath}`)
+  if (!result.canceled && result.filePath) {
+    showDownloadComplete('산출물 내보내기가 완료되었습니다.', result.filePath)
   }
 }
 
@@ -662,17 +719,6 @@ const goProject = (): void => {
     name: 'projects-index',
     params: { id: String(route.params.id) },
     query: { tab: 'deliverables' }
-  })
-}
-
-// 구조 편집 화면 이동
-const goStructure = (): void => {
-  void router.push({
-    name: 'deliverable-structure',
-    params: {
-      id: String(route.params.id),
-      deliverableId: String(route.params.deliverableId)
-    }
   })
 }
 

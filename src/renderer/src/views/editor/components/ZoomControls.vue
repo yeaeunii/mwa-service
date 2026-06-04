@@ -15,6 +15,14 @@
       <span class="w-10 text-right text-xs tabular-nums text-base-content/60">
         {{ zoomLabel }}
       </span>
+      <button
+        type="button"
+        class="tooltip tooltip-left tooltip-neutral btn btn-ghost btn-xs btn-square z-50 text-base-content/55 hover:text-primary"
+        data-tip="배율 초기화"
+        @click="emit('resetZoom')"
+      >
+        <i-lucide-scan class="h-3.5 w-3.5" />
+      </button>
     </div>
     <div class="h-4 w-px bg-base-content/10"></div>
   </div>

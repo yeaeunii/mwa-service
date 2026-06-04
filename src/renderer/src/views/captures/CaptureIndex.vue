@@ -74,7 +74,7 @@
           <div class="min-w-0">
             <div class="truncate text-xs font-black text-slate-950">프로젝트</div>
             <div class="truncate text-[11px] font-semibold text-slate-400">
-              {{ workspaceInfo?.project_name}}
+              {{ workspaceInfo?.project_name }}
             </div>
           </div>
         </div>
@@ -86,7 +86,7 @@
           <div class="min-w-0">
             <div class="truncate text-xs font-black text-slate-950">워크스페이스</div>
             <div class="truncate text-[11px] font-semibold text-slate-400">
-              {{ workspaceInfo?.name}}
+              {{ workspaceInfo?.name }}
             </div>
           </div>
         </div>
@@ -121,7 +121,7 @@
         </div>
       </div>
     </div>
-    <ModalCaptureName ref="modalCaptureNameRef" @onConfirm="onCaptureNameConfirm" />
+    <ModalCaptureName ref="modalCaptureNameRef" @on-confirm="onCaptureNameConfirm" />
     <ModalConfirm ref="modalConfirmRef" @on-confirm="onConfirmDeleteCapture">
       <template #message>
         <div class="text-center">

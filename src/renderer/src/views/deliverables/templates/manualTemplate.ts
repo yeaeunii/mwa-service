@@ -234,13 +234,13 @@ h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 1
 .screen-box img { max-width: 100%; max-height: 390px; object-fit: contain; }
 .empty-screen { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 250px; background: #f8fafc; color: #94a3b8; font-size: 14px; }
 .border-heading { border-bottom: 1px solid #e2e8f0; padding-bottom: 8px; }
-.function-table { width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; font-size: 12px; }
+.function-table { width: 100%; table-layout: fixed; border-collapse: collapse; border: 1px solid #cbd5e1; font-size: 12px; }
 .function-table th { border: 1px solid #cbd5e1; background: #eef2f7; color: #1f3554; padding: 8px 12px; text-align: center; }
 .function-table th:first-child { width: 64px; text-align: center; }
-.function-table td { border: 1px solid #cbd5e1; padding: 12px; text-align: center; vertical-align: top; }
+.function-table td { border: 1px solid #cbd5e1; padding: 12px; text-align: center; vertical-align: top; overflow-wrap: anywhere; word-break: break-all; white-space: normal; }
 .function-table td:first-child { text-align: center; }
 .function-table span { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 999px; color: #fff; font-size: 11px; font-weight: 700; }
-.function-table p { margin: 0; line-height: 1.6; color: #475569; text-align: center; }
+.function-table p { margin: 0; line-height: 1.6; color: #475569; text-align: center; overflow-wrap: anywhere; word-break: break-all; white-space: normal; }
 .manual-page-footer { display: flex; align-items: flex-end; justify-content: space-between; margin-top: auto; border-top: 1px solid #e2e8f0; padding-top: 28px; font-size: 11px; color: #1f3554; }
 .manual-footer-title { display: flex; align-items: center; gap: 6px; }
 @media print {

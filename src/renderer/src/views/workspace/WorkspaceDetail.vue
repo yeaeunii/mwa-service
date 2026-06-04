@@ -64,9 +64,11 @@
       </div>
     </header>
 
-    <div class="flex min-h-0 flex-1 gap-5 overflow-hidden bg-base-200 px-3 pt-4 text-[#111827]">
+    <div
+      class="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden bg-base-200 px-3 pb-4 pt-4 text-[#111827] xl:flex-row"
+    >
       <aside
-        class="flex w-[20%] shrink-0 flex-col overflow-hidden rounded-xl border border-base-300 bg-base-100/70 shadow-sm"
+        class="flex h-[min(42vh,32rem)] w-full shrink-0 flex-col overflow-hidden rounded-xl border border-base-300 bg-base-100/70 shadow-sm xl:h-auto xl:w-[clamp(19rem,24vw,24rem)]"
       >
         <div class="flex h-15 items-center justify-between border-b border-[#ece8eb] px-7">
           <div class="flex min-w-0 items-center gap-2">
@@ -77,22 +79,24 @@
               {{ screenshots.length }}
             </span>
           </div>
-          <div class="dropdown dropdown-end">
+          <div
+            class="dropdown dropdown-bottom dropdown-end flex h-8 w-8 items-center justify-center"
+          >
             <button
               type="button"
               tabindex="0"
-              class="tooltip tooltip-bottom flex h-8 w-8 items-center justify-center rounded-md bg-base text-white shadow-sm transition hover:bg-white"
-              data-tip="캡쳐 메뉴"
+              role="button"
+              class="tooltip tooltip-bottom flex h-8 w-8 items-center justify-center bg-transparent text-black shadow-none transition-colors hover:bg-transparent hover:text-primary"
             >
               <i-lucide-list class="h-4 w-4 text-black" />
             </button>
             <ul
               tabindex="0"
-              class="menu dropdown-content z-30 mt-2 w-44 rounded-lg border border-base-300 bg-base-100 p-1 shadow-xl"
+              class="dropdown-content menu z-30 mt-1 w-44 rounded-lg border border-base-300 bg-base-100 p-1 shadow-xl"
             >
               <li>
                 <button type="button" class="gap-2 text-xs font-semibold" @click="openPicker">
-                  <i-lucide-image-plus class="h-4 w-4" />
+                  <i-lucide-dot class="h-4 w-4 shrink-0" />
                   이미지 불러오기
                 </button>
               </li>
@@ -101,7 +105,7 @@
                   :to="{ name: 'capture-index', params: { workspaceId } }"
                   class="gap-2 text-xs font-semibold"
                 >
-                  <i-lucide-camera class="h-4 w-4" />
+                  <i-lucide-dot class="h-4 w-4 shrink-0" />
                   웹 화면 캡쳐
                 </router-link>
               </li>
@@ -110,7 +114,7 @@
                   :to="{ name: 'video-capture-index', params: { workspaceId } }"
                   class="gap-2 text-xs font-semibold"
                 >
-                  <i-lucide-video class="h-4 w-4" />
+                  <i-lucide-dot class="h-4 w-4 shrink-0" />
                   동영상 캡쳐
                 </router-link>
               </li>
@@ -127,7 +131,9 @@
         </div>
 
         <div class="flex min-h-0 flex-1 flex-col px-5 py-3">
-          <label class="input input-sm mx-auto h-8 w-[288px] rounded-md bg-white shadow-sm">
+          <label
+            class="input input-sm mx-auto h-8 w-full max-w-[288px] rounded-md bg-white shadow-sm"
+          >
             <i-lucide-search class="h-3.5 w-3.5 text-slate-500" />
             <input v-model="shotQuery" type="search" placeholder="스크린샷 검색..." />
           </label>
@@ -137,7 +143,9 @@
             class="relative mt-3 min-h-0 flex-1 overflow-y-auto select-none"
             @mousedown="onMouseDown"
           >
-            <div class="grid grid-cols-[repeat(2,140px)] justify-center gap-x-2 gap-y-3">
+            <div
+              class="grid grid-cols-[repeat(auto-fit,minmax(120px,140px))] justify-start gap-x-2 gap-y-3"
+            >
               <div
                 v-for="shot in shotList"
                 :key="shot.id"
@@ -230,7 +238,7 @@
           </span>
         </div>
 
-        <div class="pb-6 pt-3">
+        <div class="pb-3 pt-3">
           <div
             class="flex flex-wrap items-start justify-between gap-4 border-b border-base-content/10 pb-3"
           >
@@ -282,14 +290,20 @@
               </button>
             </div>
 
-            <label class="input input-sm h-8 w-72 rounded-md border-[#d8d7dd] bg-white shadow-sm">
+            <label
+              class="input input-sm h-8 w-full max-w-72 rounded-md border-[#d8d7dd] bg-white shadow-sm sm:w-72"
+            >
               <i-lucide-search class="h-3.5 w-3.5 text-slate-500" />
               <input v-model="docQuery" type="search" placeholder="문서 검색..." />
             </label>
           </div>
         </div>
 
-        <div v-if="isEditMode" class="flex items-center justify-end pb-3">
+        <div v-if="isEditMode" class="flex items-center justify-between gap-3 pb-3">
+          <p class="text-sm font-medium text-base-content/45">
+            여러 문서를 선택해 원하는 워크스페이스로 복사 및 이동하거나, 드래그하여 순서를 바꿀 수
+            있습니다. 관리할 문서를 자유롭게 편집해 보세요.
+          </p>
           <button
             type="button"
             class="btn btn-sm h-8 min-h-0 rounded-md border-[#d8d7dd] bg-white"
@@ -303,7 +317,7 @@
           <div
             v-show="docList.length > 0"
             ref="docGridRef"
-            class="grid grid-cols-[repeat(auto-fill,280px)] justify-start gap-3"
+            class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
           >
             <component
               :is="isEditMode ? 'div' : 'router-link'"
@@ -839,6 +853,7 @@ interface Document {
   status: string
   updatedAt: string
   updatedTime: number
+  createdTime: number
   functionCount: number
   sortOrder: number
 }
@@ -959,6 +974,7 @@ const loadDocs = async (): Promise<void> => {
       status: doc.status,
       updatedAt: fmtDocDate(doc.updated_at),
       updatedTime: docTime(doc.updated_at),
+      createdTime: docTime(doc.created_at),
       functionCount: countFuncs(doc.content_json),
       sortOrder: doc.sort_order
     }
@@ -1145,9 +1161,11 @@ const createDocsFromShots = async (droppedIds: number[]): Promise<void> => {
   const now = new Date()
   const dateStr = `${pad(now.getMonth() + 1)}.${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`
 
+  const createdDocs: Document[] = []
+
   for (const [index, shot] of droppedShots.entries()) {
     const description = `${shot.name}에 대한 화면 설명입니다.`
-    const sortOrder = documents.value.length + index + 1
+    const sortOrder = index + 1
     const createdDoc = await createDoc({
       workspaceId: Number(workspaceId.value),
       title: shot.name,
@@ -1166,7 +1184,7 @@ const createDocsFromShots = async (droppedIds: number[]): Promise<void> => {
 
     if (createdDoc === null) continue
 
-    documents.value.push({
+    createdDocs.push({
       id: createdDoc.id,
       title: shot.name,
       description,
@@ -1174,9 +1192,15 @@ const createDocsFromShots = async (droppedIds: number[]): Promise<void> => {
       status: '작업대기',
       updatedAt: dateStr,
       updatedTime: now.getTime(),
+      createdTime: now.getTime(),
       functionCount: 0,
       sortOrder
     })
+  }
+
+  if (createdDocs.length > 0) {
+    documents.value = [...createdDocs, ...documents.value]
+    await saveDocOrder()
   }
 
   selectedIds.value = new Set()

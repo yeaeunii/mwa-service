@@ -1,12 +1,27 @@
 <template>
-  <div class="flex items-center justify-center" :style="thumbnailStyle">
-    <span class="text-sm font-black uppercase tracking-[0.18em]"> thumbnail </span>
+  <div class="flex items-center justify-center px-5" :style="thumbnailStyle">
+    <div class="max-w-[86%] text-center">
+      <div
+        class="break-words font-black"
+        :class="label ? 'text-xl leading-tight' : 'text-sm uppercase tracking-[0.18em]'"
+      >
+        {{ label || 'thumbnail' }}
+      </div>
+      <p
+        v-if="description"
+        class="mt-2 line-clamp-2 text-xs font-semibold leading-relaxed opacity-75"
+      >
+        {{ description }}
+      </p>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 const props = defineProps<{
   id: number
+  label?: string
+  description?: string
 }>()
 
 const getHexColorById = (id: number): string => {

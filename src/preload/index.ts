@@ -12,6 +12,7 @@ const INVOKE_CHANNELS = [
   'ffmpeg:createPreview',
   'ffmpeg:extractFrame',
   'export:project',
+  'import:project',
   'export:manualHtmlZip',
   'export:manualPdf',
   'dao:call',

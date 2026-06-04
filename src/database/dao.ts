@@ -59,6 +59,52 @@ const deleteStoredFiles = (filePaths: Array<string | null | undefined>): void =>
   Array.from(new Set(filePaths.filter(Boolean))).forEach((filePath) => deleteStoredFile(filePath))
 }
 
+const getString = (row: Record<string, unknown>, key: string, fallback = ''): string => {
+  const value = row[key]
+  return typeof value === 'string' ? value : fallback
+}
+
+const getDateString = (row: Record<string, unknown>, key: string): string => getString(row, key)
+
+const getNumber = (row: Record<string, unknown>, key: string): number => Number(row[key] ?? 0)
+
+const getNullableMappedId = (map: Map<number, number>, oldId: unknown): number | null => {
+  if (oldId === null || oldId === undefined || oldId === '') return null
+  return map.get(Number(oldId)) ?? null
+}
+
+const getStoredFileExtension = (filePath: string, fallback = '.png'): string => {
+  const extension = path.extname(filePath)
+  return extension || fallback
+}
+
+const createImportedFilePath = (
+  dir: 'Thumbnails' | 'CAPTURES' | 'DOCS' | 'VIDEO',
+  fileName: string
+): string => path.join('FILE', dir, fileName).replace(/\\/g, '/')
+
+const writeImportedAsset = (
+  assets: Record<string, Buffer>,
+  oldPath: unknown,
+  newPath: string,
+  writtenFiles: string[]
+): string => {
+  if (typeof oldPath !== 'string' || !oldPath) return ''
+
+  const normalizedOldPath = oldPath.replace(/\\/g, '/').replace(/^\/+/, '')
+  const asset = assets[normalizedOldPath]
+  if (!asset) return ''
+
+  const absPath = resolveStoredFilePath(newPath)
+  if (!absPath) return ''
+
+  mkdirSync(path.dirname(absPath), { recursive: true })
+  writeFileSync(absPath, asset)
+  writtenFiles.push(newPath)
+
+  return newPath
+}
+
 const touchProject = (db: Database, projectId: string | number, updatedAt: string): void => {
   db.prepare(
     `
@@ -223,6 +269,394 @@ export const getProjectExportData = (id: string | number): ProjectExportData | n
       section_docs: sectionDocs
     }
   })
+}
+
+export const importProjectExportData = (
+  data: ProjectExportData,
+  assets: Record<string, Buffer>
+): number => {
+  const writtenFiles: string[] = []
+
+  try {
+    return transaction((db) => {
+      const projectIdMap = new Map<number, number>()
+      const workspaceIdMap = new Map<number, number>()
+      const captureIdMap = new Map<number, number>()
+      const docIdMap = new Map<number, number>()
+      const deliverableIdMap = new Map<number, number>()
+      const sectionIdMap = new Map<number, number>()
+
+      const project = data.project
+      const oldProjectId = getNumber(project, 'id')
+      const projectResult = db
+        .prepare(
+          `
+            INSERT INTO t_project (
+              name,
+              description,
+              serv_url,
+              status,
+              thumbnail_path,
+              delete_yn,
+              created_at,
+              updated_at
+            )
+            VALUES (
+              @name,
+              @description,
+              @serv_url,
+              @status,
+              @thumbnail_path,
+              @delete_yn,
+              @created_at,
+              @updated_at
+            )
+          `
+        )
+        .run({
+          name: getString(project, 'name', '불러온 프로젝트'),
+          description: getString(project, 'description'),
+          serv_url: getString(project, 'serv_url'),
+          status: getString(project, 'status', '진행중'),
+          thumbnail_path: '',
+          delete_yn: getString(project, 'delete_yn', '0'),
+          created_at: getDateString(project, 'created_at'),
+          updated_at: getDateString(project, 'updated_at')
+        })
+      const newProjectId = Number(projectResult.lastInsertRowid)
+      if (oldProjectId) projectIdMap.set(oldProjectId, newProjectId)
+
+      const projectThumbnailPath = writeImportedAsset(
+        assets,
+        project.thumbnail_path,
+        createImportedFilePath(
+          'Thumbnails',
+          `thumbnail_project_${makeHash()}_${newProjectId}${getStoredFileExtension(
+            getString(project, 'thumbnail_path')
+          )}`
+        ),
+        writtenFiles
+      )
+      if (projectThumbnailPath) {
+        db.prepare(
+          `
+            UPDATE t_project
+            SET thumbnail_path = @thumbnailPath
+            WHERE id = @id
+          `
+        ).run({ id: newProjectId, thumbnailPath: projectThumbnailPath })
+      }
+
+      const insertWorkspace = db.prepare(
+        `
+          INSERT INTO t_workspace (
+            project_id,
+            name,
+            latest_src_url,
+            video_path,
+            video_origin_name,
+            thumbnail_path,
+            created_at,
+            updated_at
+          )
+          VALUES (
+            @project_id,
+            @name,
+            @latest_src_url,
+            @video_path,
+            @video_origin_name,
+            @thumbnail_path,
+            @created_at,
+            @updated_at
+          )
+        `
+      )
+
+      data.workspaces.forEach((workspace) => {
+        const oldWorkspaceId = getNumber(workspace, 'id')
+        const workspaceResult = insertWorkspace.run({
+          project_id: newProjectId,
+          name: getString(workspace, 'name'),
+          latest_src_url: getString(workspace, 'latest_src_url'),
+          video_path: '',
+          video_origin_name: getString(workspace, 'video_origin_name'),
+          thumbnail_path: '',
+          created_at: getDateString(workspace, 'created_at'),
+          updated_at: getDateString(workspace, 'updated_at')
+        })
+        const newWorkspaceId = Number(workspaceResult.lastInsertRowid)
+        if (oldWorkspaceId) workspaceIdMap.set(oldWorkspaceId, newWorkspaceId)
+
+        const thumbnailPath = writeImportedAsset(
+          assets,
+          workspace.thumbnail_path,
+          createImportedFilePath(
+            'Thumbnails',
+            `thumbnail_workspace_${makeHash()}_${newWorkspaceId}${getStoredFileExtension(
+              getString(workspace, 'thumbnail_path')
+            )}`
+          ),
+          writtenFiles
+        )
+        const videoPath = writeImportedAsset(
+          assets,
+          workspace.video_path,
+          createImportedFilePath(
+            'VIDEO',
+            `video_${makeHash()}_${newWorkspaceId}${getStoredFileExtension(
+              getString(workspace, 'video_path'),
+              '.mp4'
+            )}`
+          ),
+          writtenFiles
+        )
+
+        if (thumbnailPath || videoPath) {
+          db.prepare(
+            `
+              UPDATE t_workspace
+              SET thumbnail_path = @thumbnailPath,
+                  video_path = @videoPath
+              WHERE id = @id
+            `
+          ).run({
+            id: newWorkspaceId,
+            thumbnailPath,
+            videoPath
+          })
+        }
+      })
+
+      const insertCapture = db.prepare(
+        `
+          INSERT INTO t_capture (workspace_id, name, img_path, source_type, created_at)
+          VALUES (@workspace_id, @name, @img_path, @source_type, @created_at)
+        `
+      )
+      data.captures.forEach((capture) => {
+        const newWorkspaceId = workspaceIdMap.get(getNumber(capture, 'workspace_id'))
+        if (!newWorkspaceId) return
+
+        const captureResult = insertCapture.run({
+          workspace_id: newWorkspaceId,
+          name: getString(capture, 'name'),
+          img_path: '',
+          source_type: getString(capture, 'source_type', 'web'),
+          created_at: getDateString(capture, 'created_at')
+        })
+        const newCaptureId = Number(captureResult.lastInsertRowid)
+        const oldCaptureId = getNumber(capture, 'id')
+        if (oldCaptureId) captureIdMap.set(oldCaptureId, newCaptureId)
+
+        const imgPath = writeImportedAsset(
+          assets,
+          capture.img_path,
+          createImportedFilePath(
+            'CAPTURES',
+            `captures_${makeHash()}_${newCaptureId}${getStoredFileExtension(
+              getString(capture, 'img_path')
+            )}`
+          ),
+          writtenFiles
+        )
+        if (imgPath) {
+          db.prepare(
+            `
+              UPDATE t_capture
+              SET img_path = @imgPath
+              WHERE id = @id
+            `
+          ).run({ id: newCaptureId, imgPath })
+        }
+      })
+
+      const insertDoc = db.prepare(
+        `
+          INSERT INTO t_doc (
+            workspace_id,
+            section_id,
+            title,
+            description,
+            status,
+            doc_meta_json,
+            content_json,
+            annotation_json,
+            orgn_img_path,
+            draw_img_path,
+            sort_order,
+            created_at,
+            updated_at
+          )
+          VALUES (
+            @workspace_id,
+            @section_id,
+            @title,
+            @description,
+            @status,
+            @doc_meta_json,
+            @content_json,
+            @annotation_json,
+            @orgn_img_path,
+            @draw_img_path,
+            @sort_order,
+            @created_at,
+            @updated_at
+          )
+        `
+      )
+      data.docs.forEach((doc) => {
+        const newWorkspaceId = workspaceIdMap.get(getNumber(doc, 'workspace_id'))
+        if (!newWorkspaceId) return
+
+        const docResult = insertDoc.run({
+          workspace_id: newWorkspaceId,
+          section_id: null,
+          title: getString(doc, 'title'),
+          description: getString(doc, 'description'),
+          status: getString(doc, 'status'),
+          doc_meta_json: getString(doc, 'doc_meta_json'),
+          content_json: getString(doc, 'content_json'),
+          annotation_json: getString(doc, 'annotation_json'),
+          orgn_img_path: '',
+          draw_img_path: '',
+          sort_order: getNumber(doc, 'sort_order'),
+          created_at: getDateString(doc, 'created_at'),
+          updated_at: getDateString(doc, 'updated_at')
+        })
+        const newDocId = Number(docResult.lastInsertRowid)
+        const oldDocId = getNumber(doc, 'id')
+        if (oldDocId) docIdMap.set(oldDocId, newDocId)
+
+        const orgnImgPath = writeImportedAsset(
+          assets,
+          doc.orgn_img_path,
+          createImportedFilePath(
+            'DOCS',
+            `orgnImg_${makeHash()}_${newDocId}${getStoredFileExtension(
+              getString(doc, 'orgn_img_path')
+            )}`
+          ),
+          writtenFiles
+        )
+        const drawImgPath = writeImportedAsset(
+          assets,
+          doc.draw_img_path,
+          createImportedFilePath(
+            'DOCS',
+            `drawImg_${makeHash()}_${newDocId}${getStoredFileExtension(
+              getString(doc, 'draw_img_path')
+            )}`
+          ),
+          writtenFiles
+        )
+
+        if (orgnImgPath || drawImgPath) {
+          db.prepare(
+            `
+              UPDATE t_doc
+              SET orgn_img_path = @orgnImgPath,
+                  draw_img_path = @drawImgPath
+              WHERE id = @id
+            `
+          ).run({ id: newDocId, orgnImgPath, drawImgPath })
+        }
+      })
+
+      const insertDeliverable = db.prepare(
+        `
+          INSERT INTO t_deliverable (project_id, title, created_at, updated_at)
+          VALUES (@project_id, @title, @created_at, @updated_at)
+        `
+      )
+      data.deliverables.forEach((deliverable) => {
+        const result = insertDeliverable.run({
+          project_id: newProjectId,
+          title: getString(deliverable, 'title'),
+          created_at: getDateString(deliverable, 'created_at'),
+          updated_at: getDateString(deliverable, 'updated_at')
+        })
+        const oldDeliverableId = getNumber(deliverable, 'id')
+        if (oldDeliverableId) deliverableIdMap.set(oldDeliverableId, Number(result.lastInsertRowid))
+      })
+
+      const insertSection = db.prepare(
+        `
+          INSERT INTO t_section (
+            deliverable_id,
+            parent_id,
+            name,
+            sort_order,
+            created_at,
+            updated_at
+          )
+          VALUES (
+            @deliverable_id,
+            @parent_id,
+            @name,
+            @sort_order,
+            @created_at,
+            @updated_at
+          )
+        `
+      )
+      const pendingSections = [...data.sections]
+      while (pendingSections.length) {
+        const beforeCount = pendingSections.length
+        for (let index = pendingSections.length - 1; index >= 0; index -= 1) {
+          const section = pendingSections[index]
+          const oldParentId = section.parent_id
+          const parentId = getNullableMappedId(sectionIdMap, oldParentId)
+          if (oldParentId && !parentId) continue
+
+          const newDeliverableId = deliverableIdMap.get(getNumber(section, 'deliverable_id'))
+          if (!newDeliverableId) {
+            pendingSections.splice(index, 1)
+            continue
+          }
+
+          const result = insertSection.run({
+            deliverable_id: newDeliverableId,
+            parent_id: parentId,
+            name: getString(section, 'name'),
+            sort_order: getNumber(section, 'sort_order'),
+            created_at: getDateString(section, 'created_at'),
+            updated_at: getDateString(section, 'updated_at')
+          })
+          const oldSectionId = getNumber(section, 'id')
+          if (oldSectionId) sectionIdMap.set(oldSectionId, Number(result.lastInsertRowid))
+          pendingSections.splice(index, 1)
+        }
+
+        if (pendingSections.length === beforeCount) {
+          throw new Error('섹션 구조를 가져올 수 없습니다.')
+        }
+      }
+
+      const insertSectionDoc = db.prepare(
+        `
+          INSERT INTO t_section_doc (section_id, doc_id, sort_order, created_at)
+          VALUES (@section_id, @doc_id, @sort_order, @created_at)
+        `
+      )
+      data.section_docs.forEach((sectionDoc) => {
+        const newSectionId = sectionIdMap.get(getNumber(sectionDoc, 'section_id'))
+        const newDocId = docIdMap.get(getNumber(sectionDoc, 'doc_id'))
+        if (!newSectionId || !newDocId) return
+
+        insertSectionDoc.run({
+          section_id: newSectionId,
+          doc_id: newDocId,
+          sort_order: getNumber(sectionDoc, 'sort_order'),
+          created_at: getDateString(sectionDoc, 'created_at')
+        })
+      })
+
+      return newProjectId
+    })
+  } catch (error) {
+    deleteStoredFiles(writtenFiles)
+    throw error
+  }
 }
 // 프로젝트 생성
 export const createProject = (project: Record<string, unknown>): number => {

@@ -9,14 +9,19 @@
         alt="project banner"
         loading="lazy"
       />
-      <DefaultThumbnail v-else :id="Number(route.params.id)" class="h-48 w-full" />
+      <DefaultThumbnail
+        v-else
+        :id="Number(route.params.id)"
+        :label="curProject?.name"
+        class="h-48 w-full"
+      />
       <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-black/60" />
 
       <!-- Top Bar -->
       <div class="absolute inset-x-0 top-0 z-10">
         <div class="mx-auto flex max-w-[1200px] items-center justify-between px-4 py-3">
           <button
-            class="btn btn-sm border-none bg-white/10 text-white backdrop-blur-sm hover:bg-white/20"
+            class="inline-flex items-center gap-1.5 bg-transparent px-1 py-1 text-sm font-bold text-white/75 transition-colors hover:text-white"
             @click="router.push('/')"
           >
             <i-lucide-arrow-left class="h-4 w-4" />
@@ -26,7 +31,7 @@
             <div
               tabindex="0"
               role="button"
-              class="btn btn-sm btn-circle border-none bg-white/10 text-white backdrop-blur-sm hover:bg-white/20"
+              class="flex h-8 w-8 items-center justify-center rounded-full bg-transparent text-white/80 transition hover:text-white hover:shadow-md hover:shadow-black/25"
             >
               <i-lucide-more-vertical class="h-4 w-4" />
             </div>
@@ -54,7 +59,7 @@
       <!-- Project Info -->
       <div class="absolute inset-x-0 bottom-0 z-10 pb-5">
         <div class="mx-auto max-w-[1200px] px-4 text-center">
-          <h1 class="mb-1.5 text-2xl font-bold text-white drop-shadow-md">
+          <h1 v-if="projectThumbnail" class="mb-1.5 text-2xl font-bold text-white drop-shadow-md">
             {{ curProject?.name }}
           </h1>
           <p class="text-sm text-white/70">
@@ -75,105 +80,17 @@
               name="project_detail_tabs"
               value="workspaces"
             />
-            <i-lucide-layout-grid class="h-4 w-4 text-primary" />
+            <span class="grid h-4 w-4 grid-cols-2 gap-0.5 text-primary" aria-hidden="true">
+              <span class="rounded-[1px] border-2 border-current"></span>
+              <span class="rounded-[1px] border-2 border-current"></span>
+              <span class="rounded-[1px] border-2 border-current"></span>
+              <span class="rounded-[1px] border-2 border-current"></span>
+            </span>
             워크스페이스
           </label>
-          <div class="tab-content border-base-300 bg-base-100 p-6">
+          <div class="tab-content min-h-[calc(100vh-18rem)] border-base-300 bg-base-100 p-6">
             <div class="space-y-4">
-              <div class="flex items-center justify-end">
-                <label class="input input-sm w-64">
-                  <i-lucide-search class="h-3.5 w-3.5 opacity-45" />
-                  <input
-                    v-model="workspaceSearchText"
-                    type="search"
-                    placeholder="워크스페이스 검색..."
-                  />
-                </label>
-              </div>
-
               <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                <!-- Workspace Cards -->
-                <router-link
-                  v-for="ws in filteredWorkspaces"
-                  :key="ws.id"
-                  :to="`/workspace/${ws.id}`"
-                  class="group block overflow-hidden rounded-xl border border-base-content/10 bg-base-100 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg"
-                >
-                  <div class="relative h-44 overflow-hidden">
-                    <img
-                      v-if="ws.thumbnail"
-                      :src="ws.thumbnail"
-                      alt="workspace thumbnail"
-                      class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                    <DefaultThumbnail
-                      v-else
-                      :id="ws.id"
-                      class="h-full w-full transition-transform duration-300 group-hover:scale-105"
-                    />
-                    <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                    <div
-                      class="dropdown dropdown-end absolute right-2.5 top-2.5 z-20"
-                      @click.stop.prevent
-                      @mousedown.stop
-                    >
-                      <button
-                        tabindex="0"
-                        type="button"
-                        class="btn btn-xs btn-circle border-none bg-black/35 text-white shadow-sm backdrop-blur-sm hover:bg-black/50"
-                        @click.stop.prevent
-                      >
-                        <i-lucide-more-vertical class="h-3.5 w-3.5" />
-                      </button>
-                      <ul
-                        tabindex="0"
-                        class="dropdown-content menu z-20 w-36 rounded-xl border border-base-content/10 bg-base-100 p-1.5 shadow-lg"
-                        @click.stop.prevent
-                      >
-                        <li>
-                          <button
-                            type="button"
-                            class="rounded-lg text-sm"
-                            @click.stop.prevent="openEditWorkspace(ws)"
-                          >
-                            <i-lucide-pencil class="h-4 w-4 opacity-60" />
-                            수정
-                          </button>
-                        </li>
-                        <li>
-                          <button
-                            type="button"
-                            class="rounded-lg text-sm text-error"
-                            @click.stop.prevent="openDeleteWorkspace(ws)"
-                          >
-                            <i-lucide-trash-2 class="h-4 w-4 opacity-60" />
-                            삭제
-                          </button>
-                        </li>
-                      </ul>
-                    </div>
-                    <div class="absolute inset-x-0 bottom-0 p-4">
-                      <div class="text-lg font-bold text-white drop-shadow-md">{{ ws.name }}</div>
-                    </div>
-                  </div>
-                  <div class="flex items-center justify-between px-4 py-3">
-                    <div class="flex items-center gap-1 text-xs text-base-content/40">
-                      <i-lucide-clock class="h-3 w-3" />
-                      {{ ws.createdAt }}
-                    </div>
-                    <div class="flex items-center gap-3">
-                      <div class="flex items-center gap-1 text-xs text-base-content/40">
-                        <i-lucide-image class="h-3 w-3" />
-                        {{ ws.imageCount }}
-                      </div>
-                      <div class="flex items-center gap-1 text-xs text-base-content/40">
-                        <i-lucide-file-text class="h-3 w-3" />
-                        {{ ws.docCount }}
-                      </div>
-                    </div>
-                  </div>
-                </router-link>
-
                 <button
                   type="button"
                   class="flex min-h-56 flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-base-content/15 bg-base-100/50 transition-all duration-200 hover:border-primary/40 hover:bg-primary/5"
@@ -186,6 +103,47 @@
                   </div>
                   <span class="text-sm font-bold text-base-content/40">새 워크스페이스</span>
                 </button>
+
+                <!-- Workspace Cards -->
+                <router-link
+                  v-for="ws in filteredWorkspaces"
+                  :key="ws.id"
+                  :to="`/workspace/${ws.id}`"
+                  class="group block overflow-hidden rounded-xl border border-base-content/10 bg-base-100 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg"
+                  @contextmenu.prevent.stop="openWorkspaceContextMenu(ws, $event)"
+                >
+                  <div class="relative h-44 overflow-hidden">
+                    <img
+                      v-if="ws.thumbnail"
+                      :src="ws.thumbnail"
+                      alt="workspace thumbnail"
+                      class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                    <DefaultThumbnail
+                      v-else
+                      :id="ws.id"
+                      :label="ws.name"
+                      class="h-full w-full transition-transform duration-300 group-hover:scale-105"
+                    />
+                    <div
+                      v-if="ws.thumbnail"
+                      class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"
+                    />
+                    <div v-if="ws.thumbnail" class="absolute inset-x-0 bottom-0 p-4">
+                      <div class="text-lg font-bold text-white drop-shadow-md">{{ ws.name }}</div>
+                    </div>
+                  </div>
+                  <div class="flex items-center justify-between px-4 py-3">
+                    <div class="flex items-center gap-1 text-xs text-base-content/40">
+                      <i-lucide-clock class="h-3 w-3" />
+                      {{ ws.createdAt }}
+                    </div>
+                    <div class="flex items-center gap-1 text-xs text-base-content/40">
+                      <i-lucide-file-text class="h-3 w-3" />
+                      {{ ws.docCount }}
+                    </div>
+                  </div>
+                </router-link>
               </div>
             </div>
           </div>
@@ -197,28 +155,17 @@
               name="project_detail_tabs"
               value="deliverables"
             />
-            <i-lucide-folder-kanban class="h-4 w-4 text-primary" />
+            <i-lucide-file-text class="h-4 w-4 text-primary" />
             산출물 관리
           </label>
-          <div class="tab-content border-base-300 bg-base-100 p-6">
+          <div class="tab-content min-h-[calc(100vh-18rem)] border-base-300 bg-base-100 p-6">
             <div class="space-y-4">
               <div class="flex flex-wrap items-center justify-between gap-3">
                 <div class="flex items-center gap-2">
-                  <i-lucide-folder-kanban class="h-4 w-4 text-primary" />
+                  <i-lucide-file-text class="h-4 w-4 text-primary" />
                   <span class="text-sm font-semibold">산출물 목록</span>
-                  <span class="badge badge-sm badge-ghost">
-                    {{ filteredDeliverables.length }}
-                  </span>
                 </div>
                 <div class="flex flex-wrap items-center justify-end gap-2">
-                  <label class="input input-sm w-72">
-                    <i-lucide-search class="h-3.5 w-3.5 opacity-45" />
-                    <input
-                      v-model="deliverableSearchText"
-                      type="search"
-                      placeholder="산출물 검색..."
-                    />
-                  </label>
                   <button
                     type="button"
                     class="btn btn-sm btn-primary gap-1.5"
@@ -286,24 +233,53 @@
                     >
                       <i-lucide-eye class="h-4 w-4" />
                     </button>
-                    <button
-                      type="button"
-                      class="tooltip tooltip-left btn btn-ghost btn-xs btn-square text-primary hover:bg-primary/10"
-                      data-tip="다운로드"
-                      :disabled="downloadStatusById[item.id] === 'downloading'"
-                      @click.stop="openDownloadMenu(item, $event)"
-                    >
-                      <span
-                        v-if="downloadStatusById[item.id] === 'downloading'"
-                        class="loading loading-spinner loading-xs"
-                      ></span>
-                      <i-lucide-download v-else class="h-4 w-4" />
-                    </button>
+                    <div class="dropdown dropdown-end" @click.stop>
+                      <button
+                        tabindex="0"
+                        type="button"
+                        class="tooltip tooltip-left btn btn-ghost btn-xs btn-square text-primary hover:bg-primary/10"
+                        data-tip="내보내기"
+                        :disabled="downloadStatusById[item.id] === 'downloading'"
+                      >
+                        <span
+                          v-if="downloadStatusById[item.id] === 'downloading'"
+                          class="loading loading-spinner loading-xs"
+                        ></span>
+                        <i-lucide-download v-else class="h-4 w-4" />
+                      </button>
+                      <ul
+                        tabindex="0"
+                        class="dropdown-content menu z-[9999] mt-1 w-44 rounded-xl border border-base-content/10 bg-base-100 p-1.5 shadow-xl"
+                      >
+                        <li>
+                          <button
+                            v-blur
+                            type="button"
+                            class="rounded-lg text-sm font-medium text-base-content/80 hover:text-base-content"
+                            @click="downloadDeliverable(item, 'html')"
+                          >
+                            <i-lucide-file-archive class="h-4 w-4 opacity-70" />
+                            HTML 내보내기
+                          </button>
+                        </li>
+                        <li>
+                          <button
+                            v-blur
+                            type="button"
+                            class="rounded-lg text-sm font-medium text-base-content/80 hover:text-base-content"
+                            @click="downloadDeliverable(item, 'pdf')"
+                          >
+                            <i-lucide-file-down class="h-4 w-4 opacity-70" />
+                            PDF 내보내기
+                          </button>
+                        </li>
+                      </ul>
+                    </div>
                     <button
                       v-if="downloadStatusById[item.id] === 'done'"
                       type="button"
                       class="tooltip tooltip-left btn btn-ghost btn-xs btn-square text-primary hover:bg-primary/10"
-                      data-tip="다운로드 폴더 열기"
+                      data-tip="폴더 열기"
                       @click.stop="openSavedDownloadFolder(item.id)"
                     >
                       <i-lucide-folder-open class="h-4 w-4" />
@@ -329,7 +305,31 @@
     <ModalNewWorkspace ref="modalNewWorkspaceRef" @on-submit="onSubmitWorkspace" />
 
     <ul
-      v-if="deliverableContextMenu.isOpen"
+      v-if="workspaceContextMenu.visible"
+      class="menu fixed z-[9999] w-36 rounded-xl border border-base-content/10 bg-base-100 p-1.5 shadow-xl"
+      :style="{
+        left: `${workspaceContextMenu.x}px`,
+        top: `${workspaceContextMenu.y}px`
+      }"
+      @click.stop
+      @contextmenu.prevent.stop
+    >
+      <li>
+        <button type="button" class="rounded-lg text-sm" @click="editContextWorkspace">
+          <i-lucide-pencil class="h-4 w-4 opacity-60" />
+          수정
+        </button>
+      </li>
+      <li>
+        <button type="button" class="rounded-lg text-sm text-error" @click="deleteContextWorkspace">
+          <i-lucide-trash-2 class="h-4 w-4 opacity-60" />
+          삭제
+        </button>
+      </li>
+    </ul>
+
+    <ul
+      v-if="deliverableContextMenu.visible"
       class="menu fixed z-[9999] w-40 rounded-xl border border-base-content/10 bg-base-100 p-1.5 shadow-xl"
       :style="{
         left: `${deliverableContextMenu.x}px`,
@@ -356,38 +356,6 @@
       </li>
     </ul>
 
-    <ul
-      v-if="downloadMenu.isOpen"
-      class="menu fixed z-[9999] w-44 rounded-xl border border-base-content/10 bg-base-100 p-1.5 shadow-xl"
-      :style="{
-        left: `${downloadMenu.x}px`,
-        top: `${downloadMenu.y}px`
-      }"
-      @click.stop
-      @contextmenu.prevent.stop
-    >
-      <li>
-        <button
-          type="button"
-          class="rounded-lg text-sm"
-          @click="downloadSelectedDeliverable('html')"
-        >
-          <i-lucide-file-archive class="h-4 w-4 opacity-60" />
-          HTML 다운로드
-        </button>
-      </li>
-      <li>
-        <button
-          type="button"
-          class="rounded-lg text-sm"
-          @click="downloadSelectedDeliverable('pdf')"
-        >
-          <i-lucide-file-down class="h-4 w-4 opacity-60" />
-          PDF 다운로드
-        </button>
-      </li>
-    </ul>
-
     <modal-confirm
       ref="modalConfirmRef"
       ok-text="예"
@@ -409,6 +377,7 @@ import {
   deleteWorkspace,
   createDeliverable,
   deleteDeliverable,
+  getDocList,
   getDeliverables,
   getProjects,
   getWorkspaces,
@@ -421,6 +390,7 @@ import type { DownloadFormat, ExportResult } from '@/types'
 import { formatDate } from '@/utils/datetime'
 import { buildManualExport } from '@/views/deliverables/templates/manualExport'
 import { renderManual, renderManualInline } from '@/views/deliverables/templates/manualTemplate'
+import { useContextMenu } from '@renderer/composables/useContextMenu'
 import { useRouter } from 'vue-router'
 
 interface Workspace {
@@ -428,7 +398,7 @@ interface Workspace {
   name: string
   thumbnail: string | null
   createdAt: string
-  imageCount: number
+  createdTime: number
   docCount: number
 }
 
@@ -442,6 +412,7 @@ interface DeliverableItem {
   id: string
   title: string
   updated_at: string
+  createdTime: number
 }
 
 const router = useRouter()
@@ -470,28 +441,18 @@ const editingDeliverableId = ref<string | null>(null)
 const editingDeliverableTitle = ref('')
 const downloadStatusById = ref<Record<string, 'downloading' | 'done'>>({})
 const savedDownloadPathById = ref<Record<string, string>>({})
-const deliverableContextMenu = reactive<{
-  isOpen: boolean
-  x: number
-  y: number
-  item: DeliverableItem | null
-}>({
-  isOpen: false,
-  x: 0,
-  y: 0,
-  item: null
-})
-const downloadMenu = reactive<{
-  isOpen: boolean
-  x: number
-  y: number
-  item: DeliverableItem | null
-}>({
-  isOpen: false,
-  x: 0,
-  y: 0,
-  item: null
-})
+const {
+  contextMenu: workspaceContextMenu,
+  selectedItem: selectedWorkspaceContextItem,
+  openContextMenu: openWorkspaceMenu,
+  closeContextMenu: closeWorkspaceContextMenu
+} = useContextMenu<Workspace>({ closeOnWindowContextMenu: true })
+const {
+  contextMenu: deliverableContextMenu,
+  selectedItem: selectedDeliverableContextItem,
+  openContextMenu: openDeliverableMenu,
+  closeContextMenu: closeDeliverableContextMenu
+} = useContextMenu<DeliverableItem>({ closeOnWindowContextMenu: true })
 
 // 이미지 파일 경로를 화면 표시용 URL로 변환
 const toFileSrc = (imgPath: string, version?: string): string => {
@@ -509,7 +470,7 @@ const mapWorkspaceToCard = (workspace: DbWorkspace): Workspace => {
       ? toFileSrc(workspace.thumbnail_path, workspace.updated_at)
       : null,
     createdAt: formatDate(new Date(workspace.created_at), 'YYYY-MM-DD HH:mm'),
-    imageCount: 0,
+    createdTime: new Date(workspace.created_at).getTime(),
     docCount: 0
   }
 }
@@ -518,7 +479,8 @@ const mapWorkspaceToCard = (workspace: DbWorkspace): Workspace => {
 const mapDeliverableToItem = (deliverable: Deliverable): DeliverableItem => ({
   id: String(deliverable.id),
   title: deliverable.title,
-  updated_at: formatDate(new Date(deliverable.updated_at), 'YYYY년 MM월 DD일')
+  updated_at: formatDate(new Date(deliverable.updated_at), 'YYYY년 MM월 DD일'),
+  createdTime: new Date(deliverable.created_at).getTime()
 })
 
 const getSearchKeyword = (value: string): string => value.trim().toLowerCase()
@@ -556,7 +518,21 @@ const loadProject = async (): Promise<void> => {
 const loadWorkspaces = async (): Promise<void> => {
   const projectId = Number(route.params.id)
   const rows = await getWorkspaces({ project_id: projectId, limit: 50, offset: 0 })
-  workspaces.value = rows.map(mapWorkspaceToCard)
+  const cards = rows.map(mapWorkspaceToCard)
+  const docCounts = await Promise.all(
+    cards.map(async (workspace) => {
+      const docs = await getDocList({ workspaceId: workspace.id })
+      return [workspace.id, docs.length] as const
+    })
+  )
+  const docCountByWorkspaceId = new Map(docCounts)
+
+  workspaces.value = cards
+    .map((workspace) => ({
+      ...workspace,
+      docCount: docCountByWorkspaceId.get(workspace.id) ?? 0
+    }))
+    .sort((left, right) => right.createdTime - left.createdTime)
 }
 
 // 산출물 목록 조회
@@ -568,7 +544,9 @@ const loadDeliverables = async (): Promise<void> => {
   }
 
   const rows = await getDeliverables({ projectId })
-  deliverables.value = rows.map(mapDeliverableToItem)
+  deliverables.value = rows
+    .map(mapDeliverableToItem)
+    .sort((left, right) => right.createdTime - left.createdTime)
 }
 
 // 프로젝트 수정 모달
@@ -638,6 +616,30 @@ const openDeleteWorkspace = (workspace: Workspace): void => {
     })()
   }
   modalConfirmRef.value?.onOpen()
+}
+
+// 워크스페이스 우클릭 메뉴 열기
+const openWorkspaceContextMenu = (workspace: Workspace, event: MouseEvent): void => {
+  closeDeliverableContextMenu()
+  openWorkspaceMenu(event, workspace)
+}
+
+// 우클릭 메뉴에서 워크스페이스 수정 열기
+const editContextWorkspace = (): void => {
+  const workspace = selectedWorkspaceContextItem.value
+  closeWorkspaceContextMenu()
+  if (!workspace) return
+
+  openEditWorkspace(workspace)
+}
+
+// 우클릭 메뉴에서 워크스페이스 삭제 확인 열기
+const deleteContextWorkspace = (): void => {
+  const workspace = selectedWorkspaceContextItem.value
+  closeWorkspaceContextMenu()
+  if (!workspace) return
+
+  openDeleteWorkspace(workspace)
 }
 
 // 새 산출물 기본 제목 생성
@@ -718,24 +720,15 @@ watch(
   }
 )
 
-// 산출물 우클릭 메뉴 닫기
-const closeDeliverableContextMenu = (): void => {
-  deliverableContextMenu.isOpen = false
-  deliverableContextMenu.item = null
-}
-
 // 산출물 우클릭 메뉴 열기
 const openDeliverableContextMenu = (item: DeliverableItem, event: MouseEvent): void => {
-  closeDownloadMenu()
-  deliverableContextMenu.item = item
-  deliverableContextMenu.x = event.clientX
-  deliverableContextMenu.y = event.clientY
-  deliverableContextMenu.isOpen = true
+  closeWorkspaceContextMenu()
+  openDeliverableMenu(event, item)
 }
 
 // 우클릭 메뉴에서 산출물 이름 수정 시작
 const renameContextDeliverable = (): void => {
-  const item = deliverableContextMenu.item
+  const item = selectedDeliverableContextItem.value
   closeDeliverableContextMenu()
   if (!item) return
 
@@ -744,27 +737,11 @@ const renameContextDeliverable = (): void => {
 
 // 우클릭 메뉴에서 산출물 삭제 확인 열기
 const deleteContextDeliverable = (): void => {
-  const item = deliverableContextMenu.item
+  const item = selectedDeliverableContextItem.value
   closeDeliverableContextMenu()
   if (!item) return
 
   openDeleteDeliverable(item)
-}
-
-// 다운로드 형식 선택 메뉴 닫기
-const closeDownloadMenu = (): void => {
-  downloadMenu.isOpen = false
-  downloadMenu.item = null
-}
-
-// 다운로드 형식 선택 메뉴 열기
-const openDownloadMenu = (item: DeliverableItem, event: MouseEvent): void => {
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-  closeDeliverableContextMenu()
-  downloadMenu.item = item
-  downloadMenu.x = rect.left
-  downloadMenu.y = rect.bottom + 6
-  downloadMenu.isOpen = true
 }
 
 // 산출물별 다운로드 상태 저장
@@ -850,15 +827,6 @@ const saveManualPdf = async (
     defaultFileName: data.fileName,
     html: renderManualInline(data.model)
   })) as ExportResult
-}
-
-// 선택한 산출물의 HTML/PDF 저장 메뉴 처리
-const downloadSelectedDeliverable = (format: DownloadFormat): void => {
-  const item = downloadMenu.item
-  closeDownloadMenu()
-  if (!item) return
-
-  void downloadDeliverable(item, format)
 }
 
 // 마지막 저장 파일 위치를 파일 탐색기에서 표시
@@ -988,22 +956,10 @@ const onDeleteProject = (): void => {
   modalConfirmRef.value?.onOpen()
 }
 
-// 화면 진입 시 프로젝트 상세 데이터 조회 및 전역 메뉴 닫기 이벤트 연결
+// 화면 진입 시 프로젝트 상세 데이터 조회
 onMounted(() => {
   void loadProject()
   void loadWorkspaces()
   void loadDeliverables()
-  document.addEventListener('click', closeDeliverableContextMenu)
-  document.addEventListener('contextmenu', closeDeliverableContextMenu)
-  document.addEventListener('click', closeDownloadMenu)
-  document.addEventListener('contextmenu', closeDownloadMenu)
-})
-
-// 화면 이탈 시 전역 이벤트 정리
-onUnmounted(() => {
-  document.removeEventListener('click', closeDeliverableContextMenu)
-  document.removeEventListener('contextmenu', closeDeliverableContextMenu)
-  document.removeEventListener('click', closeDownloadMenu)
-  document.removeEventListener('contextmenu', closeDownloadMenu)
 })
 </script>

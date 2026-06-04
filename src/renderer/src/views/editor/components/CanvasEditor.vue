@@ -6,11 +6,11 @@
           <canvas ref="canvasEl" class="border border-white/10"></canvas>
 
           <div
-            v-if="contextMenu"
+            v-if="annotationContextMenu.visible"
             class="absolute z-50 w-36 overflow-hidden rounded-lg border border-base-content/10 bg-base-100 py-1 text-xs shadow-xl"
             :style="{
-              left: `${contextMenu.left}px`,
-              top: `${contextMenu.top}px`
+              left: `${annotationContextMenu.x}px`,
+              top: `${annotationContextMenu.y}px`
             }"
             @mousedown.stop
             @contextmenu.prevent.stop
@@ -69,7 +69,12 @@ import {
   filters
 } from 'fabric'
 import { nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
+import { useContextMenu } from '@renderer/composables/useContextMenu'
 import type { CanvasAnnotation, ToolMode } from '@/types'
+
+interface AnnotationContextTarget {
+  annotationId: string
+}
 
 type CanvasObj = (Rect | FabricImage | Group) & {
   annotationId?: string
@@ -133,9 +138,19 @@ const CANVAS_PADDING = 32
 // DOM 참조
 const editorFrame = ref<HTMLDivElement | null>(null)
 const canvasEl = ref<HTMLCanvasElement | null>(null)
-const contextMenu = ref<{ annotationId: string; left: number; top: number } | null>(null)
+const {
+  contextMenu: annotationContextMenu,
+  selectedItem: selectedAnnotationContextItem,
+  openContextMenuAt: openAnnotationContextMenuAt,
+  closeContextMenu: closeAnnotationMenu
+} = useContextMenu<AnnotationContextTarget>({ closeOnWindowClick: false })
 const selectedObj = shallowRef<CanvasObj | null>(null)
 const listSelectId = ref<string | null>(null)
+
+const closeAnnotationContextMenu = (): void => {
+  closeAnnotationMenu()
+  emit('close-context-menu')
+}
 
 // ─── Fabric Runtime State ───
 
@@ -157,6 +172,7 @@ let pendingSelectAnnotationId: string | null = null
 let copiedAnnotation: CanvasAnnotation | null = null // 복사해둔 어노테이션
 let cloneDragState: CloneDragState | null = null // Ctrl 드래그 복제 중 상태
 let rotationState: RotationState | null = null // 회전 중 상태
+let isShiftPressed = false
 
 // ─── Selection State ───
 
@@ -181,7 +197,11 @@ const setNumberRing = (obj: CanvasObj | null, selected: boolean): void => {
 }
 
 const isDrawingTool = (tool: ToolMode): boolean =>
-  tool === 'number' || tool === 'strokebox' || tool === 'filled-box' || tool === 'mosaic'
+  tool === 'number' ||
+  tool === 'strokebox' ||
+  tool === 'filled-box' ||
+  tool === 'dashed-box' ||
+  tool === 'mosaic'
 
 const syncCanvasSelectionMode = (): void => {
   if (!canvas) return
@@ -192,7 +212,7 @@ const syncCanvasSelectionMode = (): void => {
 const clearSel = (): void => {
   setNumberRing(selectedObj.value, false)
   selectedObj.value = null
-  contextMenu.value = null
+  closeAnnotationContextMenu()
   listSelectId.value = null
   canvas?.requestRenderAll()
 }
@@ -320,25 +340,6 @@ const rotateBaseImageCCW90 = (): void => {
   canvas.requestRenderAll()
 }
 
-// 선택 회전
-const rotateSelectedAnnotationCCW90 = (): void => {
-  if (!canvas || !selectedObj.value?.annotationId) return
-
-  const centerPoint = selectedObj.value.getCenterPoint()
-  const nextAngle = ((selectedObj.value.angle ?? 0) - 90) % 360
-  selectedObj.value.set({
-    angle: nextAngle
-  })
-  selectedObj.value.setPositionByOrigin(centerPoint, 'center', 'center')
-  selectedObj.value.setCoords()
-  canvas.setActiveObject(selectedObj.value)
-  syncSel()
-  canvas.requestRenderAll()
-  emitObjectUpdate(selectedObj.value, {
-    angle: nextAngle
-  })
-}
-
 // 원본 영역
 const getImgBounds = (): { left: number; top: number; width: number; height: number } | null => {
   if (!baseImg) return null
@@ -361,32 +362,39 @@ const exportImageDataURL = (): string | null => {
   const activeObj = canvas.getActiveObject() as CanvasObj | null
   const selectedObjBeforeExport = selectedObj.value
   const listSelectIdBeforeExport = listSelectId.value
+  const viewportBeforeExport = canvas.viewportTransform
+    ? ([...canvas.viewportTransform] as [number, number, number, number, number, number])
+    : ([1, 0, 0, 1, 0, 0] as [number, number, number, number, number, number])
+
   setNumberRing(selectedObjBeforeExport, false)
-  canvas.discardActiveObject()
-  canvas.renderAll()
 
-  const bounds = getImgBounds()
-  const dataUrl = !bounds
-    ? canvas.toDataURL({
-        format: 'png',
-        multiplier: 1
-      })
-    : canvas.toDataURL({
-        format: 'png',
-        left: bounds.left,
-        top: bounds.top,
-        width: bounds.width,
-        height: bounds.height,
-        multiplier: 1
-      })
+  try {
+    canvas.discardActiveObject()
+    canvas.setViewportTransform([1, 0, 0, 1, 0, 0])
+    canvas.renderAll()
 
-  if (activeObj) canvas.setActiveObject(activeObj)
-  listSelectId.value = listSelectIdBeforeExport
-  selectedObj.value = selectedObjBeforeExport
-  setNumberRing(selectedObj.value, Boolean(selectedObj.value))
-  canvas.requestRenderAll()
-
-  return dataUrl
+    const bounds = getImgBounds()
+    return !bounds
+      ? canvas.toDataURL({
+          format: 'png',
+          multiplier: 1
+        })
+      : canvas.toDataURL({
+          format: 'png',
+          left: bounds.left,
+          top: bounds.top,
+          width: bounds.width,
+          height: bounds.height,
+          multiplier: 1
+        })
+  } finally {
+    canvas.setViewportTransform(viewportBeforeExport)
+    if (activeObj) canvas.setActiveObject(activeObj)
+    listSelectId.value = listSelectIdBeforeExport
+    selectedObj.value = selectedObjBeforeExport
+    setNumberRing(selectedObj.value, Boolean(selectedObj.value))
+    canvas.requestRenderAll()
+  }
 }
 
 // ─── Annotation Lookup / Metadata ───
@@ -547,7 +555,7 @@ const sendBackwards = (annotationId: string): void => {
 }
 
 const onClickLayerAction = (action: 'front' | 'forward' | 'backward' | 'back'): void => {
-  const annotationId = contextMenu.value?.annotationId
+  const annotationId = selectedAnnotationContextItem.value?.annotationId
   if (!annotationId) return
 
   if (action === 'front') bringToFront(annotationId)
@@ -555,8 +563,7 @@ const onClickLayerAction = (action: 'front' | 'forward' | 'backward' | 'back'): 
   if (action === 'backward') sendBackwards(annotationId)
   if (action === 'back') sendToBack(annotationId)
 
-  contextMenu.value = null
-  emit('close-context-menu')
+  closeAnnotationContextMenu()
 }
 
 // ─── Fabric Object Builders ───
@@ -614,6 +621,7 @@ const makeBox = (annotation: CanvasAnnotation): CanvasObj => {
     fill: annotation.toolType === 'filled-box' ? annotation.color : 'transparent',
     stroke: annotation.color,
     strokeWidth: 2,
+    strokeDashArray: annotation.toolType === 'dashed-box' ? [8, 6] : undefined,
     selectable: true,
     evented: true,
     hasControls: true,
@@ -939,6 +947,12 @@ const onObjectRotating = (target?: CanvasObj): void => {
     }
   }
 
+  if (isShiftPressed) {
+    target.set({
+      angle: Math.round((target.angle ?? 0) / 45) * 45
+    })
+  }
+
   target.setPositionByOrigin(rotationState.center, 'center', 'center')
   target.setCoords()
   syncSel()
@@ -946,6 +960,8 @@ const onObjectRotating = (target?: CanvasObj): void => {
 
 // 단축키
 const onKeyDown = (event: KeyboardEvent): void => {
+  isShiftPressed = event.shiftKey
+
   const target = event.target as HTMLElement | null
   const isEditableTarget =
     target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable
@@ -992,6 +1008,10 @@ const onKeyDown = (event: KeyboardEvent): void => {
     event.preventDefault()
     pasteCopiedAnnotation()
   }
+}
+
+const onKeyUp = (event: KeyboardEvent): void => {
+  isShiftPressed = event.shiftKey
 }
 
 // ─── Annotation Data Sync ───
@@ -1044,6 +1064,7 @@ const startBox = (left: number, top: number): void => {
     fill: props.activeTool === 'filled-box' ? props.activeColor : 'transparent',
     stroke: props.activeColor,
     strokeWidth: 2,
+    strokeDashArray: props.activeTool === 'dashed-box' ? [8, 6] : undefined,
     selectable: false,
     evented: false,
     hasControls: false,
@@ -1124,11 +1145,7 @@ const setupCanvas = (): void => {
         if (annotationId) {
           canvas.setActiveObject(target)
           syncSel()
-          contextMenu.value = {
-            annotationId,
-            left: mouseEvent.offsetX,
-            top: mouseEvent.offsetY
-          }
+          openAnnotationContextMenuAt(mouseEvent.offsetX, mouseEvent.offsetY, { annotationId })
 
           emit('open-context-menu', {
             annotationId,
@@ -1139,13 +1156,11 @@ const setupCanvas = (): void => {
         }
       }
 
-      contextMenu.value = null
-      emit('close-context-menu')
+      closeAnnotationContextMenu()
       return
     }
 
-    contextMenu.value = null
-    emit('close-context-menu')
+    closeAnnotationContextMenu()
 
     if (target) {
       if (mouseEvent.ctrlKey && target.annotationId) {
@@ -1173,7 +1188,8 @@ const setupCanvas = (): void => {
       return
     }
 
-    if (!['strokebox', 'filled-box', 'mosaic'].includes(props.activeTool ?? '')) return
+    if (!['strokebox', 'filled-box', 'dashed-box', 'mosaic'].includes(props.activeTool ?? ''))
+      return
     startBox(pointer.x, pointer.y)
   })
 
@@ -1263,6 +1279,7 @@ watch(
 // mount
 onMounted(() => {
   window.addEventListener('keydown', onKeyDown)
+  window.addEventListener('keyup', onKeyUp)
   setupCanvas()
   void nextTick(() => {
     resizeCanvasToFrame()
@@ -1279,6 +1296,7 @@ onMounted(() => {
 // unmount
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeyDown)
+  window.removeEventListener('keyup', onKeyUp)
   resizeObserver?.disconnect()
   resizeObserver = null
   canvas?.dispose()
@@ -1296,7 +1314,6 @@ defineExpose({
   sendBackwards,
   selectAnnotation,
   applyColor,
-  rotateSelectedAnnotationCCW90,
   rotateBaseImageCCW90,
   exportImageDataURL
 })

@@ -75,27 +75,17 @@
                 @select-color="onSelectColor"
               />
               <div class="h-4 w-px bg-base-content/10"></div>
-              <ZoomControls v-model:zoom-pct="zoomPct" />
-              <div class="flex items-center gap-1">
-                <button
-                  type="button"
-                  class="tooltip tooltip-neutral tooltip-bottom btn btn-ghost btn-xs gap-1"
-                  data-tip="왼쪽으로 90° 회전"
-                  @click="onRotate"
-                >
-                  <i-lucide-rotate-ccw class="h-3.5 w-3.5" />
-                  회전
-                </button>
-                <button
-                  type="button"
-                  class="tooltip tooltip-neutral tooltip-bottom btn btn-ghost btn-xs gap-1 text-error"
-                  data-tip="전체 초기화"
-                  @click="onClickResetAnnotations"
-                >
-                  <i-lucide-eraser class="h-3.5 w-3.5" />
-                  초기화
-                </button>
-              </div>
+              <button
+                type="button"
+                class="tooltip tooltip-neutral tooltip-bottom btn btn-ghost btn-xs gap-1 text-error"
+                data-tip="전체 초기화"
+                @click="onClickResetAnnotations"
+              >
+                <i-lucide-eraser class="h-3.5 w-3.5" />
+                초기화
+              </button>
+              <div class="h-4 w-px bg-base-content/10"></div>
+              <ZoomControls v-model:zoom-pct="zoomPct" @reset-zoom="resetZoom" />
             </div>
           </div>
 
@@ -158,13 +148,35 @@
             <span class="badge badge-sm badge-ghost">{{ documentItems.length }}</span>
           </div>
         </div>
-
-        <!-- Search -->
-        <div class="px-3 py-2">
-          <label class="input input-sm w-full">
-            <i-lucide-search class="h-3.5 w-3.5 opacity-40" />
-            <input v-model="documentSearchKeyword" type="search" placeholder="문서 검색..." />
-          </label>
+        <div class="shrink-0 space-y-2 border-b border-base-content/5 px-3 py-2">
+          <div
+            class="flex items-center gap-1 rounded-md bg-base-200 p-1 text-[11px] font-bold text-base-content/55"
+          >
+            <button
+              type="button"
+              class="h-6 flex-1 rounded px-2 transition-colors"
+              :class="docListFilter === 'all' ? 'bg-base-100 text-base-content shadow-sm' : ''"
+              @click="docListFilter = 'all'"
+            >
+              전체
+            </button>
+            <button
+              type="button"
+              class="h-6 flex-1 rounded px-2 transition-colors"
+              :class="docListFilter === 'doing' ? 'bg-base-100 text-base-content shadow-sm' : ''"
+              @click="docListFilter = 'doing'"
+            >
+              작업중
+            </button>
+            <button
+              type="button"
+              class="h-6 flex-1 rounded px-2 transition-colors"
+              :class="docListFilter === 'done' ? 'bg-base-100 text-base-content shadow-sm' : ''"
+              @click="docListFilter = 'done'"
+            >
+              작업완료
+            </button>
+          </div>
         </div>
 
         <!-- Doc List -->
@@ -183,16 +195,14 @@
             <div class="relative">
               <img :src="doc.thumbnail" alt="thumbnail" class="h-28 w-full object-cover" />
               <div
-                class="absolute left-2 top-2 flex h-5 min-w-5 items-center justify-center rounded bg-black px-1.5 text-[10px] font-black tabular-nums text-white shadow-sm"
+                class="absolute left-2 top-2 flex h-5 min-w-5 items-center justify-center rounded px-1.5 text-[10px] font-black tabular-nums shadow-sm transition-colors duration-200"
+                :class="
+                  curDocId === doc.id
+                    ? 'bg-primary text-primary-content'
+                    : 'bg-primary/30 text-primary'
+                "
               >
                 {{ doc.orderNo }}
-              </div>
-              <div v-if="curDocId === doc.id" class="absolute right-2 top-2">
-                <div
-                  class="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-white"
-                >
-                  <i-lucide-check class="h-3 w-3" />
-                </div>
               </div>
             </div>
             <div class="min-w-0 p-2.5">
@@ -217,7 +227,7 @@
           v-else
           class="flex flex-1 items-center justify-center p-6 text-center text-sm text-base-content/40"
         >
-          {{ documentSearchKeyword ? '검색 결과가 없습니다' : '문서가 없습니다' }}
+          문서가 없습니다
         </div>
       </div>
     </div>
@@ -247,7 +257,6 @@ interface CanvasEditorRef {
   resetViewport: () => void
   selectAnnotation: (annotationId: string) => void
   applyColor: (color: string) => void
-  rotateSelectedAnnotationCCW90: () => void
   exportImageDataURL: () => string | null
 }
 
@@ -299,8 +308,8 @@ const curDocId = ref(Number(route.params.docId || 0))
 const currentWorkspaceId = ref(0)
 const currentDocTitle = ref('')
 const imageSrc = ref('')
-const documentSearchKeyword = ref('')
 const documentItems = ref<DocumentItem[]>([])
+const docListFilter = ref<'all' | 'doing' | 'done'>('all')
 const EMPTY_DOC_TITLE = '제목 없는 문서'
 
 // 에디터 상태
@@ -582,6 +591,15 @@ const docStatusClass = (doc: DocumentItem): string =>
 
 const getDocTitle = (doc: DocumentItem): string => doc.title.trim() || EMPTY_DOC_TITLE
 
+const filteredDocumentItems = computed(() =>
+  documentItems.value.filter(
+    (doc) =>
+      docListFilter.value === 'all' ||
+      (docListFilter.value === 'done' && isDoneDoc(doc)) ||
+      (docListFilter.value === 'doing' && !isDoneDoc(doc))
+  )
+)
+
 // 문서 카드 데이터
 const toDocumentItem = (doc: Doc, index: number): DocumentItem => {
   const thumbnailPath = doc.draw_img_path || doc.orgn_img_path
@@ -598,14 +616,6 @@ const toDocumentItem = (doc: Doc, index: number): DocumentItem => {
     orderNo: Number(doc.sort_order || 0) || index + 1
   }
 }
-
-// 문서 검색
-const filteredDocumentItems = computed(() => {
-  const keyword = documentSearchKeyword.value.trim().toLowerCase()
-  if (!keyword) return documentItems.value
-
-  return documentItems.value.filter((doc) => getDocTitle(doc).toLowerCase().includes(keyword))
-})
 
 // 문서 목록 조회
 const loadDocumentItems = async (workspaceId: number): Promise<void> => {
@@ -683,6 +693,12 @@ const onZoomWheel = (payload: {
   zoomPct.value = nextZoomPct
 }
 
+const resetZoom = (): void => {
+  wheelZoomPoint = null
+  zoomPct.value = 100
+  canvasEditorRef.value?.resetViewport()
+}
+
 // 초기화 확인
 const onClickResetAnnotations = (): void => {
   resetConfirmRef.value?.onOpen()
@@ -692,14 +708,7 @@ const onClickResetAnnotations = (): void => {
 const onConfirmResetAnnotations = (): void => {
   annotations.value = []
   funcItems.value = []
-  wheelZoomPoint = null
-  zoomPct.value = 100
-  canvasEditorRef.value?.resetViewport()
-}
-
-// 선택 어노테이션 회전
-const onRotate = (): void => {
-  canvasEditorRef.value?.rotateSelectedAnnotationCCW90()
+  resetZoom()
 }
 
 // 저장 content_json

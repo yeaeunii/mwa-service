@@ -204,16 +204,16 @@
 
               <VueDraggable
                 v-if="isWorkspaceExpanded(workspace.id)"
-                :model-value="workspace.items"
+                :model-value="getDoneWorkspaceItems(workspace)"
                 :animation="180"
                 :group="sourceGroup"
                 :clone="cloneStructureItem"
                 item-key="doc_id"
                 :sort="false"
-                class="px-3 py-1"
+                class="px-3 pt-1"
               >
                 <div
-                  v-for="item in workspace.items"
+                  v-for="item in getDoneWorkspaceItems(workspace)"
                   :key="item.doc_id"
                   class="border-b border-slate-100 bg-white last:border-b-0"
                 >
@@ -254,6 +254,37 @@
                   </div>
                 </div>
               </VueDraggable>
+
+              <div
+                v-if="
+                  isWorkspaceExpanded(workspace.id) && getWorkingWorkspaceItems(workspace).length
+                "
+                class="px-3 pb-1"
+              >
+                <div
+                  v-for="item in getWorkingWorkspaceItems(workspace)"
+                  :key="item.doc_id"
+                  class="text-base-content/45 last:border-b-0">
+                  <div class="flex cursor-not-allowed items-center gap-2 px-1 py-1.5" @click.stop>
+                    <div class="min-w-0 flex-1">
+                      <div class="flex min-w-0 items-center gap-1.5">
+                        <span class="truncate text-xs font-bold leading-tight">
+                          {{ getDocumentTitle(item) }}
+                        </span>
+                        <span class="badge badge-ghost badge-xs">작업중</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      class="tooltip tooltip-left btn btn-ghost btn-xs btn-square h-6 min-h-6 w-6"
+                      data-tip="문서보기"
+                      @click.stop="openDocumentPreview(item)"
+                    >
+                      <i-lucide-file-search class="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -458,6 +489,16 @@ const cloneStructureItem = (item: SectionDocInput): SectionDocInput => ({
   doc_id: `${item.doc_id}-copy-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
 })
 
+const isDoneStructureItem = (item: SectionDocInput): boolean => item.status === '작업완료'
+
+const sortStructureItems = (items: SectionDocInput[]): SectionDocInput[] =>
+  [...items].sort((left, right) => {
+    const doneOrder = Number(isDoneStructureItem(right)) - Number(isDoneStructureItem(left))
+    if (doneOrder !== 0) return doneOrder
+
+    return getDocumentTitle(left).localeCompare(getDocumentTitle(right), 'ko')
+  })
+
 // DB 문서를 산출물 배치용 문서로 변환
 const mapDocToStructureItem = (doc: Doc): SectionDocInput => ({
   doc_id: String(doc.id),
@@ -522,10 +563,11 @@ const mapWorkspaceToStructureWorkspace = (
   workspace: Workspace,
   docs: Doc[]
 ): StructureWorkspaceView => {
+  const items = sortStructureItems(docs.map(mapDocToStructureItem))
   const structureWorkspace: StructureWorkspaceView = {
     id: String(workspace.id),
     name: workspace.name,
-    items: docs.map(mapDocToStructureItem),
+    items,
     bundleItems: []
   }
 
@@ -962,6 +1004,12 @@ const getOriginalItemId = (itemId: string): string => itemId.split('-copy-')[0]
 const getDocumentTitle = (item: SectionDocInput): string =>
   item.doc_title.trim() || '제목이 없는 문서'
 
+const getDoneWorkspaceItems = (workspace: StructureWorkspace): SectionDocInput[] =>
+  workspace.items.filter(isDoneStructureItem)
+
+const getWorkingWorkspaceItems = (workspace: StructureWorkspace): SectionDocInput[] =>
+  workspace.items.filter((item) => !isDoneStructureItem(item))
+
 const isSelectedSourceDoc = (item: SectionDocInput): boolean =>
   selectedSourceOriginalDocId.value === getOriginalItemId(item.doc_id)
 
@@ -1146,18 +1194,19 @@ const expandWorkspaceBundle = (
   if (!rootCategory) return false
 
   const workspace = workspaces.value.find((item) => item.id === workspaceId)
+  const doneItems = workspace?.items.filter(isDoneStructureItem) ?? []
   const duplicateItems =
-    workspace?.items.filter(
+    doneItems.filter(
       (item) => countItemsInCategory(getOriginalItemId(item.doc_id), rootCategory) > 0
     ) ?? []
   const availableItems =
-    workspace?.items.filter(
+    doneItems.filter(
       (item) => countItemsInCategory(getOriginalItemId(item.doc_id), rootCategory) === 0
     ) ?? []
 
   targetItems.splice(itemIndex, 1, ...availableItems.map(cloneDocumentForCategory))
 
-  if (availableItems.length !== workspace?.items.length) {
+  if (availableItems.length !== doneItems.length) {
     const [firstDuplicate] = duplicateItems
     const duplicateLabel = firstDuplicate
       ? duplicateItems.length > 1
