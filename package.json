@@ -1,6 +1,6 @@
 {
   "name": "miso-mwa-electron",
-  "version": "1.0.0",
+  "version": "0.1.2",
   "description": "Miso Manual Writing Assistant",
   "main": "./out/main/index.js",
   "author": "example.com",
@@ -24,46 +24,52 @@
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
     "better-sqlite3": "^12.8.0",
+    "dayjs": "^1.11.20",
     "electron-updater": "^6.8.3",
     "fabric": "^7.2.0",
+    "ffmpeg-static": "^5.3.0",
     "mousetrap": "^1.6.5",
     "pinia": "^3.0.4",
-    "vue-router": "^5.0.3"
+    "vue-dompurify-html": "^5.3.0",
+    "vue-draggable-plus": "^0.6.1",
+    "vue-router": "^5.0.4"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "3.0.0",
     "@electron-toolkit/eslint-config-ts": "^3.1.0",
     "@electron-toolkit/tsconfig": "^2.0.0",
-    "@iconify-json/lucide": "^1.2.94",
-    "@iconify/vue": "^5.0.0",
+    "@iconify-json/fluent": "^1.2.47",
+    "@iconify-json/lucide": "^1.2.100",
+    "@iconify-json/mdi": "^1.2.3",
     "@rushstack/eslint-patch": "^1.16.1",
-    "@tailwindcss/vite": "^4.2.1",
-    "@types/node": "^22.19.1",
-    "@vitejs/plugin-vue": "^6.0.2",
+    "@tailwindcss/vite": "^4.2.2",
+    "@types/node": "^22.19.15",
+    "@vitejs/plugin-vue": "^6.0.5",
     "@vue/eslint-config-prettier": "^10.2.0",
     "@vue/eslint-config-typescript": "^14.7.0",
     "daisyui": "^5.5.19",
-    "electron": "^39.2.6",
-    "electron-builder": "^26.0.12",
+    "electron": "^39.8.5",
+    "electron-builder": "^26.8.1",
     "electron-vite": "^5.0.0",
-    "eslint": "^9.39.1",
-    "eslint-plugin-vue": "^10.6.2",
-    "prettier": "^3.7.4",
-    "tailwindcss": "^4.2.1",
+    "eslint": "^9.39.4",
+    "eslint-plugin-vue": "^10.8.0",
+    "prettier": "^3.8.1",
+    "tailwindcss": "^4.2.2",
     "typescript": "^5.9.3",
     "unplugin-auto-import": "^21.0.0",
     "unplugin-icons": "^23.0.1",
-    "unplugin-vue-components": "^31.0.0",
-    "vite": "^7.2.6",
-    "vue": "^3.5.25",
-    "vue-eslint-parser": "^10.2.0",
-    "vue-tsc": "^3.1.6"
+    "unplugin-vue-components": "^31.1.0",
+    "vite": "^7.3.1",
+    "vue": "^3.5.31",
+    "vue-eslint-parser": "^10.4.0",
+    "vue-tsc": "^3.2.6"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
       "better-sqlite3",
       "electron",
-      "esbuild"
+      "esbuild",
+      "ffmpeg-static"
     ]
   }
 }

@@ -6,20 +6,47 @@
 // biome-ignore lint: disable
 export {}
 declare global {
+  const ANNOTATION_SHORTCUTS: typeof import('./constants/shortcuts').ANNOTATION_SHORTCUTS
+  const CAPTURE_SHORTCUTS: typeof import('./constants/shortcuts').CAPTURE_SHORTCUTS
   const EffectScope: typeof import('vue').EffectScope
+  const SHORTCUT_CHANNELS: typeof import('./constants/shortcuts').SHORTCUT_CHANNELS
+  const VIDEO_PLAYER_SHORTCUTS: typeof import('./constants/shortcuts').VIDEO_PLAYER_SHORTCUTS
   const acceptHMRUpdate: typeof import('pinia').acceptHMRUpdate
   const computed: typeof import('vue').computed
+  const copyDocs: typeof import('./database/index').copyDocs
   const createApp: typeof import('vue').createApp
+  const createCapture: typeof import('./database/index').createCapture
+  const createCaptureWithImage: typeof import('./database/index').createCaptureWithImage
+  const createDeliverable: typeof import('./database/index').createDeliverable
+  const createDoc: typeof import('./database/index').createDoc
   const createPinia: typeof import('pinia').createPinia
+  const createProject: typeof import('./database/index').createProject
+  const createWorkspace: typeof import('./database/index').createWorkspace
   const customRef: typeof import('vue').customRef
   const defineAsyncComponent: typeof import('vue').defineAsyncComponent
   const defineComponent: typeof import('vue').defineComponent
   const defineStore: typeof import('pinia').defineStore
+  const deleteCapture: typeof import('./database/index').deleteCapture
+  const deleteDeliverable: typeof import('./database/index').deleteDeliverable
+  const deleteDoc: typeof import('./database/index').deleteDoc
+  const deleteProject: typeof import('./database/index').deleteProject
+  const deleteWorkspace: typeof import('./database/index').deleteWorkspace
   const effectScope: typeof import('vue').effectScope
   const getActivePinia: typeof import('pinia').getActivePinia
+  const getCaptureList: typeof import('./database/index').getCaptureList
   const getCurrentInstance: typeof import('vue').getCurrentInstance
   const getCurrentScope: typeof import('vue').getCurrentScope
   const getCurrentWatcher: typeof import('vue').getCurrentWatcher
+  const getDeliverableDetail: typeof import('./database/index').getDeliverableDetail
+  const getDeliverableStructure: typeof import('./database/index').getDeliverableStructure
+  const getDeliverables: typeof import('./database/index').getDeliverables
+  const getDocDetail: typeof import('./database/index').getDocDetail
+  const getDocList: typeof import('./database/index').getDocList
+  const getProject: typeof import('./database/index').getProject
+  const getProjects: typeof import('./database/index').getProjects
+  const getWorkspaceDetail: typeof import('./database/index').getWorkspaceDetail
+  const getWorkspaceList: typeof import('./database/index').getWorkspaceList
+  const getWorkspaces: typeof import('./database/index').getWorkspaces
   const h: typeof import('vue').h
   const inject: typeof import('vue').inject
   const isProxy: typeof import('vue').isProxy
@@ -33,6 +60,7 @@ declare global {
   const mapStores: typeof import('pinia').mapStores
   const mapWritableState: typeof import('pinia').mapWritableState
   const markRaw: typeof import('vue').markRaw
+  const moveDocs: typeof import('./database/index').moveDocs
   const nextTick: typeof import('vue').nextTick
   const onActivated: typeof import('vue').onActivated
   const onBeforeMount: typeof import('vue').onBeforeMount
@@ -56,6 +84,7 @@ declare global {
   const readonly: typeof import('vue').readonly
   const ref: typeof import('vue').ref
   const resolveComponent: typeof import('vue').resolveComponent
+  const saveDeliverableStructure: typeof import('./database/index').saveDeliverableStructure
   const setActivePinia: typeof import('pinia').setActivePinia
   const setMapStoreSuffix: typeof import('pinia').setMapStoreSuffix
   const shallowReactive: typeof import('vue').shallowReactive
@@ -68,10 +97,26 @@ declare global {
   const toValue: typeof import('vue').toValue
   const triggerRef: typeof import('vue').triggerRef
   const unref: typeof import('vue').unref
+  const updateCaptureName: typeof import('./database/index').updateCaptureName
+  const updateCapturePath: typeof import('./database/index').updateCapturePath
+  const updateDeliverableTitle: typeof import('./database/index').updateDeliverableTitle
+  const updateDoc: typeof import('./database/index').updateDoc
+  const updateDocAnnotation: typeof import('./database/index').updateDocAnnotation
+  const updateDocSortOrders: typeof import('./database/index').updateDocSortOrders
+  const updateDocStatus: typeof import('./database/index').updateDocStatus
+  const updateProject: typeof import('./database/index').updateProject
+  const updateProjectStatus: typeof import('./database/index').updateProjectStatus
+  const updateWorkspace: typeof import('./database/index').updateWorkspace
+  const updateWorkspaceVideo: typeof import('./database/index').updateWorkspaceVideo
   const useAttrs: typeof import('vue').useAttrs
+  const useContextMenu: typeof import('./composables/useContextMenu').useContextMenu
   const useCounterStore: typeof import('./stores/counter').useCounterStore
   const useCssModule: typeof import('vue').useCssModule
   const useCssVars: typeof import('vue').useCssVars
+  const useDragSelect: typeof import('./composables/useDragSelect').useDragSelect
+  const useDragSource: typeof import('./composables/useCrossDrag').useDragSource
+  const useDraggable: typeof import('vue-draggable-plus').useDraggable
+  const useDropZone: typeof import('./composables/useCrossDrag').useDropZone
   const useElectron: typeof import('./composables/useElectron').useElectron
   const useId: typeof import('vue').useId
   const useLink: typeof import('vue-router').useLink
@@ -91,8 +136,17 @@ declare global {
   export type { Component, Slot, Slots, ComponentPublicInstance, ComputedRef, DirectiveBinding, ExtractDefaultPropTypes, ExtractPropTypes, ExtractPublicPropTypes, InjectionKey, PropType, Ref, ShallowRef, MaybeRef, MaybeRefOrGetter, VNode, WritableComputedRef } from 'vue'
   import('vue')
   // @ts-ignore
-  export type { CaptureImage } from './types/index'
+  export type { UseDragSourceOptions, UseDragSourceReturn, UseDropZoneOptions, UseDropZoneReturn } from './composables/useCrossDrag'
+  import('./composables/useCrossDrag')
+  // @ts-ignore
+  export type { UseDragSelectOptions, UseDragSelectReturn } from './composables/useDragSelect'
+  import('./composables/useDragSelect')
+  // @ts-ignore
+  export type { CaptureImage, ToolMode, CanvasAnnotation, AnnotationItem, ContentItem, Card, EditorDocGroup, EditorDoc, DownloadFormat, ManualExportBundle, ExportResult } from './types/index'
   import('./types/index')
+  // @ts-ignore
+  export type { WorkspaceDetail, Capture, Deliverable, DeliverableSection, DeliverableSectionDoc, DeliverableStructureResponse, Doc, Project, SectionDocInput, SectionTreeInput, Workspace } from './database/index'
+  import('./database/index')
 }
 
 // for vue template auto import
@@ -100,20 +154,43 @@ import { UnwrapRef } from 'vue'
 declare module 'vue' {
   interface GlobalComponents {}
   interface ComponentCustomProperties {
+    readonly ANNOTATION_SHORTCUTS: UnwrapRef<typeof import('./constants/shortcuts')['ANNOTATION_SHORTCUTS']>
+    readonly CAPTURE_SHORTCUTS: UnwrapRef<typeof import('./constants/shortcuts')['CAPTURE_SHORTCUTS']>
     readonly EffectScope: UnwrapRef<typeof import('vue')['EffectScope']>
+    readonly SHORTCUT_CHANNELS: UnwrapRef<typeof import('./constants/shortcuts')['SHORTCUT_CHANNELS']>
+    readonly VIDEO_PLAYER_SHORTCUTS: UnwrapRef<typeof import('./constants/shortcuts')['VIDEO_PLAYER_SHORTCUTS']>
     readonly acceptHMRUpdate: UnwrapRef<typeof import('pinia')['acceptHMRUpdate']>
     readonly computed: UnwrapRef<typeof import('vue')['computed']>
+    readonly copyDocs: UnwrapRef<typeof import('./database/index')['copyDocs']>
     readonly createApp: UnwrapRef<typeof import('vue')['createApp']>
+    readonly createCaptureWithImage: UnwrapRef<typeof import('./database/index')['createCaptureWithImage']>
+    readonly createDeliverable: UnwrapRef<typeof import('./database/index')['createDeliverable']>
+    readonly createDoc: UnwrapRef<typeof import('./database/index')['createDoc']>
     readonly createPinia: UnwrapRef<typeof import('pinia')['createPinia']>
+    readonly createProject: UnwrapRef<typeof import('./database/index')['createProject']>
+    readonly createWorkspace: UnwrapRef<typeof import('./database/index')['createWorkspace']>
     readonly customRef: UnwrapRef<typeof import('vue')['customRef']>
     readonly defineAsyncComponent: UnwrapRef<typeof import('vue')['defineAsyncComponent']>
     readonly defineComponent: UnwrapRef<typeof import('vue')['defineComponent']>
     readonly defineStore: UnwrapRef<typeof import('pinia')['defineStore']>
+    readonly deleteCapture: UnwrapRef<typeof import('./database/index')['deleteCapture']>
+    readonly deleteDeliverable: UnwrapRef<typeof import('./database/index')['deleteDeliverable']>
+    readonly deleteDoc: UnwrapRef<typeof import('./database/index')['deleteDoc']>
+    readonly deleteProject: UnwrapRef<typeof import('./database/index')['deleteProject']>
+    readonly deleteWorkspace: UnwrapRef<typeof import('./database/index')['deleteWorkspace']>
     readonly effectScope: UnwrapRef<typeof import('vue')['effectScope']>
     readonly getActivePinia: UnwrapRef<typeof import('pinia')['getActivePinia']>
+    readonly getCaptureList: UnwrapRef<typeof import('./database/index')['getCaptureList']>
     readonly getCurrentInstance: UnwrapRef<typeof import('vue')['getCurrentInstance']>
     readonly getCurrentScope: UnwrapRef<typeof import('vue')['getCurrentScope']>
     readonly getCurrentWatcher: UnwrapRef<typeof import('vue')['getCurrentWatcher']>
+    readonly getDeliverableDetail: UnwrapRef<typeof import('./database/index')['getDeliverableDetail']>
+    readonly getDeliverableStructure: UnwrapRef<typeof import('./database/index')['getDeliverableStructure']>
+    readonly getDeliverables: UnwrapRef<typeof import('./database/index')['getDeliverables']>
+    readonly getDocList: UnwrapRef<typeof import('./database/index')['getDocList']>
+    readonly getProjects: UnwrapRef<typeof import('./database/index')['getProjects']>
+    readonly getWorkspaceDetail: UnwrapRef<typeof import('./database/index')['getWorkspaceDetail']>
+    readonly getWorkspaces: UnwrapRef<typeof import('./database/index')['getWorkspaces']>
     readonly h: UnwrapRef<typeof import('vue')['h']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
     readonly isProxy: UnwrapRef<typeof import('vue')['isProxy']>
@@ -127,6 +204,7 @@ declare module 'vue' {
     readonly mapStores: UnwrapRef<typeof import('pinia')['mapStores']>
     readonly mapWritableState: UnwrapRef<typeof import('pinia')['mapWritableState']>
     readonly markRaw: UnwrapRef<typeof import('vue')['markRaw']>
+    readonly moveDocs: UnwrapRef<typeof import('./database/index')['moveDocs']>
     readonly nextTick: UnwrapRef<typeof import('vue')['nextTick']>
     readonly onActivated: UnwrapRef<typeof import('vue')['onActivated']>
     readonly onBeforeMount: UnwrapRef<typeof import('vue')['onBeforeMount']>
@@ -150,6 +228,7 @@ declare module 'vue' {
     readonly readonly: UnwrapRef<typeof import('vue')['readonly']>
     readonly ref: UnwrapRef<typeof import('vue')['ref']>
     readonly resolveComponent: UnwrapRef<typeof import('vue')['resolveComponent']>
+    readonly saveDeliverableStructure: UnwrapRef<typeof import('./database/index')['saveDeliverableStructure']>
     readonly setActivePinia: UnwrapRef<typeof import('pinia')['setActivePinia']>
     readonly setMapStoreSuffix: UnwrapRef<typeof import('pinia')['setMapStoreSuffix']>
     readonly shallowReactive: UnwrapRef<typeof import('vue')['shallowReactive']>
@@ -162,10 +241,25 @@ declare module 'vue' {
     readonly toValue: UnwrapRef<typeof import('vue')['toValue']>
     readonly triggerRef: UnwrapRef<typeof import('vue')['triggerRef']>
     readonly unref: UnwrapRef<typeof import('vue')['unref']>
+    readonly updateCaptureName: UnwrapRef<typeof import('./database/index')['updateCaptureName']>
+    readonly updateDeliverableTitle: UnwrapRef<typeof import('./database/index')['updateDeliverableTitle']>
+    readonly updateDoc: UnwrapRef<typeof import('./database/index')['updateDoc']>
+    readonly updateDocAnnotation: UnwrapRef<typeof import('./database/index')['updateDocAnnotation']>
+    readonly updateDocSortOrders: UnwrapRef<typeof import('./database/index')['updateDocSortOrders']>
+    readonly updateDocStatus: UnwrapRef<typeof import('./database/index')['updateDocStatus']>
+    readonly updateProject: UnwrapRef<typeof import('./database/index')['updateProject']>
+    readonly updateProjectStatus: UnwrapRef<typeof import('./database/index')['updateProjectStatus']>
+    readonly updateWorkspace: UnwrapRef<typeof import('./database/index')['updateWorkspace']>
+    readonly updateWorkspaceVideo: UnwrapRef<typeof import('./database/index')['updateWorkspaceVideo']>
     readonly useAttrs: UnwrapRef<typeof import('vue')['useAttrs']>
+    readonly useContextMenu: UnwrapRef<typeof import('./composables/useContextMenu')['useContextMenu']>
     readonly useCounterStore: UnwrapRef<typeof import('./stores/counter')['useCounterStore']>
     readonly useCssModule: UnwrapRef<typeof import('vue')['useCssModule']>
     readonly useCssVars: UnwrapRef<typeof import('vue')['useCssVars']>
+    readonly useDragSelect: UnwrapRef<typeof import('./composables/useDragSelect')['useDragSelect']>
+    readonly useDragSource: UnwrapRef<typeof import('./composables/useCrossDrag')['useDragSource']>
+    readonly useDraggable: UnwrapRef<typeof import('vue-draggable-plus')['useDraggable']>
+    readonly useDropZone: UnwrapRef<typeof import('./composables/useCrossDrag')['useDropZone']>
     readonly useElectron: UnwrapRef<typeof import('./composables/useElectron')['useElectron']>
     readonly useId: UnwrapRef<typeof import('vue')['useId']>
     readonly useLink: UnwrapRef<typeof import('vue-router')['useLink']>

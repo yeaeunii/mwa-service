@@ -1,11 +1,15 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
+
+import * as DAO from '../database/dao'
 
 // Invoke channels
 const INVOKE_CHANNELS = [
   'dialog:openFile',
   'shell:openExternal',
+  'shell:showItemInFolder',
   'app:getVersion',
+<<<<<<< HEAD
   'db:getPath',
   'project:list',
   'project:create',
@@ -25,6 +29,15 @@ const INVOKE_CHANNELS = [
   'workspace:updateCaptureOrder',
   'annotation:replace',
   'webview:saveCapture',
+=======
+  'ffmpeg:createPreview',
+  'ffmpeg:extractFrame',
+  'export:project',
+  'import:project',
+  'export:manualHtmlZip',
+  'export:manualPdf',
+  'dao:call',
+>>>>>>> feature/deliverable-design
   'shortcut:register',
   'shortcut:unregister'
 ]
@@ -33,7 +46,16 @@ const INVOKE_CHANNELS = [
 const SEND_CHANNELS: string[] = []
 
 // Listener channels
+<<<<<<< HEAD
 const ON_CHANNELS = ['update:available', 'update:downloaded', 'shortcut:captureWebview', 'capture:webviewWindowOpen']
+=======
+const ON_CHANNELS = [
+  'update:available',
+  'update:downloaded',
+  'shortcut:captureWebview',
+  'shortcut:captureVideo'
+]
+>>>>>>> feature/deliverable-design
 
 const systemInfo = {
   platform: process.platform,
@@ -45,6 +67,7 @@ const systemInfo = {
 // Custom APIs for renderer
 const api = {
   getSystemInfo: () => systemInfo,
+  getPathForFile: (file: File) => webUtils.getPathForFile(file),
   invoke: (channel: string, ...args: unknown[]) => {
     if (INVOKE_CHANNELS.includes(channel)) {
       return ipcRenderer.invoke(channel, ...args)
@@ -82,4 +105,6 @@ if (process.contextIsolated) {
   window.electron = electronAPI
   // @ts-ignore (define in dts)
   window.api = api
+  // @ts-ignore (define in dts)
+  window.dao = DAO
 }

@@ -1,101 +1,84 @@
 <template>
-  <div class="drawer drawer-end">
-    <input id="drawerRight" v-model="isDrawerOpen" type="checkbox" class="drawer-toggle" />
-    <div class="drawer-content">
-      <div class="flex h-[100vh] flex-col">
-        <div class="flex items-center gap-3 border-b border-white/10 bg-slate-900 p-2">
-            <button
-              type="button"
-              class="flex h-12 w-12 items-center justify-center rounded-none bg-slate-900 text-white transition-colors hover:bg-slate-900"
-              @click="goHome"
-            >
-            <i-lucide-house class="text-lg" />
-          </button>
-
-          <div class="flex grow items-center gap-2">
-            <div class="flex gap-1">
-              <button :disabled="!canGoBack" class="btn btn-sm btn-ghost" @click="goBack">
-                <i-lucide-chevron-left />
+  <div class="flex gap-1 bg-slate-200">
+    <div class="flex h-[100vh] flex-col flex-1">
+      <!-- Toolbar -->
+      <div
+        class="flex items-center gap-3 border-b border-base-content/10 bg-slate-200 shadow-md p-2"
+      >
+        <div class="flex grow items-center gap-2">
+          <div class="flex gap-1">
+            <div class="tooltip tooltip-bottom" data-tip="뒤로 가기">
+              <button
+                :disabled="!canGoBack"
+                class="btn btn-sm btn-ghost border-none shadow-none rounded-full hover:text-neutral"
+                @click="goBack"
+              >
+                <i-lucide-chevron-left class="text-lg" />
               </button>
-              <button :disabled="!canGoForward" class="btn btn-sm btn-ghost" @click="goForward">
-                <i-lucide-chevron-right />
+            </div>
+            <div class="tooltip tooltip-bottom" data-tip="앞으로 가기">
+              <button
+                :disabled="!canGoForward"
+                class="btn btn-sm btn-ghost border-none shadow-none rounded-full hover:text-neutral"
+                @click="goForward"
+              >
+                <i-lucide-chevron-right class="text-lg" />
               </button>
+            </div>
+            <div class="tooltip tooltip-bottom" data-tip="새로고침">
               <button class="btn btn-sm btn-ghost" :disabled="isLoading" @click="reload">
                 <div v-if="isLoading" class="loading loading-spinner loading-sm"></div>
                 <i-lucide-refresh-cw />
               </button>
             </div>
-            <form class="flex flex-1 gap-2" @submit.prevent="navigate">
-              <input
-                v-model="urlInput"
-                type="text"
-                class="input input-sm input-bordered w-full font-mono text-sm"
-                placeholder="https://example.com"
-              />
-            </form>
           </div>
+          <form class="flex flex-1 gap-2" @submit.prevent="navigate">
+            <input
+              v-model="urlInput"
+              type="text"
+              class="input input-sm input-bordered w-full font-mono text-sm"
+              placeholder="https://example.com"
+            />
+          </form>
+        </div>
+        <div class="tooltip tooltip-bottom" data-tip="나가기">
+          <button type="button" class="btn btn-ghost" @click="router.back()">
+            <i-lucide-square-arrow-right-exit class="text-lg" />
+          </button>
+        </div>
+      </div>
+      <!-- Toolbar -->
 
-            <div class="flex items-center gap-2 md:w-1/2 lg:w-[28rem]">
-              <div
-                class="flex h-8 grow items-center rounded-lg border border-white/30 bg-white/5 text-white"
-              >
-                <details class="dropdown dropdown-bottom" :open="isFolderDropdownOpen">
-                  <summary
-                    class="flex h-8 w-12 cursor-pointer items-center justify-center border-r border-white/20"
-                    @click.prevent="isFolderDropdownOpen = !isFolderDropdownOpen"
-                  >
-                    <i-lucide-chevron-down class="text-sm" />
-                  </summary>
-                <ul
-                  class="dropdown-content menu z-50 mt-2 w-64 rounded-box border border-white/10 bg-slate-800 p-2 shadow-xl"
-                >
-                  <li v-if="folderItems.length === 0" class="pointer-events-none opacity-60">
-                    <span>폴더가 없습니다.</span>
-                  </li>
-                  <li v-for="folder in folderItems" :key="folder.id">
-                    <button
-                      type="button"
-                      class="flex items-center justify-between text-white"
-                      @click="onSelectFolder(folder.id)"
-                    >
-                      <span class="truncate">{{ folder.title }}</span>
-                      <span class="badge badge-xs border-0 bg-white/10 text-slate-200">
-                        {{ folder.images.length }}
-                      </span>
-                    </button>
-                  </li>
-                </ul>
-              </details>
-                <div class="flex min-w-0 flex-1 items-center justify-start px-3">
-                  <span class="truncate text-xs font-semibold">
-                    {{ selectedFolder?.title ?? '폴더를 선택하세요' }}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  class="mr-2 flex h-6 min-w-10 items-center justify-center rounded-full px-2 text-xs font-bold"
-                  :class="
-                    selectedFolderImages.length > 0
-                      ? 'bg-rose-500 text-white'
-                    : 'bg-white/10 text-slate-300'
-                "
-                :disabled="selectedFolderId === null"
-                @click="modalCaptureImagesRef?.onOpen()"
-              >
-                + {{ selectedFolderImages.length }}
-              </button>
+      <!-- Webview -->
+      <div class="relative flex-1">
+        <webview
+          v-if="webviewSrc"
+          ref="webviewRef"
+          :src="webviewSrc"
+          allowpopups
+          class="absolute inset-0 h-full w-full bg-white"
+        ></webview>
+        <div
+          class="pointer-events-none absolute inset-0 bg-white transition-opacity duration-150"
+          :class="isCaptureFlashVisible ? 'opacity-80' : 'opacity-0'"
+        ></div>
+      </div>
+      <!-- Webview -->
+    </div>
+    <div class="w-100 h-[100vh] bg-base-100 flex-shrink-0 p-3 flex flex-col overflow-hidden">
+      <div class="mb-4 flex items-center gap-2">
+        <div class="flex min-w-0 items-center gap-1.5">
+          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-violet-100">
+            <i-lucide-folder-kanban class="h-4 w-4 text-violet-600" />
+          </div>
+          <div class="min-w-0">
+            <div class="truncate text-xs font-black text-slate-950">프로젝트</div>
+            <div class="truncate text-[11px] font-semibold text-slate-400">
+              {{ workspaceInfo?.project_name }}
             </div>
-              <button
-                type="button"
-                class="btn btn-sm shrink-0 border border-blue-900 bg-white px-3 text-xs text-blue-900 shadow-none hover:bg-blue-900 hover:text-white"
-                :disabled="selectedFolderId === null"
-                @click="goSelect"
-              >
-                문서 생성 시작하기
-                <i-lucide-arrow-right class="text-sm" />
-              </button>
           </div>
         </div>
+<<<<<<< HEAD
 
         <div class="relative flex-1">
           <webview
@@ -123,36 +106,75 @@
             <i-lucide-chevron-right v-if="isDrawerOpen" class="text-sm" />
             <i-lucide-chevron-left v-else class="text-sm" />
           </label>
+=======
+        <i-lucide-chevron-right class="h-4 w-4 shrink-0 text-slate-300" />
+        <div class="flex min-w-0 items-center gap-1.5">
+          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-violet-100">
+            <i-lucide-briefcase class="h-4 w-4 text-violet-600" />
+          </div>
+          <div class="min-w-0">
+            <div class="truncate text-xs font-black text-slate-950">워크스페이스</div>
+            <div class="truncate text-[11px] font-semibold text-slate-400">
+              {{ workspaceInfo?.name }}
+            </div>
+          </div>
         </div>
-
-        <ModalCaptureImages
-          ref="modalCaptureImagesRef"
-          :captureImageItems="selectedFolderImages"
-          :title="selectedFolder?.title ?? '선택된 폴더'"
-          @onRemoveImage="onRemoveCaptureImage"
-        />
+      </div>
+      <div class="overflow-y-auto w-full p-3 bg-slate-50 rounded-md flex-1">
+        <!-- 캡쳐 이미지 목록 -->
+        <div class="grid grid-cols-2 gap-4">
+          <div v-for="image in captureImages" :key="image.id" class="group">
+            <div class="overflow-hidden border border-gray-300 rounded-md shadow-sm h-30 relative">
+              <img :src="image.src" :alt="image.name" class="object-cover w-full h-full" />
+              <div
+                class="absolute bottom-0 left-0 w-full h-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center"
+              >
+                <div class="flex gap-2">
+                  <button type="button" class="btn btn-sm btn-circle" @click="onEditCapture(image)">
+                    <i-lucide-pencil />
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-circle"
+                    @click="onDeleteCapture(image)"
+                  >
+                    <i-lucide-trash />
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="text-sm text-center mt-2 overflow-hidden text-ellipsis whitespace-nowrap">
+              {{ image.name }}
+            </div>
+          </div>
+>>>>>>> feature/deliverable-design
+        </div>
       </div>
     </div>
-
-    <div class="drawer-side pointer-events-none z-30 top-16 h-[calc(100vh-4rem)]">
-      <div class="pointer-events-auto h-full">
-        <PanelCaptureGroup
-          :folderItems="folderItems"
-          :selectedFolderId="selectedFolderId"
-          @onCreateFolder="onCreateFolder"
-          @onOpenCaptureModal="modalCaptureImagesRef?.onOpen()"
-          @onRenameFolder="onRenameFolder"
-          @onRemoveFolder="onRemoveFolder"
-          @onSelectFolder="onSelectFolder"
-        />
-      </div>
-    </div>
+    <ModalCaptureName ref="modalCaptureNameRef" @on-confirm="onCaptureNameConfirm" />
+    <ModalConfirm ref="modalConfirmRef" @on-confirm="onConfirmDeleteCapture">
+      <template #message>
+        <div class="text-center">
+          <h3 class="text-lg font-bold mb-2">{{ deletingCapture?.name }}</h3>
+          <p class="text-sm text-gray-500">캡쳐 이미지를 삭제하시겠습니까?</p>
+        </div>
+      </template>
+    </ModalConfirm>
   </div>
 </template>
 
 <script setup lang="ts">
-import { useRoute, useRouter } from 'vue-router'
-import { toFileImageSrc } from '@/utils/manualWorkspace'
+import {
+  createCaptureWithImage,
+  deleteCapture,
+  getCaptureList,
+  getWorkspaceDetail,
+  updateCaptureName,
+  type WorkspaceDetail
+} from '@/database'
+
+const modalCaptureNameRef = ref<ComponentRef<'ModalCaptureName'> | null>(null)
+const modalConfirmRef = ref<ComponentRef<'ModalConfirm'> | null>(null)
 
 interface WebviewElement extends HTMLElement {
   src: string
@@ -162,9 +184,9 @@ interface WebviewElement extends HTMLElement {
   canGoBack: () => boolean
   canGoForward: () => boolean
   capturePage: () => Promise<{ toDataURL: () => string }>
-  addEventListener: (event: string, listener: (e: unknown) => void) => void
 }
 
+<<<<<<< HEAD
 interface WebviewWindowOpenEvent {
   url: string
   preventDefault?: () => void
@@ -207,100 +229,69 @@ interface SavedCaptureRecord {
   sort_order: number
   is_selected: number
   created_at: string
+=======
+interface WebviewNavigationEvent {
+  url?: string
+  isMainFrame?: boolean
+>>>>>>> feature/deliverable-design
 }
 
 const START_PAGE_URL = 'https://www.google.com'
-const CAPTURE_SHORTCUT_KEY = 'CommandOrControl+Shift+S'
 
 const webviewRef = ref<WebviewElement | null>(null)
-const modalCaptureImagesRef = ref<ComponentRef<'ModalCaptureImages'> | null>(null)
 const router = useRouter()
 const route = useRoute()
+const workspaceId = computed(() => String(route.params.workspaceId ?? ''))
 
+<<<<<<< HEAD
 const urlInput = ref('')
+=======
+// 화면 상태
+const workspaceInfo = ref<WorkspaceDetail | null>(null)
+const urlInput = ref('')
+const webviewSrc = ref('')
+>>>>>>> feature/deliverable-design
 const currentUrl = ref('')
 const isLoading = ref(false)
 const canGoBack = ref(false)
 const canGoForward = ref(false)
-const isDrawerOpen = ref(false)
-const isFolderDropdownOpen = ref(false)
 const isCaptureFlashVisible = ref(false)
+<<<<<<< HEAD
 const isWebviewReady = ref(false)
-let captureFlashTimeout: ReturnType<typeof setTimeout> | null = null
+=======
 
+// 캡쳐 목록/모달 상태
+const captureImages = ref<CaptureImage[]>([])
+const editingCaptureId = ref<number | null>(null)
+const deletingCapture = ref<CaptureImage | null>(null)
+
+>>>>>>> feature/deliverable-design
+let captureFlashTimeout: ReturnType<typeof setTimeout> | null = null
+let webviewCaptureListener: (() => void) | null = null
+
+<<<<<<< HEAD
 const projectId = computed(() => String(route.query.projectId ?? ''))
 const captureFolderId = computed(() => String(route.query.captureFolderId ?? ''))
 const currentProject = ref<ProjectRecord | null>(null)
 const folderItems = ref<CaptureFolder[]>([])
 const selectedFolderId = ref<string | null>(String(route.query.captureFolderId ?? '') || null)
+=======
+// 워크스페이스 정보와 최초 접속 URL 불러옴
+const loadWorkspaceInfo = async (): Promise<void> => {
+  if (!workspaceId.value) return
+>>>>>>> feature/deliverable-design
 
-const selectedFolder = computed(() =>
-  folderItems.value.find((item) => item.id === selectedFolderId.value) ?? null
-)
-const selectedFolderImages = computed(() => selectedFolder.value?.images ?? [])
+  workspaceInfo.value = await getWorkspaceDetail(workspaceId.value)
 
-const ensureSelectedFolder = (): void => {
-  if (selectedFolderId.value && folderItems.value.some((item) => item.id === selectedFolderId.value)) {
-    return
-  }
-
-  selectedFolderId.value = folderItems.value[0]?.id ?? null
+  const initialUrl = workspaceInfo.value?.latest_src_url || START_PAGE_URL
+  // const latestUrl = workspaceInfo.value?.latest_src_url ?? ''
+  // const initialUrl = /^https?:\/\//i.test(latestUrl) ? latestUrl : START_PAGE_URL
+  urlInput.value = initialUrl
+  currentUrl.value = initialUrl
+  webviewSrc.value = initialUrl
 }
 
-const loadProjectFromDatabase = async (): Promise<void> => {
-  if (!projectId.value) return
-
-  currentProject.value = (await window.api.invoke('project:get', {
-    projectId: projectId.value
-  })) as ProjectRecord | null
-}
-
-const loadWorkspaceFromDatabase = async (): Promise<void> => {
-  if (!projectId.value) return
-
-  const response = (await window.api.invoke('workspace:get', {
-    projectId: projectId.value
-  })) as {
-    folders: WorkspaceFolderResponse[]
-  }
-
-  folderItems.value = (response.folders ?? [])
-    .filter((folder) => folder.area_type === 'capture')
-    .map((folder) => ({
-    id: folder.id,
-    title: folder.title,
-    description: folder.description,
-    path: folder.path,
-    images: folder.screenshots.map((row) => ({
-      id: row.id,
-      src: row.image_src ?? toFileImageSrc(row.image_path),
-      filePath: row.image_path
-    }))
-  }))
-
-  ensureSelectedFolder()
-}
-
-const syncFoldersToDatabase = async (): Promise<void> => {
-  if (!projectId.value) return
-
-  await window.api.invoke('capture:syncFolders', {
-    projectId: projectId.value,
-    projectName: currentProject.value?.name ?? projectId.value,
-    projectDescription: currentProject.value?.description ?? '',
-    sourceUrl: currentUrl.value,
-    areaScope: 'capture',
-    folders: folderItems.value.map((item, index) => ({
-      id: item.id,
-      title: item.title,
-      areaType: 'capture',
-      description: item.description,
-      path: item.path,
-      sortOrder: index
-    }))
-  })
-}
-
+// 주소 입력창에서 이동할 때만 webview src 변경
 const navigate = (): void => {
   let url = urlInput.value.trim()
   if (!url) return
@@ -309,6 +300,7 @@ const navigate = (): void => {
     urlInput.value = url
   }
   currentUrl.value = url
+  webviewSrc.value = url
 }
 
 const goBack = (): void => {
@@ -323,6 +315,7 @@ const reload = (): void => {
   webviewRef.value?.reload()
 }
 
+<<<<<<< HEAD
 const navigateToWebviewUrl = (url: string): void => {
   if (!url) return
   urlInput.value = url
@@ -348,6 +341,10 @@ const goSelect = async (): Promise<void> => {
   const activeFolderId = selectedFolderId.value
   if (!webview || activeFolderId === null) return
 
+=======
+// 현재 webview 화면을 이미지 data URL로 캡쳐
+const getCaptureImageDataURL = async (): Promise<string | null> => {
+>>>>>>> feature/deliverable-design
   if (captureFlashTimeout) {
     clearTimeout(captureFlashTimeout)
   }
@@ -357,53 +354,11 @@ const goSelect = async (): Promise<void> => {
     captureFlashTimeout = null
   }, 140)
 
-  const image = await webview.capturePage()
-  const dataUrl = image.toDataURL()
-  const activeFolder = folderItems.value.find((item) => item.id === activeFolderId)
-  if (!activeFolder) return
-
-  const result = (await window.api.invoke('capture:save', {
-    projectId: projectId.value,
-    projectName: currentProject.value?.name ?? projectId.value,
-    projectDescription: currentProject.value?.description ?? '',
-    folderId: activeFolder.id,
-    folderTitle: activeFolder.title,
-    sourceUrl: currentUrl.value,
-    pageTitle: currentUrl.value,
-    menuPath: activeFolder.path,
-    screenDescription: activeFolder.description,
-    functionalityDescription: '',
-    writerName: '',
-    dataUrl
-  })) as {
-    success: boolean
-    capture?: {
-      id: string
-      filePath: string
-      imageSrc: string
-    }
-  }
-
-  const capture = result.capture
-  if (!result.success || !capture) return
-
-  folderItems.value = folderItems.value.map((item) =>
-    item.id === activeFolderId
-      ? {
-          ...item,
-          images: [
-            ...item.images,
-            {
-              id: capture.id,
-              src: capture.imageSrc,
-              filePath: capture.filePath
-            }
-          ]
-        }
-      : item
-  )
+  const image = await webviewRef.value?.capturePage()
+  return image?.toDataURL() ?? null
 }
 
+<<<<<<< HEAD
 const onRemoveCaptureImage = async (id: string): Promise<void> => {
   const activeFolderId = selectedFolderId.value
   if (activeFolderId === null) return
@@ -511,6 +466,10 @@ onMounted(async () => {
 
   await nextTick()
 
+=======
+// webview 로딩 상태와 현재 URL 표시만 동기화
+const initWebview = (): void => {
+>>>>>>> feature/deliverable-design
   const webview = webviewRef.value
   if (!webview) return
 
@@ -525,16 +484,53 @@ onMounted(async () => {
     canGoForward.value = webview.canGoForward()
   })
 
+<<<<<<< HEAD
   webview.addEventListener('did-navigate', (e: unknown) => {
     const event = e as { url: string; isMainFrame?: boolean }
     if (!event.isMainFrame) return
 
     currentUrl.value = event.url
     urlInput.value = event.url
+=======
+  const syncCurrentUrl = (e: Event): void => {
+    const event = e as WebviewNavigationEvent
+    if (event.isMainFrame === false || !event.url) return
+
+    urlInput.value = event.url
+    currentUrl.value = event.url
+>>>>>>> feature/deliverable-design
     canGoBack.value = webview.canGoBack()
     canGoForward.value = webview.canGoForward()
+  }
+
+  webview.addEventListener('did-navigate', syncCurrentUrl)
+  webview.addEventListener('did-navigate-in-page', syncCurrentUrl)
+}
+
+// 단축키 입력 시 캡쳐 이름 입력 모달 열기
+const onCaptureWebview = async (): Promise<void> => {
+  const webview = webviewRef.value
+  if (!webview) return
+  editingCaptureId.value = null
+  modalCaptureNameRef.value?.onOpen()
+}
+
+// 로컬 저장 이미지 경로를 appimg URL로 변환
+const toFileSrc = (imgPath: string): string => {
+  const normalizedPath = imgPath.replace(/\\/g, '/')
+  return `appimg:///${normalizedPath}`
+}
+
+// 저장된 캡쳐 이미지 목록 조회
+const loadCaptureList = async (): Promise<void> => {
+  if (!workspaceId.value) return
+
+  const list = await getCaptureList({
+    workspaceId: Number(workspaceId.value),
+    sourceType: 'web'
   })
 
+<<<<<<< HEAD
   webview.addEventListener('did-navigate-in-page', (e: unknown) => {
     const event = e as { url: string; isMainFrame?: boolean }
     console.log('???', event)
@@ -564,8 +560,100 @@ onMounted(async () => {
 
 
 
+=======
+  captureImages.value = list.map((item) => ({
+    id: item.id,
+    name: item.name,
+    src: item.img_path ? toFileSrc(item.img_path) : '',
+    imgPath: item.img_path ?? undefined
+  }))
+}
+
+// 캡쳐 이미지 이름 수정 모달 열기
+const onEditCapture = (image: CaptureImage): void => {
+  editingCaptureId.value = image.id
+  modalCaptureNameRef.value?.onOpen({
+    initialName: image.name,
+    title: '캡쳐 이미지명을 변경하세요',
+    confirmText: '저장'
+  })
+}
+
+// 캡쳐 이미지 삭제 확인 모달 열기
+const onDeleteCapture = (image: CaptureImage): void => {
+  deletingCapture.value = image
+  modalConfirmRef.value?.onOpen()
+}
+
+// 캡쳐 이미지 DB row와 로컬 파일 삭제
+const onConfirmDeleteCapture = async (): Promise<void> => {
+  const target = deletingCapture.value
+  if (!target) return
+
+  await deleteCapture({
+    id: target.id,
+    imgPath: target.imgPath ?? null
+  })
+
+  captureImages.value = captureImages.value.filter((item) => item.id !== target.id)
+  deletingCapture.value = null
+}
+
+// 캡쳐 이미지 이름 저장 또는 신규 캡쳐 저장 처리
+const onCaptureNameConfirm = async (name: string): Promise<void> => {
+  const nextName = name.trim()
+  if (!nextName) return
+
+  if (editingCaptureId.value !== null) {
+    const captureId = editingCaptureId.value
+    await updateCaptureName({
+      id: captureId,
+      name: nextName
+    })
+
+    captureImages.value = captureImages.value.map((item) =>
+      item.id === captureId ? { ...item, name: nextName } : item
+    )
+    editingCaptureId.value = null
+    return
+  }
+
+  const imageDataURL = await getCaptureImageDataURL()
+  if (!imageDataURL) return
+
+  const saved = await createCaptureWithImage({
+    workspaceId: String(workspaceId.value),
+    name: nextName,
+    dataUrl: imageDataURL,
+    currentUrl: currentUrl.value,
+    sourceType: 'web'
+  })
+  if (!saved) return
+
+  captureImages.value.unshift({
+    id: saved.id,
+    name: nextName,
+    src: imageDataURL,
+    imgPath: saved.imgPath
+  })
+}
+
+// 화면 진입 시 webview와 캡쳐 단축키 초기화
+onMounted(async () => {
+  await loadWorkspaceInfo()
+  await nextTick()
+  initWebview()
+  await loadCaptureList()
+  window.api.invoke(
+    'shortcut:register',
+    CAPTURE_SHORTCUTS.WEB_CAPTURE,
+    SHORTCUT_CHANNELS.CAPTURE_WEBVIEW
+  )
+  webviewCaptureListener = window.api.on(SHORTCUT_CHANNELS.CAPTURE_WEBVIEW, onCaptureWebview)
+>>>>>>> feature/deliverable-design
 })
 
+// 화면 이탈 시 타이머와 단축키 리스너 정리
 onUnmounted(() => {
   if (captureFlashTimeout) {
     clearTimeout(captureFlashTimeout)
@@ -573,11 +661,15 @@ onUnmounted(() => {
   }
   webviewCaptureListener?.()
   webviewCaptureListener = null
+<<<<<<< HEAD
 
   popupUrlListener?.()
   popupUrlListener = null
 
 
   window.api.invoke('shortcut:unregister', CAPTURE_SHORTCUT_KEY)
+=======
+  window.api.invoke('shortcut:unregister', CAPTURE_SHORTCUTS.WEB_CAPTURE)
+>>>>>>> feature/deliverable-design
 })
 </script>
