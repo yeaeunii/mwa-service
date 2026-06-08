@@ -46,7 +46,7 @@
             : 'btn-ghost text-base-content/60 hover:bg-primary/10 hover:text-primary'
         "
         :data-tip="tool.tip"
-        :title="tool.label"
+        :title="tool.tip"
         @click="toggleTool(tool.value)"
       >
         <span class="flex h-4 w-4 items-center justify-center">
@@ -84,7 +84,6 @@ const palette = [
 
 const toolItems: Array<{
   value: ActiveToolMode
-  // label: string
   tip: string
 }> = [
   { value: 'number', tip: '번호 마커' },
