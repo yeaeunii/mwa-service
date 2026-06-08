@@ -139,7 +139,7 @@
             v-for="(entry, pageIndex) in flatItems"
             :id="getPageElementId(entry.item.placement_id)"
             :key="entry.item.placement_id"
-            class="mx-auto flex min-h-[1123px] w-[794px] flex-col bg-white px-7 py-6 text-[#1f3554] shadow-sm"
+            class="mx-auto flex min-h-[1123px] w-[794px] flex-col bg-base-100 px-7 py-6 text-base-content shadow-sm"
             :class="{ 'mb-8': pageIndex < flatItems.length - 1 }"
           >
             <header class="border-b border-slate-200 pb-4">
@@ -148,7 +148,7 @@
                   <div class="flex min-w-0 items-center gap-1.5 text-xs">
                     <span class="truncate text-base-content/55">{{ currentPhase }}</span>
                     <span class="text-base-content/45 select-none">/</span>
-                    <span class="truncate font-bold text-[#315b96]">{{ selectedTitle }}</span>
+                    <span class="truncate font-bold text-primary">{{ selectedTitle }}</span>
                   </div>
                 </div>
                 <div class="text-[11px] font-semibold text-slate-600">
@@ -171,11 +171,11 @@
                 >
               </div>
 
-              <div class="mt-5 rounded-md border border-[#cfd9e8] bg-[#eef4ff] p-4">
+              <div class="mt-5 rounded-md border border-base-300 bg-base-200 p-4">
                 <div class="mb-2 flex items-center gap-2">
-                  <span class="text-sm font-black text-[#315b96]">화면 개요</span>
+                  <span class="text-sm font-black text-primary">화면 개요</span>
                 </div>
-                <p class="text-xs leading-6 text-[#243b5a]">
+                <p class="text-xs leading-6 text-base-content/80">
                   {{ entry.item.description || '화면 설명이 없습니다.' }}
                 </p>
               </div>
@@ -184,7 +184,7 @@
             <section class="mt-6">
               <div class="mb-2 flex items-center gap-2">
                 <i-lucide-square-check class="h-3.5 w-3.5 text-slate-500" />
-                <h2 class="text-sm font-black text-[#1f3554]">화면구성</h2>
+                <h2 class="text-sm font-black text-base-content">화면구성</h2>
               </div>
 
               <div class="border border-slate-300 bg-white p-1">
@@ -211,11 +211,11 @@
             <section class="mt-6">
               <div class="mb-2 flex items-center gap-2 border-b border-slate-200 pb-2">
                 <i-lucide-square-check class="h-3.5 w-3.5 text-slate-500" />
-                <h2 class="text-sm font-black text-[#1f3554]">주요 기능 명세</h2>
+                <h2 class="text-sm font-black text-base-content">주요 기능 명세</h2>
               </div>
 
               <table class="w-full border border-slate-300 text-xs">
-                <thead class="bg-[#eef2f7] text-[#1f3554]">
+                <thead class="bg-base-200 text-base-content">
                   <tr>
                     <th class="w-16 border border-slate-300 px-3 py-2 text-center">번호</th>
                     <th class="border border-slate-300 px-3 py-2 text-center">상세 설명</th>
@@ -242,7 +242,7 @@
             </section>
 
             <footer
-              class="mt-auto flex items-end justify-between border-t border-slate-200 pt-7 text-[11px] text-[#1f3554]"
+              class="mt-auto flex items-end justify-between border-t border-slate-200 pt-7 text-[11px] text-base-content"
             >
               <div>
                 <div>{{ projectTitle }} - {{ deliverableTitle }}</div>

@@ -49,8 +49,7 @@
                 type="button"
                 :disabled="isImportingProject"
                 class="inline-flex h-5 shrink-0 items-center gap-1.5 bg-transparent px-1 text-xs font-bold text-base-content/55 transition-colors hover:text-emerald-600 hover:underline disabled:pointer-events-none disabled:opacity-50"
-                @click.stop="importProject"
-              >
+                @click.stop="importProject">
                 <span v-if="isImportingProject" class="loading loading-spinner loading-xs" />
                 <i-lucide-folder-input v-else class="h-4 w-4" />
                 불러오기
@@ -63,8 +62,7 @@
           <!-- Project Grid -->
           <section
             v-if="selectedProjectFilter === '전체' || filteredProjects.length > 0"
-            class="grid grid-cols-1 content-start gap-5 pb-6 pt-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-          >
+            class="grid grid-cols-1 content-start gap-5 pb-6 pt-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             <button
               v-if="selectedProjectFilter === '전체'"
               type="button"

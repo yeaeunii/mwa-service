@@ -24,30 +24,24 @@ const props = defineProps<{
   description?: string
 }>()
 
-const getHexColorById = (id: number): string => {
-  const color = Math.floor(Math.abs(Math.sin(id) * 16777215))
-    .toString(16)
-    .padStart(6, '0')
+const getThumbnailColorById = (id: number): { background: string; content: string } => {
+  const seed = Math.abs(id)
+  const hue = Math.round((seed * 137.508) % 360)
+  const saturation = 58 + (seed % 4) * 7
+  const lightness = 42 + (seed % 5) * 6
 
-  return `#${color}`
-}
-
-const getReadableTextColor = (backgroundColor: string): string => {
-  const hex = backgroundColor.replace('#', '')
-  const red = parseInt(hex.slice(0, 2), 16)
-  const green = parseInt(hex.slice(2, 4), 16)
-  const blue = parseInt(hex.slice(4, 6), 16)
-  const brightness = (red * 299 + green * 587 + blue * 114) / 1000
-
-  return brightness > 150 ? '#1f2937' : '#ffffff'
+  return {
+    background: `hsl(${hue} ${saturation}% ${lightness}%)`,
+    content: lightness > 58 ? 'black' : 'white'
+  }
 }
 
 const thumbnailStyle = computed(() => {
-  const backgroundColor = getHexColorById(props.id)
+  const color = getThumbnailColorById(props.id)
 
   return {
-    backgroundColor,
-    color: getReadableTextColor(backgroundColor)
+    backgroundColor: color.background,
+    color: color.content
   }
 })
 </script>

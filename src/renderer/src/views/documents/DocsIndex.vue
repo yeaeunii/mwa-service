@@ -120,7 +120,7 @@
                       <section>
                         <div class="overflow-hidden border border-base-content/20">
                           <table class="table table-sm w-full">
-                            <thead class="bg-[#eef2f7] text-[#1f3554]">
+                            <thead class="bg-base-200 text-base-content">
                               <tr>
                                 <th class="w-16 border border-slate-300 px-3 py-2 text-center">
                                   번호

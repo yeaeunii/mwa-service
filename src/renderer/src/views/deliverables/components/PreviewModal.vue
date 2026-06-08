@@ -17,7 +17,7 @@
 
     <div class="max-h-[78vh] overflow-y-auto bg-base-200 p-5">
       <article
-        class="mx-auto flex min-h-[920px] w-[720px] flex-col bg-white px-7 py-6 text-[#1f3554] shadow-sm"
+        class="mx-auto flex min-h-[920px] w-[720px] flex-col bg-base-100 px-7 py-6 text-base-content shadow-sm"
       >
         <header class="border-b border-slate-200 pb-4">
           <div class="flex items-end justify-between">
@@ -35,9 +35,9 @@
             <span>경로: {{ entryPath || '입력된 화면 경로가 없습니다' }}</span>
           </div>
 
-          <div class="mt-5 rounded-md border border-[#cfd9e8] bg-[#eef4ff] p-4">
-            <div class="mb-2 text-sm font-black text-[#315b96]">화면 개요</div>
-            <p class="text-xs leading-6 text-[#243b5a]">
+          <div class="mt-5 rounded-md border border-base-300 bg-base-200 p-4">
+            <div class="mb-2 text-sm font-black text-primary">화면 개요</div>
+            <p class="text-xs leading-6 text-base-content/80">
               {{ currentDoc?.description || '화면 설명이 없습니다.' }}
             </p>
           </div>
@@ -46,7 +46,7 @@
         <section class="mt-6">
           <div class="mb-2 flex items-center gap-2">
             <i-lucide-square-check class="h-3.5 w-3.5 text-slate-500" />
-            <h2 class="text-sm font-black text-[#1f3554]">화면구성</h2>
+            <h2 class="text-sm font-black text-base-content">화면구성</h2>
           </div>
 
           <div class="border border-slate-300 bg-white p-1">
@@ -66,11 +66,11 @@
         <section class="mt-6">
           <div class="mb-2 flex items-center gap-2 border-b border-slate-200 pb-2">
             <i-lucide-square-check class="h-3.5 w-3.5 text-slate-500" />
-            <h2 class="text-sm font-black text-[#1f3554]">주요 기능 명세</h2>
+            <h2 class="text-sm font-black text-base-content">주요 기능 명세</h2>
           </div>
 
           <table class="w-full border border-slate-300 text-xs">
-            <thead class="bg-[#eef2f7] text-[#1f3554]">
+            <thead class="bg-base-200 text-base-content">
               <tr>
                 <th class="w-16 border border-slate-300 px-3 py-2 text-center">번호</th>
                 <th class="border border-slate-300 px-3 py-2 text-center">상세 설명</th>

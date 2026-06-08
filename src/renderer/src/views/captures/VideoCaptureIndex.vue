@@ -89,7 +89,7 @@
           <div class="absolute left-5 top-12">
             <button
               type="button"
-              class="flex h-10 w-10 items-center justify-center text-[#18375f] disabled:text-slate-300"
+              class="flex h-10 w-10 items-center justify-center text-primary disabled:text-base-content/25"
               :disabled="!videoSrc"
               @click="togglePlayback"
             >

@@ -65,12 +65,12 @@
     </header>
 
     <div
-      class="flex min-h-0 flex-1 flex-col gap-5 overflow-hidden bg-base-200 px-3 pb-4 pt-4 text-[#111827] xl:flex-row"
+      class="flex min-h-0 flex-1 flex-row gap-5 overflow-auto bg-base-200 px-3 pb-4 pt-4 text-base-content"
     >
       <aside
-        class="flex h-[min(42vh,32rem)] w-full shrink-0 flex-col overflow-hidden rounded-xl border border-base-300 bg-base-100/70 shadow-sm xl:h-auto xl:w-[clamp(19rem,24vw,24rem)]"
+        class="flex h-auto w-[clamp(19rem,24vw,24rem)] shrink-0 flex-col overflow-hidden rounded-xl border border-base-300 bg-base-100/70 shadow-sm"
       >
-        <div class="flex h-15 items-center justify-between border-b border-[#ece8eb] px-7">
+        <div class="flex h-15 items-center justify-between border-b border-base-300 px-7">
           <div class="flex min-w-0 items-center gap-2">
             <h2 class="text-xl font-black leading-none tracking-tight">스크린샷</h2>
             <span
@@ -143,9 +143,7 @@
             class="relative mt-3 min-h-0 flex-1 overflow-y-auto select-none"
             @mousedown="onMouseDown"
           >
-            <div
-              class="grid grid-cols-[repeat(auto-fit,minmax(120px,140px))] justify-start gap-x-2 gap-y-3"
-            >
+            <div class="mx-auto grid w-full max-w-[288px] grid-cols-2 gap-x-2 gap-y-3">
               <div
                 v-for="shot in shotList"
                 :key="shot.id"
@@ -219,7 +217,7 @@
       </aside>
 
       <main
-        class="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-base-200 px-3 transition-colors duration-150"
+        class="relative flex min-w-[42rem] flex-1 flex-col overflow-hidden bg-base-200 px-3 transition-colors duration-150"
         :class="isOverDropZone ? 'bg-primary/5' : ''"
         @dragover.prevent="onDragOver"
         @dragleave="onDragLeave"
@@ -257,7 +255,7 @@
 
           <div v-if="!isEditMode" class="mt-2 flex flex-wrap items-center justify-between gap-3">
             <div
-              class="flex h-8 items-center gap-1 rounded-md bg-[#e8e5e8] p-1 text-[11px] font-black text-slate-500"
+              class="flex h-8 items-center gap-1 rounded-md bg-base-300/70 p-1 text-[11px] font-black text-base-content/60"
             >
               <button
                 type="button"
@@ -291,7 +289,7 @@
             </div>
 
             <label
-              class="input input-sm h-8 w-full max-w-72 rounded-md border-[#d8d7dd] bg-white shadow-sm sm:w-72"
+              class="input input-sm h-8 w-full max-w-72 rounded-md border-base-300 bg-base-100 shadow-sm sm:w-72"
             >
               <i-lucide-search class="h-3.5 w-3.5 text-slate-500" />
               <input v-model="docQuery" type="search" placeholder="문서 검색..." />
@@ -306,7 +304,7 @@
           </p>
           <button
             type="button"
-            class="btn btn-sm h-8 min-h-0 rounded-md border-[#d8d7dd] bg-white"
+            class="btn btn-sm h-8 min-h-0 rounded-md border-base-300 bg-base-100"
             @click="toggleAllDocs"
           >
             {{ allDocsSelected ? '전체 해제' : '전체 선택' }}
@@ -324,7 +322,7 @@
               v-for="(doc, index) in docList"
               :key="doc.id"
               :to="!isEditMode ? `/workspace/${workspaceId}/documents/${doc.id}` : undefined"
-              class="doc-card group overflow-hidden rounded-lg border border-[#d8d7dd] bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-black/25 hover:shadow-md"
+              class="doc-card group overflow-hidden rounded-lg border border-base-300 bg-base-100 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-base-content/25 hover:shadow-md"
               :class="[
                 isEditMode ? 'cursor-move' : 'cursor-pointer',
                 docIds.has(doc.id) ? 'border-2 border-primary shadow-lg shadow-primary/20' : ''
@@ -368,7 +366,7 @@
                   {{ getDocDescription(doc) }}
                 </p>
               </div>
-              <div class="flex items-center justify-between border-t border-[#d8d7dd] px-3 py-2">
+              <div class="flex items-center justify-between border-t border-base-300 px-3 py-2">
                 <div class="flex items-center gap-1 text-[10px] font-bold text-slate-500">
                   <i-lucide-clock class="h-3 w-3" />
                   {{ getDocUpdatedAtText(doc) }}
@@ -378,7 +376,7 @@
                   :class="
                     doc.functionCount > 0
                       ? 'border-primary/10 bg-primary/10 text-primary'
-                      : 'border-[#d8d7dd] bg-[#f1f1f4] text-slate-600'
+                      : 'border-base-300 bg-base-200 text-base-content/70'
                   "
                 >
                   {{ doc.functionCount }} {{ doc.functionCount <= 1 ? 'Step' : 'Steps' }}
