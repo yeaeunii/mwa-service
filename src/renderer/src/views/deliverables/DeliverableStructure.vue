@@ -491,13 +491,8 @@ const cloneStructureItem = (item: SectionDocInput): SectionDocInput => ({
 
 const isDoneStructureItem = (item: SectionDocInput): boolean => item.status === '작업완료'
 
-const sortStructureItems = (items: SectionDocInput[]): SectionDocInput[] =>
-  [...items].sort((left, right) => {
-    const doneOrder = Number(isDoneStructureItem(right)) - Number(isDoneStructureItem(left))
-    if (doneOrder !== 0) return doneOrder
-
-    return getDocumentTitle(left).localeCompare(getDocumentTitle(right), 'ko')
-  })
+const sortDocsBySortOrder = (docs: Doc[]): Doc[] =>
+  [...docs].sort((left, right) => left.sort_order - right.sort_order || left.id - right.id)
 
 // DB 문서를 산출물 배치용 문서로 변환
 const mapDocToStructureItem = (doc: Doc): SectionDocInput => ({
@@ -563,7 +558,7 @@ const mapWorkspaceToStructureWorkspace = (
   workspace: Workspace,
   docs: Doc[]
 ): StructureWorkspaceView => {
-  const items = sortStructureItems(docs.map(mapDocToStructureItem))
+  const items = sortDocsBySortOrder(docs).map(mapDocToStructureItem)
   const structureWorkspace: StructureWorkspaceView = {
     id: String(workspace.id),
     name: workspace.name,

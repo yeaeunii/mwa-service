@@ -9,27 +9,6 @@ const INVOKE_CHANNELS = [
   'shell:openExternal',
   'shell:showItemInFolder',
   'app:getVersion',
-<<<<<<< HEAD
-  'db:getPath',
-  'project:list',
-  'project:create',
-  'project:get',
-  'project:update',
-  'project:delete',
-  'capture:syncFolders',
-  'capture:list',
-  'capture:save',
-  'capture:getLastUrl',
-  'capture:updateMeta',
-  'capture:overwriteImage',
-  'capture:remove',
-  'capture:importToFolder',
-  'workspace:get',
-  'workspace:updateSelection',
-  'workspace:updateCaptureOrder',
-  'annotation:replace',
-  'webview:saveCapture',
-=======
   'ffmpeg:createPreview',
   'ffmpeg:extractFrame',
   'export:project',
@@ -37,7 +16,6 @@ const INVOKE_CHANNELS = [
   'export:manualHtmlZip',
   'export:manualPdf',
   'dao:call',
->>>>>>> feature/deliverable-design
   'shortcut:register',
   'shortcut:unregister'
 ]
@@ -46,16 +24,12 @@ const INVOKE_CHANNELS = [
 const SEND_CHANNELS: string[] = []
 
 // Listener channels
-<<<<<<< HEAD
-const ON_CHANNELS = ['update:available', 'update:downloaded', 'shortcut:captureWebview', 'capture:webviewWindowOpen']
-=======
 const ON_CHANNELS = [
   'update:available',
   'update:downloaded',
   'shortcut:captureWebview',
   'shortcut:captureVideo'
 ]
->>>>>>> feature/deliverable-design
 
 const systemInfo = {
   platform: process.platform,

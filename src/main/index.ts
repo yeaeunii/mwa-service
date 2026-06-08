@@ -13,30 +13,6 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
-<<<<<<< HEAD
-import {
-  closeDatabase,
-  deleteProject,
-  copyCapturesToFolder,
-  deleteCapture,
-  getLastCaptureUrlByFolderId,
-  getDatabasePath,
-  getProjectById,
-  getProjectWorkspace,
-  initDatabase,
-  insertCapture,
-  listCapturesByProject,
-  listProjects,
-  markDeletedFolders,
-  replaceCaptureAnnotations,
-  updateProject,
-  updateCaptureMetadata,
-  updateCaptureSelections,
-  updateCaptureSortOrders,
-  upsertFolder,
-  upsertProject
-} from './db/database'
-=======
 import { initDatabase, closeDatabase } from '../database/conn'
 import * as DAO from '../database/dao'
 import type { ProjectExportData } from '../database/dto'
@@ -49,7 +25,6 @@ import { execFile } from 'child_process'
 import { createRequire } from 'module'
 import { Readable } from 'stream'
 import { randomBytes } from 'crypto'
->>>>>>> feature/deliverable-design
 
 const IMG_SCHEME = 'appimg'
 const require = createRequire(import.meta.url)
@@ -650,23 +625,6 @@ app.whenReady().then(() => {
   )
 
   ipcMain.handle(
-<<<<<<< HEAD
-    'capture:getLastUrl',
-    async (_, payload: { folderId: string }) => {
-    const url = getLastCaptureUrlByFolderId(payload.folderId)
-    return { url }
-  })
-  
-  ipcMain.handle(
-    'capture:remove',
-    async (_, payload: { captureId: string; filePath: string }) => {
-      deleteCapture(payload.captureId)
-
-      try {
-        await unlink(payload.filePath)
-      } catch {
-        // File may already be removed or unavailable; DB delete is the primary action.
-=======
     'ffmpeg:createPreview',
     async (
       _,
@@ -675,7 +633,6 @@ app.whenReady().then(() => {
       const videoPath = payload.videoPath
       if (!videoPath || !existsSync(videoPath)) {
         return { previewPath: null, error: '동영상 파일 경로를 찾을 수 없습니다.' }
->>>>>>> feature/deliverable-design
       }
 
       const ffmpegPath = resolveFfmpegPath()

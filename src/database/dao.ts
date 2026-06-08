@@ -1,6 +1,6 @@
 import { app } from 'electron'
 import type Database from 'better-sqlite3'
-import { copyFileSync, existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs'
+import { copyFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, writeFileSync } from 'fs'
 import { writeFile } from 'fs/promises'
 import path from 'path'
 import { selectList, selectOne, runQuery, transaction } from './conn'
@@ -9,6 +9,42 @@ import dayjs from 'dayjs'
 import { randomBytes } from 'crypto'
 
 const makeHash = (): string => randomBytes(4).toString('hex')
+
+const getThumbnailFileName = (
+  target: 'project' | 'workspace',
+  id: string | number,
+  extension = '.png'
+): string | null => {
+  const safeId = String(id).replace(/[^\w-]/g, '')
+  if (!safeId) return null
+
+  return `thumbnail_${target}_${safeId}${extension}`
+}
+
+const removeOldThumbnails = (
+  thumbnailsDir: string,
+  target: 'project' | 'workspace',
+  id: string | number,
+  keepAbsPath: string
+): void => {
+  const safeId = String(id).replace(/[^\w-]/g, '')
+  if (!safeId || !existsSync(thumbnailsDir)) return
+
+  const legacyPattern = new RegExp(`^thumbnail_${target}_[\\w-]+_${safeId}\\.png$`)
+  const keepPath = path.resolve(keepAbsPath)
+
+  readdirSync(thumbnailsDir)
+    .filter((file) => legacyPattern.test(file))
+    .map((file) => path.join(thumbnailsDir, file))
+    .filter((filePath) => path.resolve(filePath) !== keepPath)
+    .forEach((filePath) => {
+      try {
+        unlinkSync(filePath)
+      } catch {
+        // 오래된 썸네일 정리에 실패해도 현재 저장은 유지한다.
+      }
+    })
+}
 
 const saveThumbnail = (
   target: 'project' | 'workspace',
@@ -23,11 +59,15 @@ const saveThumbnail = (
   const thumbnailsDir = path.join(app.getPath('userData'), 'FILE', 'Thumbnails')
   mkdirSync(thumbnailsDir, { recursive: true })
 
-  const thumbnailName = `thumbnail_${target}_${makeHash()}_${id}.png`
+  const thumbnailName = getThumbnailFileName(target, id)
+  if (!thumbnailName) return null
+
   const thumbnailAbsPath = path.join(thumbnailsDir, thumbnailName)
   const thumbnailPath = path.join('FILE', 'Thumbnails', thumbnailName).replace(/\\/g, '/')
 
   writeFileSync(thumbnailAbsPath, Buffer.from(base64Data, 'base64'))
+  removeOldThumbnails(thumbnailsDir, target, id, thumbnailAbsPath)
+
   return thumbnailPath
 }
 
@@ -331,9 +371,11 @@ export const importProjectExportData = (
         project.thumbnail_path,
         createImportedFilePath(
           'Thumbnails',
-          `thumbnail_project_${makeHash()}_${newProjectId}${getStoredFileExtension(
-            getString(project, 'thumbnail_path')
-          )}`
+          getThumbnailFileName(
+            'project',
+            newProjectId,
+            getStoredFileExtension(getString(project, 'thumbnail_path'))
+          ) ?? `thumbnail_project_${newProjectId}.png`
         ),
         writtenFiles
       )
@@ -392,9 +434,11 @@ export const importProjectExportData = (
           workspace.thumbnail_path,
           createImportedFilePath(
             'Thumbnails',
-            `thumbnail_workspace_${makeHash()}_${newWorkspaceId}${getStoredFileExtension(
-              getString(workspace, 'thumbnail_path')
-            )}`
+            getThumbnailFileName(
+              'workspace',
+              newWorkspaceId,
+              getStoredFileExtension(getString(workspace, 'thumbnail_path'))
+            ) ?? `thumbnail_workspace_${newWorkspaceId}.png`
           ),
           writtenFiles
         )
@@ -725,6 +769,7 @@ export const updateProject = (project: Record<string, unknown>): void => {
     project.thumbnail === null
       ? ''
       : saveThumbnail('project', project.id as string | number, project.thumbnail)
+  let removedThumbnailPath = ''
 
   const payload = {
     updated_at: now,
@@ -733,6 +778,20 @@ export const updateProject = (project: Record<string, unknown>): void => {
   }
 
   transaction((db) => {
+    if (project.thumbnail === null) {
+      const currentProject = db
+        .prepare(
+          `
+            SELECT thumbnail_path
+            FROM t_project
+            WHERE id = @id
+          `
+        )
+        .get({ id: project.id }) as { thumbnail_path: string | null } | undefined
+
+      removedThumbnailPath = currentProject?.thumbnail_path ?? ''
+    }
+
     db.prepare(
       `
         UPDATE t_project
@@ -764,6 +823,10 @@ export const updateProject = (project: Record<string, unknown>): void => {
       `
     ).run(payload)
   })
+
+  if (removedThumbnailPath) {
+    deleteStoredFile(removedThumbnailPath)
+  }
 }
 
 export const updateProjectStatus = (project: Record<string, unknown>): void => {
@@ -988,6 +1051,7 @@ export const updateWorkspace = (workspace: Record<string, unknown>): void => {
     workspace.thumbnail === null
       ? ''
       : saveThumbnail('workspace', workspace.id as string | number, workspace.thumbnail)
+  let removedThumbnailPath = ''
   const query = `
     UPDATE t_workspace
     SET
@@ -1007,6 +1071,20 @@ export const updateWorkspace = (workspace: Record<string, unknown>): void => {
   }
 
   transaction((db) => {
+    if (workspace.thumbnail === null) {
+      const currentWorkspace = db
+        .prepare(
+          `
+            SELECT thumbnail_path
+            FROM t_workspace
+            WHERE id = @id
+          `
+        )
+        .get({ id: workspace.id }) as { thumbnail_path: string | null } | undefined
+
+      removedThumbnailPath = currentWorkspace?.thumbnail_path ?? ''
+    }
+
     db.prepare(query).run(payload)
     db.prepare(
       `
@@ -1020,6 +1098,10 @@ export const updateWorkspace = (workspace: Record<string, unknown>): void => {
       `
     ).run({ id: workspace.id, updated_at: now })
   })
+
+  if (removedThumbnailPath) {
+    deleteStoredFile(removedThumbnailPath)
+  }
 }
 
 export const updateWorkspaceVideo = (workspace: Record<string, unknown>): void => {
