@@ -22,34 +22,19 @@ import { pathToFileURL } from 'url'
 import { createReadStream, existsSync, mkdirSync, statSync } from 'fs'
 import { readdir, readFile, unlink, writeFile } from 'fs/promises'
 import { execFile } from 'child_process'
-import { createRequire } from 'module'
 import { Readable } from 'stream'
 import { randomBytes } from 'crypto'
 
 const IMG_SCHEME = 'appimg'
-const require = createRequire(import.meta.url)
 
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.m4v', '.webm', '.mov'])
 
 const resolveFfmpegPath = (): string => {
-  const candidatePaths = [
-    typeof ffmpegStaticPath === 'string' ? ffmpegStaticPath : '',
-    (() => {
-      try {
-        return require('ffmpeg-static') as string
-      } catch {
-        return ''
-      }
-    })(),
-    path.join(
-      process.cwd(),
-      'node_modules',
-      'ffmpeg-static',
-      process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
-    )
-  ]
+  if (typeof ffmpegStaticPath === 'string' && existsSync(ffmpegStaticPath)) {
+    return ffmpegStaticPath
+  }
 
-  return candidatePaths.find((candidatePath) => candidatePath && existsSync(candidatePath)) ?? 'ffmpeg'
+  throw new Error('ffmpeg-static 실행 파일을 찾을 수 없습니다.')
 }
 
 interface ManualExportPayload {
@@ -351,10 +336,11 @@ function createWindow(): void {
   })
 
   mainWindow.webContents.on('did-attach-webview', (_event, guestContents) => {
-    console.log('webview attached')
     guestContents.setWindowOpenHandler(({ url }) => {
-      console.log('popup url from guest', url)
-      mainWindow.webContents.send('capture:webviewWindowOpen', { url })
+      if (url) {
+        void guestContents.loadURL(url)
+      }
+
       return { action: 'deny' }
     })
   })

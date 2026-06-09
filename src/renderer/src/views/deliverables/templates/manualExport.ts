@@ -34,6 +34,18 @@ interface ExportEntry {
   phase: string
 }
 
+type OrderedExportItem =
+  | {
+      type: 'doc'
+      item: ExportDoc
+      order: number
+    }
+  | {
+      type: 'category'
+      item: ExportSection
+      order: number
+    }
+
 export interface ManualImageFile {
   path: string
   content: string
@@ -124,7 +136,8 @@ const mapDoc = (doc: DeliverableSectionDoc): ExportDoc => ({
   annotation_json: doc.annotation_json ?? '[]',
   orgn_img_path: doc.orgn_img_path ?? '',
   draw_img_path: doc.draw_img_path ?? '',
-  updated_at: doc.updated_at ?? ''
+  updated_at: doc.updated_at ?? '',
+  sortOrder: doc.sort_order
 })
 
 // flat한 section/doc 목록을 하위 카테고리 트리로 구성
@@ -143,7 +156,8 @@ const buildSections = (
       id: String(section.id),
       name: section.name,
       docs: [],
-      children: []
+      children: [],
+      sortOrder: section.sort_order
     })
   })
 
@@ -162,15 +176,38 @@ const buildSections = (
   return attach(null)
 }
 
+const getOrder = (item: { sortOrder?: number }, fallback: number): number => item.sortOrder ?? fallback
+
+const getOrderedSectionItems = (category: ExportSection): OrderedExportItem[] => {
+  const docOrders = new Set(category.docs.map((item) => item.sortOrder))
+  const hasOverlappingOrders = category.children.some(
+    (item) => item.sortOrder !== undefined && docOrders.has(item.sortOrder)
+  )
+
+  return [
+    ...category.docs.map((item, index) => ({
+      type: 'doc' as const,
+      item,
+      order: getOrder(item, index + 1)
+    })),
+    ...category.children.map((item, index) => ({
+      type: 'category' as const,
+      item,
+      order: hasOverlappingOrders
+        ? category.docs.length + index + 1
+        : getOrder(item, category.docs.length + index + 1)
+    }))
+  ].sort((left, right) => left.order - right.order)
+}
+
 // 카테고리 트리를 문서 페이지 순서대로 펼침
 const collectEntries = (category: ExportSection, parentTitles: string[] = []): ExportEntry[] => {
   const phaseTitles = [...parentTitles, category.name]
   const phase = phaseTitles.join(' / ')
 
-  return [
-    ...category.docs.map((item) => ({ item, phase })),
-    ...category.children.flatMap((child) => collectEntries(child, phaseTitles))
-  ]
+  return getOrderedSectionItems(category).flatMap((entry) =>
+    entry.type === 'doc' ? [{ item: entry.item, phase }] : collectEntries(entry.item, phaseTitles)
+  )
 }
 
 // 좌측 목차에 표시할 카테고리/문서 row 생성
@@ -187,15 +224,20 @@ const collectOutlineRows = (
       depth,
       parentId
     },
-    ...category.docs.map<ManualOutlineRow>((item) => ({
-      id: `item-${item.doc_id}`,
-      kind: 'item',
-      title: item.doc_title,
-      pageId: getPageElementId(item.doc_id),
-      depth: depth + 1,
-      parentId: `category-${category.id}`
-    })),
-    ...collectOutlineRows(category.children, `category-${category.id}`, depth + 1)
+    ...getOrderedSectionItems(category).flatMap<ManualOutlineRow>((entry) =>
+      entry.type === 'doc'
+        ? [
+            {
+              id: `item-${entry.item.doc_id}`,
+              kind: 'item',
+              title: entry.item.doc_title,
+              pageId: getPageElementId(entry.item.doc_id),
+              depth: depth + 1,
+              parentId: `category-${category.id}`
+            }
+          ]
+        : collectOutlineRows([entry.item], `category-${category.id}`, depth + 1)
+    )
   ])
 
 const getPageElementId = (itemId: string): string => `manual-page-${itemId}`

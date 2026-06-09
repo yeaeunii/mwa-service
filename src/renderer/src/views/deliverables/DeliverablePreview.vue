@@ -175,7 +175,7 @@
                 <div class="mb-2 flex items-center gap-2">
                   <span class="text-sm font-black text-primary">화면 개요</span>
                 </div>
-                <p class="text-xs leading-6 text-base-content/80">
+                <p class="whitespace-pre-line text-xs leading-6 text-base-content/80">
                   {{ entry.item.description || '화면 설명이 없습니다.' }}
                 </p>
               </div>
@@ -232,7 +232,7 @@
                       </span>
                     </td>
                     <td class="break-all border border-slate-300 px-3 py-3 text-center align-top">
-                      <p class="whitespace-normal break-all leading-5 text-slate-600">
+                      <p class="whitespace-pre-line break-all leading-5 text-slate-600">
                         {{ item.description }}
                       </p>
                     </td>
@@ -257,11 +257,11 @@
     <ModalBase ref="downloadCompleteModalRef" width="w-80">
       <div class="py-3 text-center text-sm font-semibold">{{ downloadCompleteMessage }}</div>
       <template #footer="{ close }">
-        <button class="btn btn-smgap-1.5" @click="openSavedDownloadFolder">
+        <button class="btn btn-sm min-w-28 gap-1.5" @click="openSavedDownloadFolder">
           <i-lucide-folder-open class="h-4 w-4" />
           폴더 열기
         </button>
-        <button class="btn btn-sm" @click="close">
+        <button class="btn btn-sm min-w-28" @click="close">
           <i-lucide-check class="h-4 w-4" />
           확인
         </button>
@@ -314,6 +314,18 @@ interface PreviewEntry {
   phase: string
   depth: number
 }
+
+type OrderedPreviewItem =
+  | {
+      type: 'doc'
+      item: PreviewDoc
+      order: number
+    }
+  | {
+      type: 'category'
+      item: PreviewSection
+      order: number
+    }
 
 type PreviewOutlineRow =
   | {
@@ -428,7 +440,8 @@ const mapSectionDoc = (doc: DeliverableSectionDoc): PreviewDoc => ({
   annotation_json: doc.annotation_json ?? '[]',
   orgn_img_path: doc.orgn_img_path ?? '',
   draw_img_path: doc.draw_img_path ?? '',
-  updated_at: doc.updated_at ?? ''
+  updated_at: doc.updated_at ?? '',
+  sortOrder: doc.sort_order
 })
 
 // 카테고리 트리 구성
@@ -447,7 +460,8 @@ const buildCategoriesFromStructure = (
       id: String(section.id),
       name: section.name,
       docs: [],
-      children: []
+      children: [],
+      sortOrder: section.sort_order
     })
   })
 
@@ -466,6 +480,30 @@ const buildCategoriesFromStructure = (
   return attach(null)
 }
 
+const getOrder = (item: { sortOrder?: number }, fallback: number): number => item.sortOrder ?? fallback
+
+const getOrderedCategoryItems = (category: PreviewSection): OrderedPreviewItem[] => {
+  const docOrders = new Set(category.docs.map((item) => item.sortOrder))
+  const hasOverlappingOrders = category.children.some(
+    (item) => item.sortOrder !== undefined && docOrders.has(item.sortOrder)
+  )
+
+  return [
+    ...category.docs.map((item, index) => ({
+      type: 'doc' as const,
+      item,
+      order: getOrder(item, index + 1)
+    })),
+    ...category.children.map((item, index) => ({
+      type: 'category' as const,
+      item,
+      order: hasOverlappingOrders
+        ? category.docs.length + index + 1
+        : getOrder(item, category.docs.length + index + 1)
+    }))
+  ].sort((left, right) => left.order - right.order)
+}
+
 // 카테고리 ID 수집
 const collectCategoryIds = (categoryList: PreviewSection[]): string[] =>
   categoryList.flatMap((category) => [category.id, ...collectCategoryIds(category.children)])
@@ -479,10 +517,11 @@ const collectPreviewEntries = (
   const phaseTitles = [...parentTitles, category.name]
   const phase = phaseTitles.join(' / ')
 
-  return [
-    ...category.docs.map((item) => ({ item, phase, depth })),
-    ...category.children.flatMap((child) => collectPreviewEntries(child, phaseTitles, depth + 1))
-  ]
+  return getOrderedCategoryItems(category).flatMap((entry) =>
+    entry.type === 'doc'
+      ? [{ item: entry.item, phase, depth }]
+      : collectPreviewEntries(entry.item, phaseTitles, depth + 1)
+  )
 }
 
 const flatItems = computed(() =>
@@ -507,18 +546,21 @@ const collectPreviewOutlineRows = (
 
   return [
     categoryRow,
-    ...category.docs.map<PreviewOutlineRow>((item) => ({
-      id: `item-${item.doc_id}-${item.placement_id}`,
-      kind: 'item',
-      entry: {
-        item,
-        phase: phaseTitles.join(' / '),
-        depth
-      },
-      depth
-    })),
-    ...category.children.flatMap((child) =>
-      collectPreviewOutlineRows(child, phaseTitles, depth + 1)
+    ...getOrderedCategoryItems(category).flatMap<PreviewOutlineRow>((entry) =>
+      entry.type === 'doc'
+        ? [
+            {
+              id: `item-${entry.item.doc_id}-${entry.item.placement_id}`,
+              kind: 'item',
+              entry: {
+                item: entry.item,
+                phase: phaseTitles.join(' / '),
+                depth
+              },
+              depth
+            }
+          ]
+        : collectPreviewOutlineRows(entry.item, phaseTitles, depth + 1)
     )
   ]
 }

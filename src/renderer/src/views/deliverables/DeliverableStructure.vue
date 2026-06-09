@@ -494,6 +494,17 @@ const isDoneStructureItem = (item: SectionDocInput): boolean => item.status === 
 const sortDocsBySortOrder = (docs: Doc[]): Doc[] =>
   [...docs].sort((left, right) => left.sort_order - right.sort_order || left.id - right.id)
 
+const getWorkspaceCreatedTime = (workspace: Workspace): number => {
+  const createdTime = new Date(workspace.created_at).getTime()
+  return Number.isFinite(createdTime) ? createdTime : 0
+}
+
+const sortWorkspacesByCreatedAt = (workspaces: Workspace[]): Workspace[] =>
+  [...workspaces].sort(
+    (left, right) =>
+      getWorkspaceCreatedTime(left) - getWorkspaceCreatedTime(right) || left.id - right.id
+  )
+
 // DB 문서를 산출물 배치용 문서로 변환
 const mapDocToStructureItem = (doc: Doc): SectionDocInput => ({
   doc_id: String(doc.id),
@@ -519,7 +530,8 @@ const buildCategoriesFromStructure = (
       id: String(section.id),
       name: section.name,
       docs: [],
-      children: []
+      children: [],
+      sortOrder: section.sort_order
     })
   })
 
@@ -535,7 +547,8 @@ const buildCategoriesFromStructure = (
         kind: 'document',
         doc_title: doc.title,
         meta: '',
-        status: doc.status ?? ''
+        status: doc.status ?? '',
+        sortOrder: doc.sort_order
       }))
       category.children = attach(section.id)
       return category
@@ -677,7 +690,8 @@ const createDefaultRootCategory = (): SectionTreeInput => ({
   id: createCategoryId(),
   name: '1. 새 카테고리',
   docs: [],
-  children: []
+  children: [],
+  sortOrder: 1
 })
 
 const filteredCategories = computed(() => categories.value)
@@ -745,10 +759,27 @@ const findItemList = (
   return undefined
 }
 
+const normalizeCategoryOrder = (category: SectionTreeInput): void => {
+  const orderedItems = [
+    ...category.docs.map((item, index) => ({
+      item,
+      order: item.sortOrder ?? index + 1
+    })),
+    ...category.children.map((item, index) => ({
+      item,
+      order: item.sortOrder ?? category.docs.length + index + 1
+    }))
+  ]
+
+  orderedItems.sort((left, right) => left.order - right.order).forEach(({ item }, index) => {
+    item.sortOrder = index + 1
+  })
+}
+
 // 하위 카테고리 기본 제목 생성
 const getDefaultChildCategoryTitle = (parentId: string): string => {
   const parent = findCategory(parentId)
-  const nextOrder = (parent?.children.length ?? 0) + 1
+  const nextOrder = (parent ? parent.docs.length + parent.children.length : 0) + 1
   const parentCode = parent ? getCategoryCode(parent.name) : ''
   const childDepth = getCategoryDepth(parentId) + 1
   const childLabel = getCategoryOrderLabel(childDepth, nextOrder)
@@ -880,7 +911,12 @@ const submitNewCategory = (): void => {
     id: createCategoryId(),
     name: title,
     docs: [],
-    children: []
+    children: [],
+    sortOrder: addingCategoryParentId.value
+      ? (findCategory(addingCategoryParentId.value)?.docs.length ?? 0) +
+        (findCategory(addingCategoryParentId.value)?.children.length ?? 0) +
+        1
+      : categories.value.length + 1
   }
 
   if (addingCategoryParentId.value) {
@@ -1099,7 +1135,9 @@ const loadProjectWorkspaces = async (): Promise<void> => {
   isLoadingWorkspaces.value = true
 
   try {
-    const workspaceRows = await getWorkspaces({ project_id: projectId, limit: 100, offset: 0 })
+    const workspaceRows = sortWorkspacesByCreatedAt(
+      await getWorkspaces({ project_id: projectId, limit: 100, offset: 0 })
+    )
     const workspaceDocs = await Promise.all(
       workspaceRows.map(async (workspace) => ({
         workspace,
@@ -1233,18 +1271,27 @@ const onCategoryNodeItemAdd = async (categoryId: string, event: DragAddEvent): P
 
   await nextTick()
 
-  const targetItems = findCategory(categoryId)?.docs
+  const targetCategory = findCategory(categoryId)
+  const targetItems = targetCategory?.docs
   if (!targetItems) return
 
-  if (expandWorkspaceBundle(categoryId, targetItems, event.newIndex)) return
+  const mixedOrder = event.newIndex + 1
+  const itemIndex = targetItems.findIndex((item) => item.sortOrder === mixedOrder)
+  const targetItemIndex = itemIndex >= 0 ? itemIndex : event.newIndex
 
-  const addedItem = targetItems[event.newIndex]
+  if (expandWorkspaceBundle(categoryId, targetItems, targetItemIndex)) {
+    if (targetCategory) normalizeCategoryOrder(targetCategory)
+    return
+  }
+
+  const addedItem = targetItems[targetItemIndex]
   const rootCategory = findRootCategory(categoryId)
   if (!addedItem || !rootCategory) return
 
   if (countItemsInCategory(getOriginalItemId(addedItem.doc_id), rootCategory) <= 1) return
 
-  targetItems.splice(event.newIndex, 1)
+  targetItems.splice(targetItemIndex, 1)
+  if (targetCategory) normalizeCategoryOrder(targetCategory)
   showToast(`'${addedItem.doc_title}'은(는) 해당 카테고리에 이미 존재합니다.`)
 }
 

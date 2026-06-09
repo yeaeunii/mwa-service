@@ -140,7 +140,9 @@
                                     {{ item.number }}
                                   </span>
                                 </td>
-                                <td class="break-all border border-slate-300 px-3 py-3 text-sm">
+                                <td
+                                  class="whitespace-pre-line break-all border border-slate-300 px-3 py-3 text-sm"
+                                >
                                   {{ item.text || '작성된 기능 설명이 없습니다' }}
                                 </td>
                               </tr>
@@ -237,7 +239,7 @@
                             <i-lucide-pencil class="h-5 w-5" />
                           </span>
                           <span class="text-sm font-semibold drop-shadow">
-                            클릭 후 화면 구성을 편집해주세요
+                            클릭 후 캡처 이미지를 편집해주세요
                           </span>
                         </router-link>
                       </div>
@@ -257,7 +259,7 @@
                             {{ item.number }}
                           </div>
                           <div class="min-w-0 flex-1 pt-0.5">
-                            <div class="break-all text-sm font-medium leading-relaxed">
+                            <div class="whitespace-pre-line break-all text-sm font-medium leading-relaxed">
                               {{ item.text || '기능 설명이 없습니다' }}
                             </div>
                           </div>

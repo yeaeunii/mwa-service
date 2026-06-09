@@ -205,7 +205,14 @@ const isDrawingTool = (tool: ToolMode): boolean =>
 
 const syncCanvasSelectionMode = (): void => {
   if (!canvas) return
-  canvas.selection = !isDrawingTool(props.activeTool)
+  const isDrawing = isDrawingTool(props.activeTool)
+  canvas.selection = !isDrawing
+  canvas.skipTargetFind = isDrawing
+
+  if (isDrawing) {
+    canvas.discardActiveObject()
+    clearSel()
+  }
 }
 
 // 선택 해제
@@ -1162,19 +1169,14 @@ const setupCanvas = (): void => {
 
     closeAnnotationContextMenu()
 
-    if (target) {
-      if (mouseEvent.ctrlKey && target.annotationId) {
-        startCloneDrag(target)
-      }
-      return
-    }
-
     const pointer = canvas.getScenePoint(event.e)
 
     if (props.activeTool === 'number') {
       const nextNumber = getNextNumber()
       const annotationId = `ann-${Date.now()}`
       pendingSelectAnnotationId = annotationId
+      canvas.discardActiveObject()
+      clearSel()
       emit('add-annotation', {
         id: annotationId,
         toolType: 'number',
@@ -1185,6 +1187,13 @@ const setupCanvas = (): void => {
         y: pointer.y,
         zIndex: props.annotations.length + 1
       })
+      return
+    }
+
+    if (target) {
+      if (mouseEvent.ctrlKey && target.annotationId) {
+        startCloneDrag(target)
+      }
       return
     }
 

@@ -298,7 +298,6 @@ const goToWorkspace = async (projectId: string): Promise<void> => {
 // 프로젝트 조회
 const loadProjects = async (): Promise<void> => {
   const rows = await getProjects({ limit: -1, offset: 0 })
-  console.log('loaded rows:', rows)
   projects.value = rows
     .map(mapProjectToCard)
     .sort((left, right) => right.createdTime - left.createdTime)
@@ -451,7 +450,6 @@ const onSubmitProject = async (payload: {
   })
   if (projectId === null) return
 
-  console.log('created projectId:', projectId)
   await loadProjects()
   await goToWorkspace(String(projectId))
 }

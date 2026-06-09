@@ -84,7 +84,7 @@
           v-model="projectName"
           type="text"
           class="input input-bordered h-12 w-full rounded-xl border-slate-200 bg-slate-50 text-slate-800 shadow-none outline-none focus:border-blue-400 focus:outline-none"
-          placeholder="예: 시스템 매뉴얼"
+          placeholder="ex) 시스템 매뉴얼"
         />
       </label>
 

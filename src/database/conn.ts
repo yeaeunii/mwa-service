@@ -15,8 +15,6 @@ export const initDatabase = (): Database => {
   const dbDir = dirname(dbPath)
   const isNewDatabase = !existsSync(dbPath)
 
-  console.log('dbPath', dbPath)
-
   if (!existsSync(dbDir)) {
     mkdirSync(dbDir, { recursive: true })
   }

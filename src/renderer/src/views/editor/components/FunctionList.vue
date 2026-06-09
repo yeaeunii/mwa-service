@@ -34,7 +34,7 @@
         <button
           v-if="editingItemId !== item.id"
           type="button"
-          class="function-preview h-12 w-full rounded-md bg-base-200/50 px-2 py-1.5 text-left text-sm leading-6 text-base-content/80 transition-colors hover:bg-base-200/70"
+          class="function-preview h-14 w-full rounded-md bg-base-200/50 px-2 py-1.5 text-left text-sm leading-5 text-base-content/80 transition-colors hover:bg-base-200/70"
           :class="!item.content ? 'text-base-content/30' : ''"
           @click="openEditor(item.id)"
         >

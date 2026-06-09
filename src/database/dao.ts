@@ -2272,11 +2272,12 @@ export const saveDeliverableStructure = (params: {
 
     const insertCategories = (sections: SectionTreeInput[], parentId: number | null): void => {
       sections.forEach((section, sectionIndex) => {
+        const sectionSortOrder = parentId === null ? sectionIndex + 1 : (section.sortOrder ?? sectionIndex + 1)
         const result = insertSection.run({
           deliverableId: params.deliverableId,
           parentId,
           name: section.name,
-          sortOrder: sectionIndex + 1,
+          sortOrder: sectionSortOrder,
           created_at: now,
           updated_at: now
         })
@@ -2291,7 +2292,7 @@ export const saveDeliverableStructure = (params: {
           insertSectionDoc.run({
             sectionId,
             docId,
-            sortOrder: docIndex + 1,
+            sortOrder: doc.sortOrder ?? docIndex + 1,
             created_at: now
           })
         })

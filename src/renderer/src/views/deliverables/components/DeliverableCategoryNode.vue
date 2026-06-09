@@ -1,7 +1,7 @@
 <template>
   <div class="min-w-0">
     <div
-      class="category-handle relative flex h-9 min-w-0 cursor-grab items-center gap-2 border border-indigo-200 bg-indigo-100/80 px-2 text-indigo-950"
+      class="category-handle structure-drag-handle relative flex h-9 min-w-0 cursor-grab items-center gap-2 border border-indigo-200 bg-indigo-100/80 px-2 text-indigo-950"
       @click.stop
       @contextmenu.prevent.stop="$emit('open-menu', $event, getCategoryTarget(category))"
     >
@@ -65,95 +65,87 @@
 
     <VueDraggable
       v-if="isExpanded"
-      :model-value="category.docs"
+      :model-value="mixedItems"
       :animation="180"
-      :group="categoryGroup"
-      item-key="doc_id"
+      :group="mixedGroup"
+      handle=".structure-drag-handle"
+      item-key="key"
       class="ml-5 min-w-0 overflow-hidden border-l-2 border-indigo-200/60 pl-3"
       :class="{
-        'min-h-2 border-b border-dashed border-slate-200/50 py-0.5': !category.docs.length
+        'min-h-2 border-b border-dashed border-slate-200/50 py-0.5': !mixedItems.length
       }"
-      @update:model-value="$emit('update-items', category.id, $event)"
-      @add="$emit('item-add', category.id, $event)"
+      @update:model-value="updateMixedItems"
+      @add="emit('item-add', category.id, $event)"
     >
-      <div
-        v-for="item in category.docs"
-        :key="item.doc_id"
-        class="relative flex h-7 w-full min-w-0 max-w-full items-center gap-2 overflow-hidden border-b border-slate-200 px-2 text-slate-950"
-        :class="
-          isSelectedDoc(item) ? 'border-l-4 border-yellow-200 bg-yellow-50 text-yellow-950' : ''
-        "
-        @click.stop
-        @contextmenu.prevent.stop="$emit('open-menu', $event, getItemTarget(item))"
-      >
-        <form
-          v-if="isEditing('item', item.doc_id)"
-          class="flex min-w-0 flex-1 items-center gap-2"
-          @submit.prevent="$emit('submit-edit')"
+      <template v-for="mixedItem in mixedItems" :key="mixedItem.key">
+        <div
+          v-if="mixedItem.type === 'doc'"
+          class="structure-drag-handle relative flex h-7 w-full min-w-0 max-w-full cursor-grab items-center gap-2 overflow-hidden border-b border-slate-200 px-2 text-slate-950"
+          :class="
+            isSelectedDoc(mixedItem.item)
+              ? 'border-l-4 border-yellow-200 bg-yellow-50 text-yellow-950'
+              : ''
+          "
+          @click.stop
+          @contextmenu.prevent.stop="$emit('open-menu', $event, getItemTarget(mixedItem.item))"
         >
-          <input
-            :value="editTitle"
-            type="text"
-            class="input input-xs input-bordered min-w-0 flex-1"
-            autofocus
-            @input="$emit('update:edit-title', ($event.target as HTMLInputElement).value)"
-          />
-          <button type="submit" class="btn btn-primary btn-xs btn-square">
-            <i-lucide-check class="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            class="btn btn-ghost btn-xs btn-square"
-            @click="$emit('cancel-edit')"
+          <form
+            v-if="isEditing('item', mixedItem.item.doc_id)"
+            class="flex min-w-0 flex-1 items-center gap-2"
+            @submit.prevent="$emit('submit-edit')"
           >
-            <i-lucide-x class="h-3.5 w-3.5" />
-          </button>
-        </form>
-        <template v-else>
-          <i-fluent-document-bullet-list-20-filled
-            class="h-3.5 w-3.5 shrink-0 text-base-content/45"
-          />
-          <span class="block min-w-0 flex-1 basis-0 truncate text-xs font-semibold">
-            {{ getDocumentTitle(item) }}
-          </span>
-        </template>
-      </div>
-    </VueDraggable>
+            <input
+              :value="editTitle"
+              type="text"
+              class="input input-xs input-bordered min-w-0 flex-1"
+              autofocus
+              @input="$emit('update:edit-title', ($event.target as HTMLInputElement).value)"
+            />
+            <button type="submit" class="btn btn-primary btn-xs btn-square">
+              <i-lucide-check class="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              class="btn btn-ghost btn-xs btn-square"
+              @click="$emit('cancel-edit')"
+            >
+              <i-lucide-x class="h-3.5 w-3.5" />
+            </button>
+          </form>
+          <template v-else>
+            <i-fluent-document-bullet-list-20-filled
+              class="h-3.5 w-3.5 shrink-0 text-base-content/45"
+            />
+            <span class="block min-w-0 flex-1 basis-0 truncate text-xs font-semibold">
+              {{ getDocumentTitle(mixedItem.item) }}
+            </span>
+          </template>
+        </div>
 
-    <VueDraggable
-      v-if="isExpanded"
-      :model-value="category.children"
-      :animation="180"
-      :group="categoryTreeGroup"
-      handle=".category-handle"
-      item-key="id"
-      class="ml-5 min-w-0 overflow-hidden border-l-2 border-indigo-200/60 pl-3"
-      @update:model-value="$emit('update-children', category.id, $event)"
-    >
-      <DeliverableCategoryNode
-        v-for="child in category.children"
-        :key="child.id"
-        v-model:new-category-title="newCategoryTitleProxy"
-        v-model:edit-title="editTitleProxy"
-        :category="child"
-        :category-group="categoryGroup"
-        :category-tree-group="categoryTreeGroup"
-        :is-adding-category="isAddingCategory"
-        :adding-category-parent-id="addingCategoryParentId"
-        :is-category-expanded="isCategoryExpanded"
-        :is-editing="isEditing"
-        :selected-original-doc-id="selectedOriginalDocId"
-        :depth="depth + 1"
-        @open-menu="(event, target) => $emit('open-menu', event, target)"
-        @toggle-category="$emit('toggle-category', $event)"
-        @submit-new-category="$emit('submit-new-category')"
-        @cancel-add="$emit('cancel-add')"
-        @submit-edit="$emit('submit-edit')"
-        @cancel-edit="$emit('cancel-edit')"
-        @update-children="(categoryId, children) => $emit('update-children', categoryId, children)"
-        @update-items="(categoryId, items) => $emit('update-items', categoryId, items)"
-        @item-add="(categoryId, event) => $emit('item-add', categoryId, event)"
-      />
+        <DeliverableCategoryNode
+          v-else
+          v-model:new-category-title="newCategoryTitleProxy"
+          v-model:edit-title="editTitleProxy"
+          :category="mixedItem.item"
+          :category-group="categoryGroup"
+          :category-tree-group="categoryTreeGroup"
+          :is-adding-category="isAddingCategory"
+          :adding-category-parent-id="addingCategoryParentId"
+          :is-category-expanded="isCategoryExpanded"
+          :is-editing="isEditing"
+          :selected-original-doc-id="selectedOriginalDocId"
+          :depth="depth + 1"
+          @open-menu="(event, target) => $emit('open-menu', event, target)"
+          @toggle-category="$emit('toggle-category', $event)"
+          @submit-new-category="$emit('submit-new-category')"
+          @cancel-add="$emit('cancel-add')"
+          @submit-edit="$emit('submit-edit')"
+          @cancel-edit="$emit('cancel-edit')"
+          @update-children="(categoryId, children) => $emit('update-children', categoryId, children)"
+          @update-items="(categoryId, items) => $emit('update-items', categoryId, items)"
+          @item-add="(categoryId, event) => $emit('item-add', categoryId, event)"
+        />
+      </template>
     </VueDraggable>
   </div>
 </template>
@@ -173,6 +165,18 @@ interface ActionTarget {
 interface DragAddEvent {
   newIndex?: number
 }
+
+type MixedItem =
+  | {
+      type: 'doc'
+      key: string
+      item: SectionDocInput
+    }
+  | {
+      type: 'category'
+      key: string
+      item: SectionTreeInput
+    }
 
 defineOptions({
   name: 'DeliverableCategoryNode'
@@ -218,6 +222,45 @@ const editTitleProxy = computed({
 
 const isExpanded = computed(() => props.isCategoryExpanded(props.category.id))
 
+const getOrder = (item: { sortOrder?: number }, fallback: number): number => item.sortOrder ?? fallback
+
+const mixedGroup = computed(() => ({
+  ...props.categoryTreeGroup,
+  put: [props.categoryTreeGroup.name, props.categoryGroup.name]
+}))
+
+const mixedItems = computed<MixedItem[]>(() =>
+  {
+    const docOrders = new Set(props.category.docs.map((item) => item.sortOrder))
+    const hasOverlappingOrders = props.category.children.some(
+      (item) => item.sortOrder !== undefined && docOrders.has(item.sortOrder)
+    )
+
+    return [
+      ...props.category.docs.map((item, index) => ({
+        type: 'doc' as const,
+        key: `doc-${item.doc_id}`,
+        item,
+        order: getOrder(item, index + 1)
+      })),
+      ...props.category.children.map((item, index) => ({
+        type: 'category' as const,
+        key: `category-${item.id}`,
+        item,
+        order: hasOverlappingOrders
+          ? props.category.docs.length + index + 1
+          : getOrder(item, props.category.docs.length + index + 1)
+      }))
+    ]
+      .sort((left, right) => left.order - right.order)
+      .map((item) =>
+        item.type === 'doc'
+          ? { type: 'doc', key: item.key, item: item.item }
+          : { type: 'category', key: item.key, item: item.item }
+      )
+  }
+)
+
 const getOriginalItemId = (itemId: string): string => itemId.split('-copy-')[0]
 
 const getDocumentTitle = (item: SectionDocInput): string =>
@@ -237,4 +280,46 @@ const getItemTarget = (item: SectionDocInput): ActionTarget => ({
   id: item.doc_id,
   title: item.doc_title
 })
+
+const isMixedItem = (item: unknown): item is MixedItem => {
+  if (!item || typeof item !== 'object') return false
+  return 'type' in item && (item.type === 'doc' || item.type === 'category') && 'item' in item
+}
+
+const isCategoryItem = (item: unknown): item is SectionTreeInput => {
+  if (!item || typeof item !== 'object') return false
+  return 'children' in item && 'docs' in item && 'name' in item
+}
+
+const isDocumentItem = (item: unknown): item is SectionDocInput => {
+  if (!item || typeof item !== 'object') return false
+  return 'doc_id' in item && 'doc_title' in item
+}
+
+const normalizeMixedItem = (item: unknown): MixedItem | null => {
+  if (isMixedItem(item)) return item
+  if (isCategoryItem(item)) return { type: 'category', key: `category-${item.id}`, item }
+  if (isDocumentItem(item)) return { type: 'doc', key: `doc-${item.doc_id}`, item }
+  return null
+}
+
+const updateMixedItems = (items: unknown[]): void => {
+  const docs: SectionDocInput[] = []
+  const children: SectionTreeInput[] = []
+
+  items.forEach((rawItem, index) => {
+    const mixedItem = normalizeMixedItem(rawItem)
+    if (!mixedItem) return
+
+    mixedItem.item.sortOrder = index + 1
+    if (mixedItem.type === 'doc') {
+      docs.push(mixedItem.item)
+    } else {
+      children.push(mixedItem.item)
+    }
+  })
+
+  emit('update-items', props.category.id, docs)
+  emit('update-children', props.category.id, children)
+}
 </script>

@@ -106,6 +106,7 @@ export interface SectionDocInput {
   kind: 'workspace' | 'document'
   meta: string
   status?: string
+  sortOrder?: number
 }
 
 export interface SectionTreeInput {
@@ -113,4 +114,5 @@ export interface SectionTreeInput {
   name: string
   docs: SectionDocInput[]
   children: SectionTreeInput[]
+  sortOrder?: number
 }

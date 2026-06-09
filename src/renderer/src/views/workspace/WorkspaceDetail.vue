@@ -686,11 +686,39 @@ const loadWorkspaceList = async (): Promise<void> => {
     return
   }
 
-  workspaceList.value = await getWorkspaces({
+  workspaceList.value = sortWorkspacesByCreatedAt(
+    await getWorkspaces({
+      project_id: projectId.value,
+      limit: 100,
+      offset: 0
+    })
+  )
+}
+
+const getWorkspaceCreatedTime = (workspace: Workspace): number => {
+  const createdTime = new Date(workspace.created_at).getTime()
+  return Number.isFinite(createdTime) ? createdTime : 0
+}
+
+const sortWorkspacesByCreatedAt = (workspaces: Workspace[]): Workspace[] =>
+  [...workspaces].sort(
+    (left, right) =>
+      getWorkspaceCreatedTime(left) - getWorkspaceCreatedTime(right) || left.id - right.id
+  )
+
+const loadActionWorkspaces = async (): Promise<void> => {
+  if (projectId.value == null) {
+    actionWorkspaces.value = []
+    return
+  }
+
+  actionWorkspaces.value = sortWorkspacesByCreatedAt(
+    await getWorkspaces({
     project_id: projectId.value,
     limit: 100,
     offset: 0
   })
+  )
 }
 
 const goWorkspace = async (nextId: number, event?: MouseEvent): Promise<void> => {
@@ -1066,11 +1094,7 @@ const openDocAction = async (action: 'copy' | 'move'): Promise<void> => {
   docAction.value = action
   targetWorkspaceId.value = null
   targetWorkspaceMenuOpen.value = false
-  actionWorkspaces.value = await getWorkspaces({
-    project_id: projectId.value,
-    limit: 100,
-    offset: 0
-  })
+  await loadActionWorkspaces()
   actionModalRef.value?.onOpen()
 }
 
@@ -1309,7 +1333,6 @@ watch(workspaceId, () => {
 })
 
 onMounted(() => {
-  console.log('workspaceId:', workspaceId.value)
   updateRelativeNow()
   relativeTimeTimer = setInterval(updateRelativeNow, 60_000)
   loadPage()

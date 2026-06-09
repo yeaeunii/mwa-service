@@ -37,7 +37,7 @@
 
           <div class="mt-5 rounded-md border border-base-300 bg-base-200 p-4">
             <div class="mb-2 text-sm font-black text-primary">화면 개요</div>
-            <p class="text-xs leading-6 text-base-content/80">
+            <p class="whitespace-pre-line text-xs leading-6 text-base-content/80">
               {{ currentDoc?.description || '화면 설명이 없습니다.' }}
             </p>
           </div>
@@ -87,7 +87,7 @@
                   </span>
                 </td>
                 <td class="break-all border border-slate-300 px-3 py-3 text-center align-top">
-                  <p class="whitespace-normal break-all leading-5 text-slate-600">
+                  <p class="whitespace-pre-line break-all leading-5 text-slate-600">
                     {{ item.description }}
                   </p>
                 </td>

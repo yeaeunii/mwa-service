@@ -276,15 +276,6 @@
                       </ul>
                     </div>
                     <button
-                      v-if="downloadStatusById[item.id] === 'done'"
-                      type="button"
-                      class="tooltip tooltip-left btn btn-ghost btn-xs btn-square text-primary hover:bg-primary/10"
-                      data-tip="폴더 열기"
-                      @click.stop="openSavedDownloadFolder(item.id)"
-                    >
-                      <i-lucide-folder-open class="h-4 w-4" />
-                    </button>
-                    <button
                       type="button"
                       class="tooltip tooltip-left btn btn-ghost btn-xs btn-square"
                       data-tip="복사"
@@ -303,6 +294,19 @@
 
     <ModalNewProject ref="modalEditProjectRef" @on-submit="onSubmitEditProject" />
     <ModalNewWorkspace ref="modalNewWorkspaceRef" @on-submit="onSubmitWorkspace" />
+    <ModalBase ref="downloadCompleteModalRef" width="w-80">
+      <div class="py-3 text-center text-sm font-semibold">{{ downloadCompleteMessage }}</div>
+      <template #footer="{ close }">
+        <button class="btn btn-sm min-w-28 gap-1.5" @click="openSavedDownloadFolder">
+          <i-lucide-folder-open class="h-4 w-4" />
+          폴더 열기
+        </button>
+        <button class="btn btn-sm min-w-28" @click="close">
+          <i-lucide-check class="h-4 w-4" />
+          확인
+        </button>
+      </template>
+    </ModalBase>
 
     <ul
       v-if="workspaceContextMenu.visible"
@@ -423,6 +427,7 @@ const onConfirmCallback = ref<(() => void) | null>(null)
 const modalConfirmRef = ref<ComponentRef<'ModalConfirm'> | null>(null)
 const modalEditProjectRef = ref<ComponentRef<'ModalNewProject'> | null>(null)
 const modalNewWorkspaceRef = ref<ComponentRef<'ModalNewWorkspace'> | null>(null)
+const downloadCompleteModalRef = ref<ComponentRef<'ModalBase'> | null>(null)
 const confirmMsgHtml = ref<string>('')
 
 const runConfirmCallback = (): void => {
@@ -441,6 +446,8 @@ const editingDeliverableId = ref<string | null>(null)
 const editingDeliverableTitle = ref('')
 const downloadStatusById = ref<Record<string, 'downloading' | 'done'>>({})
 const savedDownloadPathById = ref<Record<string, string>>({})
+const downloadCompleteMessage = ref('')
+const savedDownloadPath = ref('')
 const {
   contextMenu: workspaceContextMenu,
   selectedItem: selectedWorkspaceContextItem,
@@ -787,6 +794,7 @@ const downloadDeliverable = async (
       [deliverable.id]: result.filePath
     }
     setDownloadStatus(deliverable.id, 'done')
+    showDownloadComplete('산출물 내보내기가 완료되었습니다.', result.filePath)
   } catch (error) {
     console.error('Failed to download deliverable:', error)
     setDownloadStatus(deliverable.id, undefined)
@@ -829,12 +837,18 @@ const saveManualPdf = async (
   })) as ExportResult
 }
 
-// 마지막 저장 파일 위치를 파일 탐색기에서 표시
-const openSavedDownloadFolder = (id: string): void => {
-  const filePath = savedDownloadPathById.value[id]
-  if (!filePath) return
+const showDownloadComplete = (message: string, filePath: string): void => {
+  downloadCompleteMessage.value = message
+  savedDownloadPath.value = filePath
+  downloadCompleteModalRef.value?.onOpen()
+}
 
-  void window.api.invoke('shell:showItemInFolder', filePath)
+// 마지막 저장 파일 위치를 파일 탐색기에서 표시
+const openSavedDownloadFolder = (): void => {
+  if (!savedDownloadPath.value) return
+
+  void window.api.invoke('shell:showItemInFolder', savedDownloadPath.value)
+  downloadCompleteModalRef.value?.onClose()
 }
 
 // 산출물 이름 수정 시작
