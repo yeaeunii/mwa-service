@@ -1,6 +1,6 @@
-@import './fonts/Pretendard/pretendardvariable.css';
+@import './fonts/Pretendard/variable/pretendardvariable.css';
 
 body {
   min-height: 100vh;
-  font-family: 'Pretendard', 'Malgun Gothic', 'Segoe UI', sans-serif;
+  font-family: 'Pretendard Variable', 'Pretendard', 'Malgun Gothic', 'Segoe UI', sans-serif;
 }

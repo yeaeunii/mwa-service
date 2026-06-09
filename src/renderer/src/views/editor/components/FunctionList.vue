@@ -16,7 +16,7 @@
       <span class="badge badge-primary badge-soft badge-sm">{{ localItems.length }}개</span>
     </div>
 
-    <div ref="funcListRef" class="flex-1 space-y-3 overflow-y-auto bg-base-200/40 p-3.5">
+    <div ref="funcListRef" class="flex-1 space-y-3 overflow-y-auto bg-slate-50 p-3.5">
       <div
         v-for="item in localItems"
         :key="item.id"
@@ -34,7 +34,7 @@
         <button
           v-if="editingItemId !== item.id"
           type="button"
-          class="function-preview h-14 w-full rounded-md bg-base-200/50 px-2 py-1.5 text-left text-sm leading-5 text-base-content/80 transition-colors hover:bg-base-200/70"
+          class="function-preview h-10 w-full rounded-md bg-base-200/50 px-2 py-1.5 text-left text-sm leading-7 text-base-content/80 transition-colors hover:bg-base-200/70"
           :class="!item.content ? 'text-base-content/30' : ''"
           @click="openEditor(item.id)"
         >
@@ -145,11 +145,8 @@ useDraggable(funcListRef, localItems, {
 
 <style scoped>
 .function-preview {
-  display: -webkit-box;
   overflow: hidden;
-  overflow-wrap: anywhere;
-  word-break: break-all;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

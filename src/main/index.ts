@@ -11,7 +11,6 @@ import {
 } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
 import { initDatabase, closeDatabase } from '../database/conn'
 import * as DAO from '../database/dao'
@@ -26,6 +25,8 @@ import { Readable } from 'stream'
 import { randomBytes } from 'crypto'
 
 const IMG_SCHEME = 'appimg'
+const APP_TITLE = 'MWA'
+const USER_DATA_DIR_NAME = 'miso-mwa-electron'
 
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.m4v', '.webm', '.mov'])
 
@@ -319,11 +320,12 @@ protocol.registerSchemesAsPrivileged([
 function createWindow(): void {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
+    title: APP_TITLE,
     width: 900,
     height: 670,
     show: false,
     autoHideMenuBar: true,
-    ...(process.platform === 'linux' ? { icon } : {}),
+    icon,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -332,7 +334,13 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
+    mainWindow.setTitle(APP_TITLE)
     mainWindow.show()
+  })
+
+  mainWindow.on('page-title-updated', (event) => {
+    event.preventDefault()
+    mainWindow.setTitle(APP_TITLE)
   })
 
   mainWindow.webContents.on('did-attach-webview', (_event, guestContents) => {
@@ -378,6 +386,8 @@ function unregisterShortcut(keyset: string): void {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
+  app.setPath('userData', path.join(app.getPath('appData'), USER_DATA_DIR_NAME))
+
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 
@@ -836,20 +846,6 @@ app.whenReady().then(() => {
   })
 
   createWindow()
-
-  // Auto updater events
-  autoUpdater.on('update-available', () => {
-    BrowserWindow.getAllWindows()[0]?.webContents.send('update:available')
-  })
-
-  autoUpdater.on('update-downloaded', () => {
-    BrowserWindow.getAllWindows()[0]?.webContents.send('update:downloaded')
-  })
-
-  // Check for updates in production
-  if (!is.dev) {
-    autoUpdater.checkForUpdates()
-  }
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the

@@ -237,7 +237,7 @@ h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 1
 .function-table { width: 100%; table-layout: fixed; border-collapse: collapse; border: 1px solid #cbd5e1; font-size: 12px; }
 .function-table th { border: 1px solid #cbd5e1; background: #eef2f7; color: #1f3554; padding: 8px 12px; text-align: center; }
 .function-table th:first-child { width: 64px; text-align: center; }
-.function-table td { border: 1px solid #cbd5e1; padding: 12px; text-align: center; vertical-align: top; overflow-wrap: anywhere; word-break: break-all; white-space: pre-line; }
+.function-table td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: center; vertical-align: middle; overflow-wrap: anywhere; word-break: break-all; }
 .function-table td:first-child { text-align: center; }
 .function-table span { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 999px; color: #fff; font-size: 11px; font-weight: 700; }
 .function-table p { margin: 0; line-height: 1.6; color: #475569; text-align: center; overflow-wrap: anywhere; word-break: break-all; white-space: pre-line; }

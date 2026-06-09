@@ -1,5 +1,5 @@
 appId: com.electron.miso-mwa-electron
-productName: miso-mwa-electron
+productName: MISO-MWA
 directories:
   buildResources: build
 files:
@@ -14,7 +14,7 @@ asarUnpack:
 win:
   executableName: miso-mwa-electron
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
+  artifactName: ${name}-${version}.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
@@ -38,6 +38,3 @@ linux:
 appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
-publish:
-  provider: generic
-  url: https://example.com/auto-updates
