@@ -12,6 +12,7 @@ files:
 asarUnpack:
   - resources/**
 win:
+  icon: build/icon.ico
   executableName: miso-mwa-electron
 nsis:
   artifactName: ${name}-${version}.${ext}

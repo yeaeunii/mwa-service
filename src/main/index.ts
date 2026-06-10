@@ -11,7 +11,7 @@ import {
 } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import icon from '../../resources/icon.png?asset'
+import icon from '../../resources/mwa_icon.png?asset'
 import { initDatabase, closeDatabase } from '../database/conn'
 import * as DAO from '../database/dao'
 import type { ProjectExportData } from '../database/dto'
@@ -321,8 +321,8 @@ function createWindow(): void {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     title: APP_TITLE,
-    width: 900,
-    height: 670,
+    width: 1536,
+    height: 890,
     show: false,
     autoHideMenuBar: true,
     icon,

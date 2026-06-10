@@ -110,6 +110,7 @@
               @add-annotation="addAnnotation"
               @update-annotation="updateAnnotation"
               @remove-annotation="removeAnnotation"
+              @update:active-tool="activeTool = $event"
               @zoom-wheel="onZoomWheel"
             />
             <div

@@ -110,6 +110,7 @@ const emit = defineEmits<{
   'add-annotation': [annotation: CanvasAnnotation]
   'update-annotation': [annotation: CanvasAnnotation]
   'remove-annotation': [annotationId: string]
+  'update:active-tool': [tool: ToolMode]
   'open-context-menu': [
     payload: {
       annotationId: string
@@ -1247,6 +1248,7 @@ const setupCanvas = (): void => {
     drawing = false
     pendingSelectAnnotationId = annotationId
     emit('add-annotation', nextAnnotation)
+    emit('update:active-tool', null)
   })
 }
 
